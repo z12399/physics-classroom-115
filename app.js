@@ -1,45 +1,419 @@
 'use strict';
-const TOPICS={
-shadow:{name:'光的直進與影子',icon:'◭',group:2,n:'07',subtitle:'移動光源和遮光物，讓影子的大小告訴你光怎麼走。',prompt:'把手往手電筒靠近，牆上的影子會放大還是縮小？可以用直線解釋嗎？',take:'同一均勻介質中，光沿直線傳播。點光源模型下，影子大小由距離比例決定。'},
-measure:{name:'測量與估讀',icon:'⌖',group:1,n:'01',subtitle:'刻度不是答案：移動物件、切換尺規，練習把測量寫完整。',prompt:'同一個物件，換一把刻度更細的尺，記錄的位數為什麼可能改變？',take:'測量值包含數值與單位。估讀不是亂猜，而是在最小刻度之間做合理判斷。'},
-density:{name:'密度與浮沉',icon:'▧',group:1,n:'02',subtitle:'質量與體積一起看，才知道物體為什麼浮起來。',prompt:'把同一種材料切成兩半，質量變小了，密度也會變小嗎？',take:'密度是質量除以體積；均勻物體在同一液體中的浮沉，取決於平均密度的比較。'},
-matter:{name:'物質與粒子',icon:'⠿',group:1,n:'03',subtitle:'從粒子種類與組合，分清元素、化合物和混合物。',prompt:'氧氣的每個分子有兩顆原子，為什麼仍然是元素？空氣又為什麼不是化合物？',take:'元素看原子種類，純物質看物質種類。「顆數多」不等於「種類多」。'},
-solution:{name:'水溶液與溶解度',icon:'◒',group:1,n:'04',subtitle:'加更多溶質，不一定全溶解；分清投入量、溶解量與濃度。',prompt:'飽和後再加固體，杯底的固體變多，上層溶液濃度一定變大嗎？',take:'質量百分濃度的分母是溶液質量，不含未溶固體。固定溫度下，飽和濃度固定。'},
-wave:{name:'波動與波速',icon:'∿',group:1,n:'05',subtitle:'看波形向前走，也看介質的一個點到底怎麼動。',prompt:'波往右前進，標記的介質點也會一路跟著往右嗎？固定波速時，頻率加倍會怎樣？',take:'波傳遞能量；此橫波模型的介質點只上下振動。波速 v＝fλ。'},
-sound:{name:'聲音與回聲',icon:'◖',group:1,n:'06',subtitle:'用疏密波看聲音，用往返路程理解回聲。',prompt:'聽到回聲經過0.6秒，聲音走的是你到牆壁的距離，還是兩倍？',take:'聲音在空氣中是縱波。音調主要對應頻率，響度與振幅等因素有關；回聲路程是往返。'},
-mirror:{name:'反射與平面鏡',icon:'◱',group:2,n:'08',subtitle:'讓光線說明：看似在鏡後的影像，光真的走到那裡了嗎？',prompt:'物體朝鏡面靠近10公分，物體和像之間的距離會縮短多少？',take:'平面鏡像與物體等大、正立；物距等於像距。鏡後延長線的交點是虛像。'},
-refraction:{name:'折射與全反射',icon:'⌁',group:2,n:'09',subtitle:'拖動入射角，觀察光穿過兩種介質時的方向改變。',prompt:'光進入水中一定偏折嗎？從水到空氣時，入射角一直加大，又會發生什麼事？',take:'角度從法線量起。垂直入射方向不變；由高折射率到低折射率，才可能全反射。'},
-lens:{name:'透鏡與成像',icon:'◠',group:2,n:'10',subtitle:'把物體移過焦點，看實像、虛像與大小如何一起改變。',prompt:'凸透鏡一定把物體放大嗎？物體放在焦點上時，為什麼接不到有限距離的清晰像？',take:'先畫光路，再說明成像。凸透鏡的成像取決於物距；凹透鏡對實物形成正立縮小虛像。'},
-color:{name:'光與顏色',icon:'◉',group:2,n:'11',subtitle:'疊加紅、綠、藍光，看看「混在一起」為什麼可以變亮。',prompt:'紅光加綠光為什麼可以看到黃光？這跟把紅、綠顏料混合一樣嗎？',take:'光的加色與顏料的減色不同。螢幕上的RGB混光是色彩示意，不是光譜儀。'}
+/* 八年級理化互動實驗室：每個單元 = 狀態 + 控制項 + render(state)。 */
+
+/* ---------- 共用工具 ---------- */
+const P={ink:'#1b2a33',muted:'#6b777e',faint:'#cfc9ba',accent:'#0f766e',orange:'#df7c44',blue:'#4c85bb',red:'#c8553d'};
+const D={ink:'#eaf3ff',muted:'#a6b5cd',object:'#ffcc6a',image:'#bb9bff',ray:'#61ddeb',second:'#ff92bc',third:'#9be38b'};
+const rnd=i=>{const x=Math.sin(i*12.9898+78.233)*43758.5453;return x-Math.floor(x);};
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const num=(n,d=1)=>Number.isFinite(n)?n.toFixed(d):'—';
+const rad=d=>d*Math.PI/180,deg=r=>r*180/Math.PI;
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function T(x,y,s,o={}){const{size=18,fill=P.ink,anchor='start',weight=400}=o;return `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}">${s}</text>`;}
+function L(x1,y1,x2,y2,o={}){const{stroke=P.ink,w=2,dash=false,arrow=false,op=1}=o;return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${w}" stroke-linecap="round"${dash?` stroke-dasharray="${dash===true?'8 7':dash}"`:''}${arrow?' marker-end="url(#arr)"':''} opacity="${op}"/>`;}
+function vArrow(x,y0,y1,c,o={}){const{w=5,dash=false}=o;const dir=y1<=y0?1:-1;return L(x,y0,x,y1,{stroke:c,w,dash})+`<path d="M${x-9} ${y1+dir*14}L${x} ${y1}L${x+9} ${y1+dir*14}" fill="none" stroke="${c}" stroke-width="${w-1}" stroke-linecap="round" stroke-linejoin="round"/>`;}
+/* 可拖曳的把手：虛線圓圈 */
+const handle=(name,x,y,c,r=13)=>`<g class="handle" data-drag="${name}"><circle cx="${x}" cy="${y}" r="${r+12}" fill="transparent"/><circle class="ring" cx="${x}" cy="${y}" r="${r}" fill="${c}" fill-opacity=".16" stroke="${c}" stroke-width="2" stroke-dasharray="4 3"/></g>`;
+const DEFS=`<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="context-stroke"/></marker><clipPath id="stage-clip"><rect x="8" y="8" width="884" height="484" rx="10"/></clipPath></defs>`;
+
+/* ---------- 單元資料 ---------- */
+const SPECIES={
+  O2:{label:'O₂ 氧氣',atoms:['O','O']},N2:{label:'N₂ 氮氣',atoms:['N','N']},H2:{label:'H₂ 氫氣',atoms:['H','H']},
+  He:{label:'He 氦氣',atoms:['He']},H2O:{label:'H₂O 水',atoms:['O','H','H']},CO2:{label:'CO₂ 二氧化碳',atoms:['C','O','O']}};
+const ATOM={H:{r:10,c:'#7fa6d6'},O:{r:15,c:'#df7c44'},N:{r:15,c:'#0f9488'},C:{r:14,c:'#4a5860'},He:{r:12,c:'#a37acc'}};
+const SLOTS=(()=>{const out=[];for(let r=0;r<4;r++)for(let c=0;c<6;c++){const i=r*6+c;out.push([185+c*106+((i*37)%23-11),128+r*84+((i*53)%21-10)]);}const order=[7,16,2,21,11,4,19,13,0,9,22,5,14,1,18,10,23,6,15,3,20,8,12,17];return order.map(i=>out[i]);})();
+const SOLUBILITY={KNO3:{name:'硝酸鉀',data:[13.3,31.6,63.9,110,169,246]},NaCl:{name:'食鹽',data:[35.7,36.0,36.6,37.3,38.4,39.8]}};
+const solubility=(sub,t)=>{const d=SOLUBILITY[sub].data,i=clamp(Math.floor(t/20),0,4),k=(t-i*20)/20;return d[i]+(d[i+1]-d[i])*k;};
+const LIQUIDS=[[0.79,'酒精','#dfe9ee'],[0.92,'沙拉油','#f1d98a'],[1,'水','#bcd9e6'],[1.2,'濃鹽水','#97c1d6']];
+const liquid=v=>LIQUIDS.find(l=>l[0]===v);
+const MEDIA={air:['空氣',1.00,'#14263d'],water:['水',1.33,'#1b4560'],glass:['玻璃',1.50,'#24516b'],diamond:['鑽石',2.42,'#36497a']};
+const TIMBRE={pure:['音叉',[1]],flute:['笛子',[1,.35,.12]],violin:['小提琴',[1,.55,.4,.28,.2,.12]]};
+const SOUND_SPEED={air:'空氣',water:'水',steel:'鋼鐵'};
+const REFLECT={apple:['紅蘋果',[1,0,0]],leaf:['綠葉',[0,1,0]],banana:['黃香蕉',[1,1,0]],paper:['白紙',[1,1,1]],cloth:['黑布',[0,0,0]]};
+const LIGHTS=[['白光',[255,255,255]],['紅',[255,0,0]],['綠',[0,255,0]],['藍',[0,0,255]],['黃',[255,255,0]],['青',[0,255,255]],['洋紅',[255,0,255]],['關燈',[0,0,0]]];
+function colorName(r,g,b){if(Math.max(r,g,b)<40)return '黑';const k=[r,g,b].map(v=>v>=128?1:0).join('');return {'000':'暗色','100':'紅','010':'綠','001':'藍','110':'黃','011':'青','101':'洋紅','111':'白'}[k];}
+
+const LABS={
+/* ===== 01 測量 ===== */
+measure:{group:1,n:'01',name:'測量與估讀',subtitle:'拖動物件或換一把尺，練習讀出完整的測量值。',
+  q:['最小刻度為 0.1 cm 的尺，量到 5.34 cm，最後一位代表什麼？','4 是估讀位。估讀會有合理差異，不是精準知道物體的每一位數；記錄時要估讀到最小刻度的下一位。'],
+  state:{len:5.34,start:0,step:0.1,mag:true,show:false},
+  controls:[
+    {type:'seg',key:'step',label:'尺的最小刻度',options:[[1,'1 cm'],[0.1,'1 mm']]},
+    {type:'range',key:'start',label:'物件起點',min:0,max:3,step:0.5,unit:' cm'},
+    {type:'range',key:'len',label:'物件長度',min:1,max:7,step:0.01,fmt:s=>s.show?s.len.toFixed(2)+' cm':'？'},
+    {type:'toggle',key:'mag',label:'放大鏡'},
+    {type:'toggle',key:'show',label:'顯示參考讀值'}],
+  drag:{end:(p,s)=>{s.len=snap('len',(p.x-90)/72-s.start);},obj:(p,s,c)=>{s.start=snap('start',c.s0.start+(p.x-c.p0.x)/72);}},
+  render(s){
+    const X=c=>90+c*72,end=s.start+s.len,ex=X(end),dg=s.step===1?1:2,n=s.step===1?10:100;
+    let ruler=`<rect x="66" y="250" width="768" height="96" rx="6" fill="#efe3c4" stroke="#d3c49c"/>`;
+    for(let i=0;i<=n;i++){const x=X(i*10/n),major=i%(n/10)===0,half=n===100&&i%5===0;ruler+=L(x,250,x,250+(major?30:half?21:12),{stroke:'#6f6448',w:major?2:1});if(major)ruler+=T(x,322,i/(n/10),{size:18,fill:'#6f6448',anchor:'middle'});}
+    ruler+=T(812,338,'cm',{size:15,fill:'#6f6448'});
+    const obj=`<rect x="${X(s.start)}" y="200" width="${s.len*72}" height="40" rx="5" fill="${P.accent}"/>`+L(ex,190,ex,284,{stroke:P.orange,w:2,dash:'5 4'})+L(X(s.start),190,X(s.start),284,{stroke:P.orange,w:2,dash:'5 4'});
+    let h=ruler+`<g data-drag="obj" class="handle-body">${obj}</g>`+handle('end',ex,220,P.orange);
+    if(s.mag){const mx=clamp(ex,180,720),my=112,r=80;h+=`<clipPath id="mag"><circle cx="${mx}" cy="${my}" r="${r}"/></clipPath><g clip-path="url(#mag)" pointer-events="none"><circle cx="${mx}" cy="${my}" r="${r}" fill="#fbfaf6"/><g transform="translate(${mx} ${my}) scale(3) translate(${-ex} -262)">${ruler}${obj}</g></g><circle cx="${mx}" cy="${my}" r="${r}" fill="none" stroke="${P.ink}" stroke-width="3"/>`;}
+    const endR=+end.toFixed(dg),lenR=endR-s.start;
+    h+=T(450,410,s.show?`末端 ${endR.toFixed(dg)} − 起點 ${s.start.toFixed(dg)} = ${lenR.toFixed(dg)} cm`:`要估讀到 ${s.step===1?'0.1':'0.01'} cm`,{size:24,anchor:'middle',weight:600});
+    return {svg:h,reads:[['最小刻度',s.step===1?'1 cm':'0.1 cm'],['記錄到',s.step===1?'0.1 cm':'0.01 cm'],['讀值',s.show?lenR.toFixed(dg)+' cm':'先自己讀']],
+      note:'長度 = 末端讀數 − 起點讀數；最後一位是<b>估計值</b>。'};}},
+
+/* ===== 02 密度 ===== */
+density:{group:1,n:'02',name:'密度與浮沉',subtitle:'改變質量、體積或液體，看物體浮起還是沉下。',
+  q:['同一物體放進密度較大的液體，漂浮時露出水面的比例會如何變化？','露出比例變大。漂浮時浮力等於重力；液體密度越大，只要排開較少液體就能平衡，所以浸入比例變小。'],
+  state:{m:120,V:200,liq:1,forces:true},
+  controls:[
+    {type:'range',key:'m',label:'質量 m',min:10,max:2400,step:5,unit:' g'},
+    {type:'range',key:'V',label:'體積 V',min:20,max:300,step:5,unit:' cm³'},
+    {type:'buttons',label:'換材質（體積不變）',items:[['木頭',s=>{s.m=snap('m',0.6*s.V);}],['冰',s=>{s.m=snap('m',0.92*s.V);}],['塑膠',s=>{s.m=snap('m',1.05*s.V);}],['鋁',s=>{s.m=snap('m',2.7*s.V);}],['鐵',s=>{s.m=snap('m',7.9*s.V);}]]},
+    {type:'buttons',label:'操作',items:[['切成一半',s=>{s.m=snap('m',s.m/2);s.V=snap('V',s.V/2);}]]},
+    {type:'seg',key:'liq',label:'液體',options:LIQUIDS.map(([v,n])=>[v,n])},
+    {type:'toggle',key:'forces',label:'顯示重力與浮力'}],
+  render(s){
+    const rho=s.m/s.V,rl=s.liq,side=22*Math.cbrt(s.V),surface=190,bottom=430,eq=Math.abs(rho-rl)<0.005,float=!eq&&rho<rl;
+    const ratio=float?rho/rl:1,y=float?surface-side*(1-ratio):eq?(surface+bottom)/2-side/2:bottom-side,x=450-side/2;
+    const status=float?'漂浮':eq?'懸浮':'下沉';
+    let h=T(450,62,status,{size:28,anchor:'middle',weight:700,fill:float?P.accent:eq?P.blue:P.red});
+    h+=`<rect x="${x}" y="${y}" width="${side}" height="${side}" rx="5" fill="#d98a4e" stroke="#a65e2e" stroke-width="2"/>`;
+    h+=`<rect x="232" y="${surface}" width="436" height="${bottom-surface}" fill="${liquid(rl)[2]}" opacity=".62"/>`+L(232,surface,668,surface,{stroke:P.blue,w:3});
+    h+=`<path d="M228 92V434H672V92" fill="none" stroke="#9bb5b1" stroke-width="6" stroke-linejoin="round"/>`+T(244,surface-12,liquid(rl)[1],{size:17,fill:P.blue});
+    if(s.forces){const W=s.m,B=rl*(float?s.m/rl:s.V),N=float||eq?0:W-B,k=120/Math.max(W,B),cx=450,cy=y+side/2;
+      h+=L(cx+12,cy,cx+12,cy+W*k,{stroke:P.red,w:5,arrow:true})+T(cx+24,cy+W*k-4,`重力 ${num(W,0)} gw`,{size:16,fill:P.red,weight:600});
+      h+=L(cx-12,cy,cx-12,cy-B*k,{stroke:P.blue,w:5,arrow:true})+T(cx-24,cy-B*k+14,`浮力 ${num(B,0)} gw`,{size:16,fill:P.blue,anchor:'end',weight:600});
+      if(N>0.5)h+=L(cx+side/2+26,bottom,cx+side/2+26,bottom-N*k,{stroke:P.accent,w:4,arrow:true})+T(cx+side/2+36,bottom-N*k+16,`支持力 ${num(N,0)} gw`,{size:15,fill:P.accent});}
+    return {svg:h,reads:[['物體密度',rho.toFixed(2)+' g/cm³'],['液體密度',rl.toFixed(2)+' g/cm³'],['浸入比例',(ratio*100).toFixed(0)+'%']],
+      note:`<b>ρ = m ÷ V</b> = ${s.m} ÷ ${s.V} = ${rho.toFixed(2)} g/cm³<br>${float?'物體 ＜ 液體 → 漂浮，浮力 = 重力':eq?'物體 ＝ 液體 → 懸浮':'物體 ＞ 液體 → 下沉，浮力 ＜ 重力'}`};}},
+
+/* ===== 03 物質 ===== */
+matter:{group:1,n:'03',name:'物質與粒子',subtitle:'自己放入不同分子，看看它是元素、化合物還是混合物。',
+  q:['把很多顆相同的水分子放在一起，會不會變成混合物？','不會。相同種類的水分子構成純物質；水分子內含氫、氧兩種元素，所以水是化合物。'],
+  state:{counts:{O2:8,N2:0,H2:0,He:0,H2O:0,CO2:0},labels:true,t:0},
+  controls:[
+    {type:'buttons',label:'範例',items:[['氧氣',s=>setCounts(s,{O2:8})],['水',s=>setCounts(s,{H2O:8})],['二氧化碳',s=>setCounts(s,{CO2:6})],['空氣',s=>setCounts(s,{N2:8,O2:2})],['汽水',s=>setCounts(s,{H2O:8,CO2:3})],['清空',s=>setCounts(s,{})]]},
+    {type:'counter',key:'counts',label:'放入分子',items:Object.entries(SPECIES).map(([k,v])=>[k,v.label]),max:8,total:24},
+    {type:'toggle',key:'labels',label:'顯示原子符號'}],
+  tick:(s,dt)=>{s.t+=dt;},
+  render(s){
+    const list=[],kinds=Object.keys(SPECIES).filter(k=>s.counts[k]>0),left={...s.counts};
+    while(list.length<24&&kinds.some(k=>left[k]>0))for(const k of kinds)if(left[k]>0&&list.length<24){list.push(k);left[k]--;}
+    const els=[...new Set(kinds.flatMap(k=>SPECIES[k].atoms))];
+    const cls=!kinds.length?'空的':kinds.length>1?'混合物':els.length===1?'純物質 · 元素':'純物質 · 化合物';
+    let h=T(450,52,cls,{size:26,anchor:'middle',weight:700,fill:kinds.length>1?P.orange:kinds.length?P.accent:P.muted});
+    h+=`<rect x="120" y="76" width="660" height="384" rx="28" fill="#fff" stroke="#c9d6cf" stroke-width="2"/>`;
+    const atom=(x,y,a,rot)=>`<circle cx="${x}" cy="${y}" r="${ATOM[a].r}" fill="${ATOM[a].c}" stroke="#fff" stroke-width="1.5"/>${s.labels?`<text x="${x}" y="${y+5}" font-size="${a==='H'?11:13}" fill="#fff" text-anchor="middle" font-weight="700" transform="rotate(${-rot} ${x} ${y})">${a}</text>`:''}`;
+    list.forEach((k,i)=>{const[bx,by]=SLOTS[i],t=reduceMotion?0:s.t,x=bx+8*Math.sin(t*1.3+i*1.7),y=by+8*Math.cos(t*1.1+i*2.3),rot=(i*47+(reduceMotion?0:25*Math.sin(t*.8+i)))%360,a=SPECIES[k].atoms;let g='';
+      if(a.length===1)g=atom(0,0,a[0],rot);
+      else if(k==='H2O')g=atom(-13,13,'H',rot)+atom(13,13,'H',rot)+atom(0,0,'O',rot);
+      else if(k==='CO2')g=atom(-25,0,'O',rot)+atom(25,0,'O',rot)+atom(0,0,'C',rot);
+      else{const d=ATOM[a[0]].r*.85;g=atom(-d,0,a[0],rot)+atom(d,0,a[1],rot);}
+      h+=`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)}) scale(1.3)">${g}</g>`;});
+    if(!list.length)h+=T(450,275,'用右側的 ＋ 放入分子',{size:20,anchor:'middle',fill:P.muted});
+    return {svg:h,reads:[['分子種類',`${kinds.length} 種`],['元素種類',els.length?`${els.join('、')}（${els.length} 種）`:'—'],['分類',cls]],
+      note:!kinds.length?'元素看<b>原子種類</b>，純物質看<b>分子種類</b>。':kinds.length>1?'含兩種以上的分子 → <b>混合物</b>':els.length===1?'只有一種分子，且只由一種原子組成 → <b>元素</b>':'只有一種分子，但含兩種以上原子 → <b>化合物</b>'};}},
+
+/* ===== 04 溶液 ===== */
+solution:{group:1,n:'04',name:'水溶液與溶解度',subtitle:'改變溫度、水量和溶質，看溶不溶得完；也可以直接拖曲線上的點。',
+  q:['100 g 水最多能溶 36 g 某溶質，加入 50 g 後，溶液濃度是 50/150 嗎？','不是。只有 36 g 溶解，14 g 沉在杯底；溶液質量 = 100 + 36 = 136 g，濃度 = 36 ÷ 136 × 100% ≈ 26.47%。未溶的固體不算進溶液。'],
+  state:{sub:'KNO3',temp:20,water:100,solute:40},
+  controls:[
+    {type:'seg',key:'sub',label:'溶質',options:Object.entries(SOLUBILITY).map(([k,v])=>[k,v.name])},
+    {type:'range',key:'temp',label:'水溫',min:0,max:100,step:1,unit:' °C'},
+    {type:'range',key:'water',label:'水的質量',min:50,max:200,step:10,unit:' g'},
+    {type:'range',key:'solute',label:'加入溶質',min:0,max:250,step:1,unit:' g'}],
+  drag:{pt:(p,s)=>{s.temp=snap('temp',(p.x-490)/3.7);s.solute=snap('solute',(420-p.y)/1.4*s.water/100);}},
+  render(s){
+    const sol=solubility(s.sub,s.temp),cap=sol*s.water/100,d=Math.min(cap,s.solute),left=s.solute-d,pct=d/(s.water+d)*100,sat=s.solute>=cap-1e-9;
+    const level=440-s.water*1.25;
+    let h=T(230,62,sat?'飽和溶液':'未飽和溶液',{size:26,anchor:'middle',weight:700,fill:sat?P.orange:P.accent});
+    h+=`<rect x="64" y="${level}" width="332" height="${436-level}" fill="${P.blue}" opacity="${(0.12+pct*0.008).toFixed(3)}"/>`+L(64,level,396,level,{stroke:P.blue,w:2});
+    for(let i=0;i<Math.min(70,Math.round(d/2.5));i++)h+=`<circle cx="${(78+rnd(i)*304).toFixed(1)}" cy="${(level+12+rnd(i+500)*Math.max(10,(410-level))).toFixed(1)}" r="4" fill="${P.accent}" opacity=".5"/>`;
+    for(let i=0;i<Math.min(84,Math.ceil(left/2.5));i++)h+=`<rect x="${74+(i%28)*11.5}" y="${425-Math.floor(i/28)*11}" width="9" height="9" rx="2" fill="${P.orange}"/>`;
+    h+=`<path d="M60 100V430Q60 440 72 440H388Q400 440 400 430V100" fill="none" stroke="#9fb4b0" stroke-width="6"/>`+T(388,94,`${s.temp} °C`,{size:18,anchor:'end',fill:P.ink,weight:600});
+    const X=t=>490+t*3.7,Y=v=>420-v*1.4;
+    for(let v=0;v<=250;v+=50)h+=L(490,Y(v),860,Y(v),{stroke:'#e6e1d5',w:1})+T(480,Y(v)+5,v,{size:13,fill:P.muted,anchor:'end'});
+    for(let t=0;t<=100;t+=20)h+=T(X(t),442,t,{size:13,fill:P.muted,anchor:'middle'});
+    h+=T(490,52,'溶解度（g / 100 g 水）',{size:14,fill:P.muted})+T(860,468,'溫度（°C）',{size:14,fill:P.muted,anchor:'end'});
+    for(const[k,v]of Object.entries(SOLUBILITY)){const pts=v.data.map((y,i)=>`${X(i*20)},${Y(y)}`).join(' '),on=k===s.sub;h+=`<polyline points="${pts}" fill="none" stroke="${on?P.accent:P.faint}" stroke-width="${on?3.5:2}"${on?'':' stroke-dasharray="6 5"'}/>`+T(X(100)-6,Y(v.data[5])-10,v.name,{size:14,fill:on?P.accent:P.muted,anchor:'end',weight:on?700:400});}
+    const s100=s.solute*100/s.water,py=Math.max(Y(s100),62),px=X(s.temp);
+    if(s100>sol)h+=L(px,Y(sol),px,py,{stroke:P.orange,w:3,dash:'4 4'});
+    h+=`<circle cx="${px}" cy="${py}" r="7" fill="${s100>sol?P.orange:P.accent}"/>`+handle('pt',px,py,s100>sol?P.orange:P.accent);
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['溶解度',`${sol.toFixed(1)} g / 100 g 水`],['已溶解',d.toFixed(1)+' g'],['沉在杯底',left.toFixed(1)+' g'],['濃度',pct.toFixed(1)+'%']],
+      note:`<b>濃度 = 溶質 ÷ 溶液</b> = ${d.toFixed(1)} ÷ (${s.water} + ${d.toFixed(1)})<br>點在曲線上方 → 多出的溶質溶不了。`};}},
+
+/* ===== 05 波動 ===== */
+wave:{group:1,n:'05',name:'波動與波速',subtitle:'切換橫波與縱波，追蹤一個介質點怎麼動。',
+  q:['保持波速不變，把頻率加倍，波長會變成多少？','由 v = fλ，波速不變時頻率加倍，波長減半。振幅只影響振動幅度，不影響波速。'],
+  state:{kind:'T',f:1,v:3,A:0.4,run:!reduceMotion,slow:false,showL:true,track:4,t:0},
+  controls:[
+    {type:'seg',key:'kind',label:'波的種類',options:[['T','橫波'],['L','縱波']]},
+    {type:'range',key:'f',label:'頻率 f',min:0.5,max:3,step:0.1,unit:' Hz'},
+    {type:'range',key:'v',label:'波速 v',min:1,max:6,step:0.5,unit:' m/s'},
+    {type:'range',key:'A',label:'振幅 A',min:0.1,max:0.8,step:0.05,unit:' m'},
+    {type:'seg',key:'run',label:'動畫',options:[[true,'播放'],[false,'暫停']]},
+    {type:'toggle',key:'slow',label:'慢動作'},
+    {type:'toggle',key:'showL',label:'標示波長'}],
+  tick:(s,dt)=>{if(s.run)s.t+=dt*(s.slow?0.25:1);},
+  drag:{track:(p,s)=>{s.track=+clamp((p.x-80)/75,0,10).toFixed(1);}},
+  render(s){
+    const lam=s.v/s.f,X=x=>80+x*75,mid=250,ph=x=>2*Math.PI*(x/lam-s.f*s.t);let h='';
+    for(let x=0;x<=10;x++)h+=L(X(x),110,X(x),400,{stroke:'#e6e1d5',w:1})+T(X(x),432,x,{size:13,fill:P.muted,anchor:'middle'});
+    h+=T(X(10)+14,432,'m',{size:13,fill:P.muted})+T(830,74,'傳播方向 →',{size:17,fill:P.accent,anchor:'end',weight:600});
+    let markY;
+    if(s.kind==='T'){
+      const Y=x=>mid-s.A*120*Math.sin(ph(x));h+=L(X(0),mid,X(10),mid,{stroke:'#cfd8d2',w:2});
+      let d='';for(let x=0;x<=10.001;x+=0.04)d+=(x?'L':'M')+X(x).toFixed(1)+' '+Y(x).toFixed(1);h+=`<path d="${d}" fill="none" stroke="${P.accent}" stroke-width="4"/>`;
+      for(let x=0;x<=10.001;x+=0.5)h+=`<circle cx="${X(x)}" cy="${Y(x)}" r="4" fill="#fff" stroke="${P.accent}" stroke-width="2"/>`;
+      const ty=Y(s.track);h+=L(X(s.track),mid-s.A*120-14,X(s.track),mid+s.A*120+14,{stroke:P.orange,w:2,dash:'4 5'})+`<circle cx="${X(s.track)}" cy="${ty}" r="10" fill="${P.orange}" stroke="#fff" stroke-width="3"/>`+handle('track',X(s.track),ty,P.orange,16);
+      markY=mid-s.A*120-30;
+      if(s.showL){const x0=((lam*(0.25+s.f*s.t))%lam+lam)%lam;if(x0+lam<=10)h+=lamMark(X(x0),X(x0+lam),markY,lam,P.accent);}
+    }else{
+      for(let r=0;r<5;r++)for(let i=0;i<=50;i++){const x0=i*0.2,px=X(x0)+s.A*18*Math.sin(ph(x0)),tr=Math.abs(x0-s.track)<0.1;h+=`<circle cx="${px.toFixed(1)}" cy="${170+r*40}" r="${tr?6:4.5}" fill="${tr?P.orange:P.accent}" opacity="${tr?1:.55}"/>`;}
+      const tx=X(s.track)+s.A*18*Math.sin(ph(s.track));h+=L(X(s.track),140,X(s.track),360,{stroke:P.orange,w:1.5,dash:'4 5'})+handle('track',tx,250,P.orange,16);
+      const xc=((lam*(0.5+s.f*s.t))%lam+lam)%lam;
+      for(let x=xc;x<=10;x+=lam){h+=T(X(x),140,'密',{size:16,anchor:'middle',fill:P.ink,weight:700});if(x+lam/2<=10)h+=T(X(x+lam/2),140,'疏',{size:16,anchor:'middle',fill:P.muted});}
+      if(s.showL&&xc+lam<=10)h+=lamMark(X(xc),X(xc+lam),395,lam,P.accent);
+    }
+    return {svg:h,reads:[['波長 λ',lam.toFixed(2)+' m'],['週期 T',(1/s.f).toFixed(2)+' s'],['波速 v',s.v.toFixed(1)+' m/s']],
+      note:`<b>v = f × λ</b>：${s.v} = ${s.f} × ${lam.toFixed(2)}<br>橘色點只在原地${s.kind==='T'?'上下':'左右'}振動，不會跟著波前進。`};}},
+
+/* ===== 06 聲音 ===== */
+sound:{group:1,n:'06',name:'聲音與回聲',subtitle:'調整頻率、振幅和波形，看聲音的三要素；或量量回聲。',
+  q:['人離牆 51 m，聲速 340 m/s，回聲往返要多久？','聲音走 102 m，時間 = 102 ÷ 340 = 0.30 s。距離 = 聲速 × 往返時間 ÷ 2。'],
+  state:{mode:'tone',f:400,A:6,timbre:'pure',d:51,medium:'air',temp:15,echo:null,t:0},
+  controls:[
+    {type:'seg',key:'mode',label:'模式',options:[['tone','聲音三要素'],['echo','回聲測距']]},
+    {type:'range',key:'f',label:'頻率 → 音調',min:100,max:1000,step:10,unit:' Hz',show:s=>s.mode==='tone'},
+    {type:'range',key:'A',label:'振幅 → 響度',min:1,max:10,step:1,unit:' 格',show:s=>s.mode==='tone'},
+    {type:'seg',key:'timbre',label:'波形 → 音色',options:Object.entries(TIMBRE).map(([k,v])=>[k,v[0]]),show:s=>s.mode==='tone'},
+    {type:'range',key:'d',label:'到牆的距離',min:5,max:500,step:1,unit:' m',show:s=>s.mode==='echo'},
+    {type:'seg',key:'medium',label:'介質',options:Object.entries(SOUND_SPEED),show:s=>s.mode==='echo'},
+    {type:'range',key:'temp',label:'氣溫',min:0,max:40,step:1,unit:' °C',show:s=>s.mode==='echo'&&s.medium==='air'},
+    {type:'buttons',label:'',items:[['📢 發出聲音',s=>{s.echo=0;}]],show:s=>s.mode==='echo',primary:true}],
+  tick:(s,dt)=>{s.t+=dt;if(s.echo!==null&&s.echo<2)s.echo=Math.min(2,s.echo+dt);},
+  render(s){
+    let h='';
+    if(s.mode==='tone'){
+      const hs=TIMBRE[s.timbre][1],w=x=>hs.reduce((a,c,i)=>a+c*Math.sin((i+1)*x),0);let norm=0;for(let i=0;i<200;i++)norm=Math.max(norm,Math.abs(w(i/200*2*Math.PI)));
+      const X=ms=>80+ms*76,Y=y=>180-y*s.A*10/norm;
+      h+=`<rect x="70" y="36" width="780" height="280" rx="12" fill="#fff" stroke="#e1ddd2"/>`+L(80,180,840,180,{stroke:'#d8d3c6',w:1});
+      for(let ms=0;ms<=10;ms+=2)h+=L(X(ms),44,X(ms),308,{stroke:'#efebe2',w:1})+T(X(ms),336,ms,{size:13,fill:P.muted,anchor:'middle'});
+      h+=T(848,336,'ms',{size:13,fill:P.muted});
+      let d='';for(let i=0;i<=600;i++){const ms=i/60;d+=(i?'L':'M')+X(ms).toFixed(1)+' '+Y(w(2*Math.PI*s.f*ms/1000)).toFixed(1);}
+      h+=`<path d="${d}" fill="none" stroke="${P.accent}" stroke-width="3"/>`;
+      const per=1000/s.f;if(per<=10)h+=lamMark(X(0.25*per),X(1.25*per),66,null,P.orange,`週期 ${per.toFixed(2)} ms`);
+      for(let r=0;r<3;r++)for(let i=0;i<51;i++){const x=80+i*15+s.A*1.1*Math.sin(i*s.f*0.00074*2-2*Math.PI*(s.f/1000)*(reduceMotion?0:s.t));h+=`<circle cx="${x.toFixed(1)}" cy="${380+r*24}" r="3.6" fill="${P.accent}" opacity=".5"/>`;}
+      h+=T(450,470,'空氣粒子疏密（放慢 1000 倍）',{size:13,fill:P.muted,anchor:'middle'});
+      const pitch=s.f<300?'低':s.f<650?'中':'高';
+      return {svg:h,reads:[['音調',`${s.f} Hz（${pitch}）`],['響度',`振幅 ${s.A} 格`],['音色',TIMBRE[s.timbre][0]]],
+        note:'頻率越高 → <b>音調</b>越高<br>振幅越大 → <b>響度</b>越大<br>波形不同 → <b>音色</b>不同'};
+    }
+    const v=s.medium==='air'?331+0.6*s.temp:s.medium==='water'?1500:5200,t=2*s.d/v,ok=t>=0.1;
+    h+=T(60,60,`介質：${SOUND_SPEED[s.medium]}${s.medium==='air'?`（${s.temp} °C）`:''}　聲速 ${num(v,0)} m/s`,{size:17,fill:P.ink,weight:600});
+    h+=L(60,400,840,400,{stroke:'#cfc9ba',w:2})+`<rect x="790" y="170" width="28" height="230" rx="3" fill="#b8c4bc"/>`;
+    h+=`<circle cx="130" cy="290" r="20" fill="${P.accent}"/><path d="M130 310V360M130 330L104 346M130 330L156 346M130 360L110 398M130 360L150 398" stroke="${P.accent}" stroke-width="6" stroke-linecap="round" fill="none"/>`;
+    h+=L(160,440,790,440,{stroke:P.muted,w:1.5})+L(160,432,160,448,{stroke:P.muted})+L(790,432,790,448,{stroke:P.muted})+T(475,470,`${s.d} m`,{size:17,anchor:'middle',fill:P.ink});
+    if(s.echo!==null){const fr=s.echo/2,out=fr<0.5,x=out?165+fr*2*620:785-(fr-0.5)*2*620;
+      if(fr<1)for(let k=0;k<3;k++){const xx=x+(out?-k*16:k*16),c=out?1:-1;h+=`<path d="M${xx} ${290-40+k*4}Q${xx+c*22} 290 ${xx} ${290+40-k*4}" fill="none" stroke="${P.orange}" stroke-width="${4-k}" opacity="${1-k*.28}"/>`;}
+      h+=T(475,240,fr<0.5?'去程 →':fr<1?'← 回程':ok?'聽到回聲！':'回聲和原聲混在一起',{size:22,anchor:'middle',fill:P.orange,weight:700});}
+    return {svg:h,reads:[['聲速',`${num(v,0)} m/s`],['往返路程',`${2*s.d} m`],['回聲時間',`${t.toFixed(3)} s`],['能分辨回聲？',ok?'可以':'不行（< 0.1 s）']],
+      note:`<b>距離 = 聲速 × 時間 ÷ 2</b><br>${num(v,0)} × ${t.toFixed(3)} ÷ 2 = ${s.d} m`};}},
+
+/* ===== 07 影子 ===== */
+shadow:{group:2,n:'07',name:'光的直進與影子',subtitle:'拖動物體與屏幕，比較點光源和有大小的光源。',dark:true,
+  q:['物體靠近點光源，屏幕上的影子會變大還是變小？','會變大。屏幕位置不變時，光源到物體的距離 a 減少，影子的放大倍數 D/a 增加。'],
+  state:{src:'point',a:60,D:200,h:40,R:15,rays:true},
+  controls:[
+    {type:'seg',key:'src',label:'光源',options:[['point','點光源'],['area','有大小的光源']]},
+    {type:'range',key:'R',label:'光源大小',min:4,max:30,step:1,unit:' cm',show:s=>s.src==='area'},
+    {type:'range',key:'a',label:'光源 → 物體 a',min:20,max:150,step:1,unit:' cm'},
+    {type:'range',key:'D',label:'光源 → 屏幕 D',min:160,max:300,step:1,unit:' cm'},
+    {type:'range',key:'h',label:'物體高度 h',min:10,max:60,step:1,unit:' cm'},
+    {type:'toggle',key:'rays',label:'顯示邊界光線'}],
+  drag:{obj:(p,s)=>{s.a=snap('a',(p.x-100)/(700/300));},top:(p,s)=>{s.h=snap('h',2*(250-p.y)/1.6);},screen:(p,s)=>{s.D=snap('D',(p.x-100)/(700/300));}},
+  render(s){
+    const k=700/300,vy=1.6,a=Math.min(s.a,s.D-15),Dd=s.D,R=s.src==='area'?s.R:0,PX=x=>100+x*k,PY=y=>250+y*vy;
+    const s1=-R,s2=R,ot=-s.h/2,ob=s.h/2,line=(y0,y1)=>x=>y0+(y1-y0)*x/a;
+    const uU=line(s1,ot),uL=line(s2,ob),oU=line(s2,ot),oL=line(s1,ob),sx=PX(Dd),ox=PX(a);
+    let h=`<rect x="${sx}" y="30" width="16" height="440" rx="4" fill="#5d7088"/>`;
+    const poly=pts=>pts.map(([x,y])=>`${PX(x).toFixed(1)},${PY(y).toFixed(1)}`).join(' ');
+    if(R>0)h+=`<polygon points="${poly([[a,ot],[Dd,oU(Dd)],[Dd,oL(Dd)],[a,ob]])}" fill="#000" opacity=".42"/>`;
+    let umbraH;
+    if(uU(Dd)<uL(Dd)){h+=`<polygon points="${poly([[a,ot],[Dd,uU(Dd)],[Dd,uL(Dd)],[a,ob]])}" fill="#03060b" opacity=".92"/>`;umbraH=uL(Dd)-uU(Dd);}
+    else{const xs=a*(s2-s1)/((s2-s1)-(ob-ot));h+=`<polygon points="${poly([[a,ot],[xs,uU(xs)],[a,ob]])}" fill="#03060b" opacity=".92"/>`;umbraH=0;}
+    if(R>0)h+=`<rect x="${sx}" y="${PY(oU(Dd))}" width="16" height="${(oL(Dd)-oU(Dd))*vy}" fill="#2b3442"/>`;
+    if(umbraH>0)h+=`<rect x="${sx}" y="${PY(uU(Dd))}" width="16" height="${umbraH*vy}" fill="#05080d"/>`;
+    if(s.rays){const ray=(y0,y1,yE,c)=>L(PX(0),PY(y0),PX(Dd),PY(yE),{stroke:c,w:2.5,op:.9});
+      if(R>0)h+=ray(s1,ot,uU(Dd),D.ray)+ray(s2,ob,uL(Dd),D.ray)+ray(s2,ot,oU(Dd),D.second)+ray(s1,ob,oL(Dd),D.second);
+      else h+=ray(0,ot,uU(Dd),D.ray)+ray(0,ob,uL(Dd),D.ray);}
+    h+=R>0?`<rect x="92" y="${PY(s1)}" width="16" height="${2*R*vy}" rx="8" fill="#ffe8a5"/><rect x="84" y="${PY(s1)-8}" width="32" height="${2*R*vy+16}" rx="16" fill="#ffe8a5" opacity=".25"/>`:`<circle cx="100" cy="250" r="11" fill="#ffe8a5"/><circle cx="100" cy="250" r="24" fill="#ffe8a5" opacity=".25"/>`;
+    h+=L(ox,PY(ot),ox,PY(ob),{stroke:D.object,w:10})+handle('obj',ox,PY(ob)+30,D.object)+handle('top',ox,PY(ot),D.object,10)+handle('screen',sx+8,52,D.muted);
+    h+=T(100,R>0?PY(s1)-22:214,'光源',{size:19,fill:D.object,anchor:'middle'})+T(sx+8,22,'屏幕',{size:17,fill:D.ink,anchor:'middle'});
+    if(umbraH>0)h+=T(sx-10,PY(0)+6,'本影',{size:17,fill:D.ink,anchor:'end'});if(R>0)h+=T(sx-10,PY(oL(Dd))-6,'半影',{size:16,fill:D.muted,anchor:'end'});
+    h+=L(100,462,ox,462,{stroke:D.object,w:1.5,dash:'5 5'})+T((100+ox)/2,456,`a = ${a} cm`,{size:15,fill:D.object,anchor:'middle'})+L(100,488,sx,488,{stroke:D.muted,w:1.5,dash:'5 5'})+T((100+sx)/2+60,483,`D = ${Dd} cm`,{size:15,fill:D.muted,anchor:'middle'});
+    const reads=R>0?[['本影高度',umbraH>0?num(umbraH)+' cm':'沒有本影'],['半影寬度（單側）',num((oL(Dd)-oU(Dd)-umbraH)/2)+' cm'],['物體高度',s.h+' cm']]:[['物體高度 h',s.h+' cm'],['影子高度 H',num(s.h*Dd/a)+' cm'],['放大倍數',num(Dd/a,2)+' 倍']];
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,note:R>0?'光源有大小 → 完全照不到的<b>本影</b>＋部分照到的<b>半影</b>':`光沿直線前進。<b>H / h = D / a</b>：${num(s.h*Dd/a)} / ${s.h} = ${Dd} / ${a}`};}},
+
+/* ===== 08 平面鏡 ===== */
+mirror:{group:2,n:'08',name:'反射與平面鏡',subtitle:'拖動物體或眼睛，看反射光如何讓你看到鏡後的像。',dark:true,
+  q:['物體向鏡面靠近 10 cm，物與像的距離改變多少？','像也向鏡面靠近 10 cm，所以物與像的距離減少 20 cm。'],
+  state:{d:55,h:60,ex:80,ey:110,eye:true,fan:false,ext:true},
+  controls:[
+    {type:'range',key:'d',label:'物距',min:15,max:110,step:1,unit:' cm'},
+    {type:'range',key:'h',label:'物體高度',min:20,max:100,step:1,unit:' cm'},
+    {type:'toggle',key:'eye',label:'進入眼睛的光線'},
+    {type:'toggle',key:'fan',label:'物體頂端發出的多條光線'},
+    {type:'toggle',key:'ext',label:'反向延長線'}],
+  drag:{obj:(p,s)=>{s.d=snap('d',(450-p.x)/3);},img:(p,s)=>{s.d=snap('d',(p.x-450)/3);},top:(p,s)=>{s.h=snap('h',(400-p.y)/2.6);},eye:(p,s)=>{s.ex=clamp(p.x,40,420);s.ey=clamp(p.y,40,440);}},
+  render(s){
+    const mx=450,ox=mx-s.d*3,ix=mx+s.d*3,base=400,top=base-s.h*2.6;
+    let h=`<rect x="450" y="40" width="12" height="400" fill="#72dbe6" opacity=".3"/>`+L(mx,40,mx,440,{stroke:D.ray,w:4})+T(mx,30,'平面鏡',{size:17,fill:D.ray,anchor:'middle'});
+    if(s.fan)for(let i=0;i<6;i++){const hy=60+i*70,dx=mx-ox,dy=hy-top,k=(mx-30)/dx;h+=L(ox,top,mx,hy,{stroke:D.third,w:2,op:.75})+L(mx,hy,mx-dx*k,hy+dy*k,{stroke:D.third,w:2,op:.75,arrow:true});if(s.ext)h+=L(mx,hy,ix,top,{stroke:D.third,w:1.5,dash:'6 6',op:.6});}
+    if(s.eye)[top,base].forEach((Y,i)=>{const hit=s.ey+(Y-s.ey)*(mx-s.ex)/(ix-s.ex),c=i?D.second:D.ray;if(hit<40||hit>440)return;h+=L(ox,Y,mx,hit,{stroke:c,w:3,arrow:true})+L(mx,hit,s.ex,s.ey,{stroke:c,w:3,arrow:true});if(s.ext)h+=L(mx,hit,ix,Y,{stroke:c,w:2,dash:true});});
+    h+=vArrow(ox,base,top,D.object)+vArrow(ix,base,top,D.image,{dash:'7 6'})+T(ox,base+30,'物',{size:20,fill:D.object,anchor:'middle'})+T(ix,base+30,'虛像',{size:20,fill:D.image,anchor:'middle'});
+    h+=handle('obj',ox,base,D.object)+handle('top',ox,top,D.object,10)+handle('img',ix,base,D.image);
+    h+=`<path d="M${s.ex-30} ${s.ey}Q${s.ex} ${s.ey-28} ${s.ex+30} ${s.ey}Q${s.ex} ${s.ey+28} ${s.ex-30} ${s.ey}" fill="#e8f3ff"/><circle cx="${s.ex}" cy="${s.ey}" r="10" fill="#162b46"/>`+handle('eye',s.ex,s.ey,D.ink,34);
+    h+=L(ox,465,mx,465,{stroke:D.object,w:1.5,dash:'5 5'})+L(mx,465,ix,465,{stroke:D.image,w:1.5,dash:'5 5'})+T((ox+mx)/2,488,`${s.d} cm`,{size:16,fill:D.object,anchor:'middle'})+T((ix+mx)/2,488,`${s.d} cm`,{size:16,fill:D.image,anchor:'middle'});
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['物距 = 像距',`${s.d} cm`],['物與像的距離',`${s.d*2} cm`],['像的性質','正立・等大・虛像']],
+      note:'實線是光真正走的路；虛線是反射光的<b>反向延長線</b>，交點就是虛像。'};}},
+
+/* ===== 09 折射 ===== */
+refraction:{group:2,n:'09',name:'折射與全反射',subtitle:'換介質、拖動入射光，找出全反射發生的條件。',dark:true,
+  q:['光由水射向空氣，一定會折射出去嗎？','不一定。由折射率大的介質射向折射率小的介質，入射角大於臨界角時，就發生全反射。'],
+  state:{m1:'air',m2:'water',a:40},
+  controls:[
+    {type:'seg',key:'m1',label:'上方介質（光從這裡來）',options:Object.entries(MEDIA).map(([k,v])=>[k,v[0]])},
+    {type:'seg',key:'m2',label:'下方介質',options:Object.entries(MEDIA).map(([k,v])=>[k,v[0]])},
+    {type:'buttons',label:'',items:[['⇅ 上下互換',s=>{[s.m1,s.m2]=[s.m2,s.m1];}]]},
+    {type:'range',key:'a',label:'入射角 θ₁',min:0,max:89,step:1,unit:'°'}],
+  drag:{ray:(p,s)=>{const dx=450-p.x,dy=250-p.y;s.a=dy<=0?89:snap('a',deg(Math.atan2(Math.max(0,dx),dy)));}},
+  render(s){
+    const[n1Name,n1,c1]=MEDIA[s.m1],[n2Name,n2,c2]=MEDIA[s.m2],cx=450,cy=250,Ln=210,a=rad(s.a),q=n1*Math.sin(a)/n2,tir=q>1+1e-12,b=tir?null:Math.asin(Math.min(1,q)),crit=n1>n2?deg(Math.asin(n2/n1)):null;
+    const arc=(r,st,en,c)=>`<path d="M${cx+r*Math.cos(st)} ${cy+r*Math.sin(st)}A${r} ${r} 0 0 1 ${cx+r*Math.cos(en)} ${cy+r*Math.sin(en)}" fill="none" stroke="${c}" stroke-width="2"/>`;
+    const sx=cx-Ln*Math.sin(a),sy=cy-Ln*Math.cos(a);
+    let h=`<rect x="10" y="10" width="880" height="240" fill="${c1}"/><rect x="10" y="250" width="880" height="232" fill="${c2}"/>`+L(10,cy,890,cy,{stroke:'#d7edff',w:2})+L(cx,30,cx,470,{stroke:D.muted,w:2,dash:true})+T(cx+12,46,'法線',{size:16,fill:D.muted});
+    h+=T(30,52,`${n1Name}　n = ${n1.toFixed(2)}`,{size:19,fill:D.ink,weight:600})+T(30,462,`${n2Name}　n = ${n2.toFixed(2)}`,{size:19,fill:D.ink,weight:600});
+    if(crit!==null){const cr=rad(crit);h+=L(cx,cy,cx-Ln*Math.sin(cr),cy-Ln*Math.cos(cr),{stroke:'#ffffff',w:1.5,dash:'3 6',op:.5})+T(cx-(Ln+12)*Math.sin(cr),cy-(Ln+12)*Math.cos(cr),`臨界角 ${crit.toFixed(1)}°`,{size:14,fill:D.muted,anchor:'end'});}
+    h+=L(sx,sy,cx,cy,{stroke:D.object,w:4,arrow:true})+L(cx,cy,cx+Ln*Math.sin(a),cy-Ln*Math.cos(a),{stroke:D.second,w:tir?4:2.5,arrow:true,op:tir?1:.55});
+    if(s.a>0)h+=arc(64,-Math.PI/2-a,-Math.PI/2,D.object);
+    h+=T(cx-110,cy-80,`${s.a}°`,{size:19,fill:D.object,anchor:'end'});
+    if(!tir){h+=L(cx,cy,cx+Ln*Math.sin(b),cy+Ln*Math.cos(b),{stroke:D.ray,w:4,arrow:true});if(b>0.001)h+=arc(70,Math.PI/2-b,Math.PI/2,D.ray);h+=T(cx+90,cy+120,`${deg(b).toFixed(1)}°`,{size:19,fill:D.ray});}
+    else h+=T(cx+60,cy+110,'全反射：沒有折射光',{size:22,fill:D.object,weight:700});
+    h+=handle('ray',sx,sy,D.object);
+    const path=tir?'全反射':s.a===0?'垂直入射，不偏折':n2>n1?'偏向法線':n2<n1?'偏離法線':'不偏折';
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['入射角',`${s.a}°`],['折射角',tir?'—':`${deg(b).toFixed(1)}°`],['臨界角',crit===null?'不會全反射':`${crit.toFixed(1)}°`],['光的路徑',path]],
+      note:tir?`n₁ ＞ n₂ 且入射角 ＞ 臨界角 → <b>全反射</b>`:`<b>n₁ sin θ₁ = n₂ sin θ₂</b><br>${n1.toFixed(2)} × sin ${s.a}° = ${n2.toFixed(2)} × sin ${deg(b).toFixed(1)}°`};}},
+
+/* ===== 10 透鏡 ===== */
+lens:{group:2,n:'10',name:'透鏡與成像',subtitle:'拖動物體穿過焦點，看實像、虛像與大小一起改變。',dark:true,
+  q:['凸透鏡的物體放在焦點內，像能接在屏幕上嗎？','不能。折射光發散，只有反向延長線相交，形成正立放大的虛像；屏幕接不到虛像。物體恰在焦點上時，折射光平行，不成像。'],
+  state:{type:1,f:80,u:200,oh:30,r3:true},
+  controls:[
+    {type:'seg',key:'type',label:'透鏡',options:[[1,'凸透鏡'],[-1,'凹透鏡']]},
+    {type:'range',key:'u',label:'物距 u',min:20,max:360,step:1,unit:' cm'},
+    {type:'range',key:'f',label:'焦距 |f|',min:40,max:140,step:1,unit:' cm'},
+    {type:'range',key:'oh',label:'物高',min:10,max:50,step:1,unit:' cm'},
+    {type:'buttons',label:'跳到關鍵位置',items:[['u > 2f',s=>{s.u=snap('u',s.f*2.6);}],['u = 2f',s=>{s.u=snap('u',s.f*2);}],['f < u < 2f',s=>{s.u=snap('u',s.f*1.5);}],['u = f',s=>{s.u=snap('u',s.f);}],['u < f',s=>{s.u=snap('u',s.f*0.55);}]],show:s=>s.type===1},
+    {type:'toggle',key:'r3',label:'第三條光線（經過焦點）'}],
+  drag:{obj:(p,s)=>{s.u=snap('u',(450-p.x)/1.15);},top:(p,s)=>{s.oh=snap('oh',(250-p.y)/2.4);}},
+  render(s){
+    const f=s.type*s.f,u=s.u,oh=s.oh,inf=Math.abs(u-f)<1e-9,v=inf?null:f*u/(u-f),m=inf?null:-v/u,cx=450,cy=250,X=x=>cx+x*1.15,Y=y=>cy-y*2.4,E=440/1.15;
+    let h=L(15,cy,885,cy,{stroke:D.muted,w:1.5,dash:true});
+    for(const sg of[-1,1])for(const k of[1,2]){const x=X(sg*k*s.f);h+=L(x,cy-7,x,cy+7,{stroke:D.muted,w:2})+T(x,cy+28,`${k===2?'2':''}F`,{size:15,fill:D.muted,anchor:'middle'});}
+    h+=s.type===1?`<path d="M450 60Q490 250 450 440Q410 250 450 60" fill="#61ddeb22" stroke="${D.ray}" stroke-width="3"/>`:`<path d="M426 60Q462 250 426 440L474 440Q438 250 474 60Z" fill="#61ddeb22" stroke="${D.ray}" stroke-width="3"/>`;
+    const seg=(x1,y1,x2,y2,c,o={})=>L(X(x1),Y(y1),X(x2),Y(y2),{stroke:c,w:o.dash?2:3,...o});
+    h+=seg(-u,oh,0,oh,D.ray,{arrow:true})+seg(0,oh,E,oh-oh*E/f,D.ray,{arrow:true})+seg(-u,oh,0,0,D.second,{arrow:true})+seg(0,0,E,-oh*E/u,D.second,{arrow:true});
+    const y3=inf?null:f*oh/(f-u);
+    if(s.r3&&!inf&&Math.abs(y3)<400)h+=seg(-u,oh,0,y3,D.third,{arrow:true})+seg(0,y3,E,y3,D.third,{arrow:true});
+    if(!inf&&v<0){h+=seg(0,oh,v,m*oh,D.ray,{dash:true})+seg(0,0,v,m*oh,D.second,{dash:true});if(s.r3&&Math.abs(y3)<400)h+=seg(0,y3,v,y3,D.third,{dash:true});}
+    const onStage=!inf&&X(v)>20&&X(v)<880;
+    if(onStage)h+=vArrow(X(v),cy,Y(m*oh),D.image,{dash:v<0?'7 6':false})+T(X(v),Y(m*oh)+(m<0?30:-16),v>0?'實像':'虛像',{size:20,fill:D.image,anchor:'middle',weight:600});
+    h+=vArrow(X(-u),cy,Y(oh),D.object)+T(X(-u),Y(oh)-18,'物',{size:20,fill:D.object,anchor:'middle'})+handle('obj',X(-u),cy,D.object)+handle('top',X(-u),Y(oh),D.object,10);
+    if(inf)h+=T(450,480,'物體在焦點上：折射光平行，不成像',{size:19,fill:D.object,anchor:'middle'});else if(!onStage)h+=T(450,480,'像在畫面外，請看右側像距',{size:18,fill:D.image,anchor:'middle'});
+    const prop=inf?'不成像':`${v>0?'實像・倒立':'虛像・正立'}・${Math.abs(Math.abs(m)-1)<1e-6?'等大':Math.abs(m)>1?'放大':'縮小'}`;
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['像距 v',inf?'無窮遠':`${num(v)} cm`],['放大率',inf?'—':`${num(Math.abs(m),2)} 倍`],['成像',prop]],
+      note:inf?'物在焦點 → 不成像':`<b>1/f = 1/u + 1/v</b><br>1/${f<0?`(${f})`:f} = 1/${u} + 1/${v<0?`(${num(v)})`:num(v)}`};}},
+
+/* ===== 11 顏色 ===== */
+color:{group:2,n:'11',name:'光與顏色',subtitle:'混合紅綠藍光，或用色光照物體，看看顏色從哪裡來。',dark:true,
+  q:['紅光和綠光相加，會變成哪種光？紅蘋果在綠光下是什麼顏色？','紅光＋綠光是黃光。紅蘋果只反射紅光，綠光下沒有紅光可反射，所以看起來是黑色。'],
+  state:{mode:'mix',r:255,g:255,b:0,obj:'apple'},
+  controls:[
+    {type:'seg',key:'mode',label:'模式',options:[['mix','色光混合'],['object','色光照物體']]},
+    {type:'seg',key:'obj',label:'物體',options:Object.entries(REFLECT).map(([k,v])=>[k,v[0]]),show:s=>s.mode==='object'},
+    {type:'buttons',label:'光的顏色',items:LIGHTS.map(([n,c])=>[n,s=>{[s.r,s.g,s.b]=c;}])},
+    {type:'range',key:'r',label:'紅光 R',min:0,max:255,step:1},
+    {type:'range',key:'g',label:'綠光 G',min:0,max:255,step:1},
+    {type:'range',key:'b',label:'藍光 B',min:0,max:255,step:1}],
+  render(s){
+    const{r,g,b}=s;let h;
+    if(s.mode==='mix'){
+      h=`<rect x="35" y="30" width="550" height="440" rx="22" fill="#05080d"/><g style="isolation:isolate"><circle cx="250" cy="200" r="130" fill="rgb(${r},0,0)"/><circle cx="380" cy="200" r="130" fill="rgb(0,${g},0)" style="mix-blend-mode:screen"/><circle cx="315" cy="312" r="130" fill="rgb(0,0,${b})" style="mix-blend-mode:screen"/></g>`;
+      h+=T(200,62,'R',{size:22,fill:'#ff8a8a',anchor:'middle',weight:700})+T(430,62,'G',{size:22,fill:'#8aff9a',anchor:'middle',weight:700})+T(315,462,'B',{size:22,fill:'#8ab4ff',anchor:'middle',weight:700});
+      h+=T(735,72,'重疊後的顏色',{size:18,fill:D.muted,anchor:'middle'})+`<rect x="635" y="95" width="200" height="170" rx="20" fill="rgb(${r},${g},${b})" stroke="#ffffff33"/>`+T(735,305,colorName(r,g,b)+'光',{size:30,fill:D.ink,anchor:'middle',weight:700});
+      h+=T(735,370,'紅 + 綠 = 黃',{size:17,fill:D.muted,anchor:'middle'})+T(735,400,'綠 + 藍 = 青',{size:17,fill:D.muted,anchor:'middle'})+T(735,430,'紅 + 藍 = 洋紅',{size:17,fill:D.muted,anchor:'middle'});
+      return {svg:h,reads:[['紅 R',r],['綠 G',g],['藍 B',b],['看到',colorName(r,g,b)+'光']],note:'光的三原色相加會<b>更亮</b>（加色）；三色等量相加 = 白光。'};
+    }
+    const[oname,ref]=REFLECT[s.obj],pr=Math.round(r*ref[0]),pg=Math.round(g*ref[1]),pb=Math.round(b*ref[2]),fill=`rgb(${pr},${pg},${pb})`;
+    const shape=(c,stroke='#ffffff40')=>({apple:`<circle cx="0" cy="0" r="62" fill="${c}" stroke="${stroke}" stroke-width="2"/><path d="M0 -58Q4 -80 18 -88" stroke="#5b4026" stroke-width="7" fill="none" stroke-linecap="round"/>`,
+      leaf:`<path d="M-90 25Q-20 -95 90 -25Q20 75 -90 25Z" fill="${c}" stroke="${stroke}" stroke-width="2"/><path d="M-80 22Q0 -10 80 -22" stroke="#00000040" stroke-width="3" fill="none"/>`,
+      banana:`<path d="M-95 -30Q0 80 95 -35Q86 -12 74 -6Q0 42 -84 -40Z" fill="${c}" stroke="${stroke}" stroke-width="2"/>`,
+      paper:`<rect x="-62" y="-80" width="124" height="160" rx="4" fill="${c}" stroke="${stroke}" stroke-width="2"/>`,
+      cloth:`<path d="M-80 -70Q-40 -82 0 -70T80 -70V70Q40 82 0 70T-80 70Z" fill="${c}" stroke="${stroke}" stroke-width="2"/>`})[s.obj];
+    h=`<rect x="20" y="20" width="560" height="460" rx="20" fill="#05080d"/><polygon points="270,40 330,40 520,420 80,420" fill="rgb(${r},${g},${b})" opacity=".22"/><ellipse cx="300" cy="420" rx="220" ry="34" fill="rgb(${r},${g},${b})" opacity=".35"/><rect x="262" y="24" width="76" height="22" rx="6" fill="#8796a8"/>`;
+    h+=`<g transform="translate(300 330)">${shape(fill)}</g>`;
+    h+=T(735,70,'白光下',{size:17,fill:D.muted,anchor:'middle'})+`<g transform="translate(735 160) scale(.7)">${shape(`rgb(${ref.map(v=>v*255).join(',')})`)}</g>`+T(735,262,oname,{size:18,fill:D.ink,anchor:'middle'});
+    h+=T(735,330,'現在看起來',{size:17,fill:D.muted,anchor:'middle'})+T(735,375,colorName(pr,pg,pb)+'色',{size:32,fill:D.ink,anchor:'middle',weight:700});
+    return {svg:h,reads:[['照射的光',colorName(r,g,b)+'光'],['物體會反射',ref[0]&&ref[1]&&ref[2]?'所有色光':ref.some(Boolean)?['紅','綠','藍'].filter((_,i)=>ref[i]).join('、')+'光':'幾乎不反射'],['看起來',colorName(pr,pg,pb)+'色']],
+      note:'物體只<b>反射</b>和自己同色的光，其餘被吸收；沒有光可反射 → 看起來是黑色。'};}}
 };
-const lab=document.getElementById('lab'); let cleanup=()=>{},current='lens';
-const C={green:'#0f766e',orange:'#df7c44',blue:'#4c85bb',ink:'#1b2a33',muted:'#6b777e',light:'#e2f0ec'};
-const range=(id,label,min,max,value,step=1,unit='')=>`<div class="control"><label for="${id}">${label}<output id="${id}-value">${value} ${unit}</output></label><input id="${id}" type="range" min="${min}" max="${max}" value="${value}" step="${step}" data-unit="${unit}"></div>`;
-const choose=(id,label,items)=>`<div class="control"><label for="${id}">${label}</label><select id="${id}">${items.map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}</select></div>`;
-const question=(q,a)=>`<section class="question"><h3>先猜，再操作</h3><p>${q}</p><details><summary>展開解釋</summary><div class="answer">${a}</div></details></section>`;
-const text=(x,y,t,size=18,color=C.ink,extra='')=>`<text x="${x}" y="${y}" font-size="${size}" fill="${color}" ${extra}>${t}</text>`;
-const line=(x1,y1,x2,y2,color=C.ink,width=2,extra='')=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}" ${extra}/>`;
-function frame(title,controls,q,a){lab.innerHTML=`<div class="sim-layout"><div class="viz-panel"><div class="viz-heading"><span><i class="live-dot"></i>${title}</span><span class="tag">互動模擬</span></div><svg id="scene" viewBox="0 0 900 500" role="img" aria-label="${title}"></svg><div id="legend" class="legend"></div></div><div class="controls"><h3>改變條件，觀察結果</h3>${controls}<div id="readouts" class="readouts"></div><div id="sim-note" class="note"></div></div></div>${question(q,a)}`;}
-const fillRanges=()=>lab.querySelectorAll('input[type=range]').forEach(el=>el.style.setProperty('--p',(el.value-el.min)/(el.max-el.min)*100+'%'));
-['input','click'].forEach(type=>lab.addEventListener(type,()=>requestAnimationFrame(fillRanges)));
-const val=id=>Number(document.getElementById(id).value);
-const select=id=>document.getElementById(id).value;
-const draw=html=>document.getElementById('scene').innerHTML=html;
-const readouts=items=>document.getElementById('readouts').innerHTML=items.map(([a,b])=>`<div class="readout"><span>${a}</span><b>${b}</b></div>`).join('');
-const note=html=>document.getElementById('sim-note').innerHTML=html;
-function bind(fn){lab.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{const out=document.getElementById(el.id+'-value');if(out)out.textContent=el.value+' '+(el.dataset.unit||'');fn();}));fn();}
-function mountMeasure(){frame('讀尺練習 · 零點對齊',range('length','物件長度',1,9,5.34,.01,'cm')+choose('step','最小刻度',[['1','1 cm'],['0.1','0.1 cm（1 mm）']])+`<button id="measure-answer" class="btn primary">顯示參考讀值</button>`, '最小刻度為0.1 cm的尺，量到5.34 cm，最後一位代表什麼？','4是估讀位。實際估讀會有合理差異，不是精準知道物體的每一位數；本模型顯示值用於練習記錄位數。');let show=false;function render(){const l=val('length'),s=val('step'),digits=s===1?1:2;let h=`<rect x="85" y="246" width="720" height="108" rx="6" fill="#eadbb7" stroke="#c8b88c"/>`;for(let n=0;n<=10/s;n++){let x=100+n*s*68,major=Math.abs(n*s-Math.round(n*s))<.001;h+=line(x,248,x,major?287:272,'#71684e',major?2:1);if(major)h+=text(x,317,Math.round(n*s),18,'#71684e','text-anchor="middle"');}h+=`<rect x="100" y="189" width="${l*68}" height="39" rx="4" fill="${C.green}"/><path d="M${100+l*68} 179V358" stroke="${C.orange}" stroke-width="2" stroke-dasharray="5 5"/>`;h+=text(100,162,'零點對齊',18,C.muted)+text(790,385,'cm',18,C.muted)+text(450,425,show?`參考讀值：${l.toFixed(digits)} cm`:'先讀尺，再按「顯示參考讀值」',24,C.ink,'text-anchor="middle"');draw(h);readouts([['最小刻度',s+' cm'],['估讀到',s===1?'0.1 cm':'0.01 cm']]);note('此為連續刻度尺的理想模型。滑桿數值是設定值；<b>測量記錄</b>的位數依尺規精度決定。');}bind(render);document.getElementById('measure-answer').onclick=()=>{show=!show;document.getElementById('measure-answer').textContent=show?'隱藏參考讀值':'顯示參考讀值';render();};}
-function mountDensity(){frame('質量 ÷ 體積 · 預測浮沉',range('mass','物體質量',10,600,120,5,'g')+range('volume','物體體積',20,300,200,5,'cm³')+range('liquid','液體密度',.5,1.5,1,.05,'g/cm³'), '同一物體放進密度較大的液體，漂浮時露出水面的比例會如何變化？','漂浮時，浮力等於重力。液體密度越大，只要排開較少液體便能平衡，因此浸入比例變小。這裡把物體視為不吸水、均勻且不溶解的剛體。');bind(()=>{let m=val('mass'),v=val('volume'),r=val('liquid'),rho=m/v,ratio=Math.min(rho/r,1),size=75*Math.cbrt(v/100),surface=205,bottom=420,y=rho<r?surface-size*(1-ratio):rho===r?270:bottom-size;let h=`<path d="M230 90V425H670V90" fill="none" stroke="#9bb5b1" stroke-width="5"/><path d="M233 ${surface}H667V422H233Z" fill="#d7e9eb"/>${line(233,surface,667,surface,C.blue,3)}<rect x="${450-size/2}" y="${y}" width="${size}" height="${size}" rx="4" fill="${C.orange}" opacity=".86" stroke="#aa5d32" stroke-width="2"/>`;h+=text(250,170,'液面',18,C.blue)+text(450,62,rho<r?'漂浮':Math.abs(rho-r)<1e-8?'懸浮（理想中性浮力）':'下沉至底部',26,C.ink,'text-anchor="middle"')+text(450,474,'示意圖：容器視為足夠大，液面高度固定',14,C.muted,'text-anchor="middle"');draw(h);readouts([['物體密度',rho.toFixed(2)+' g/cm³'],['密度比較',rho<r?'物體 ＜ 液體':Math.abs(rho-r)<1e-8?'物體 ＝ 液體':'物體 ＞ 液體'],['漂浮浸入比例',rho<r?(ratio*100).toFixed(0)+'%':'—']]);note(`<b>ρ＝m/V</b><br>${m} ÷ ${v}＝${rho.toFixed(2)} g/cm³。${rho<r?'漂浮時浸入體積比＝物體密度／液體密度。':'沉底時還有底部支持力；不能說此時浮力等於重力。'}`);});}
-function mountMatter(){frame('粒子模型 · 種類比顆數重要',choose('substance','選擇樣本',[['element','氧氣 O₂：元素'],['compound','水 H₂O：化合物'],['mix','氧氣＋氮氣：混合物'],['mix2','水＋氧氣：混合物']])+`<div class="control"><label><input type="checkbox" id="labels" checked> 顯示粒子標記</label></div>`, '把很多顆相同的水分子放在一起，會不會變成混合物？','不會。相同種類的水分子構成純物質；水分子內含氫、氧兩種元素，所以水是化合物。純物質與元素不是同一層次的分類。');bind(()=>{let type=select('substance'),labels=document.getElementById('labels').checked,h=`<rect x="150" y="80" width="600" height="330" rx="30" fill="#fff" stroke="#b9cec2" stroke-width="2"/>`;const atom=(x,y,r,c,t)=>`<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>${labels?text(x,y+6,t,16,'#fff','text-anchor="middle"'):''}`;for(let i=0;i<12;i++){let x=220+(i%4)*147,y=146+Math.floor(i/4)*105,isWater=type==='compound'||type==='mix2'&&i%2===0,isN=type==='mix'&&i%2===0;if(isWater){h+=line(x,y,x-26,y+25,'#96aba4',6)+line(x,y,x+26,y+25,'#96aba4',6)+atom(x,y,19,C.orange,'O')+atom(x-26,y+25,12,C.blue,'H')+atom(x+26,y+25,12,C.blue,'H');}else{let c=isN?C.green:C.orange,t=isN?'N':'O';h+=line(x-15,y,x+15,y,c,8)+atom(x-18,y,19,c,t)+atom(x+18,y,19,c,t);}}h+=text(450,455,'球代表原子；連線代表原子間的鍵結',16,C.muted,'text-anchor="middle"');draw(h);readouts([['物質種類',type.startsWith('mix')?'2 種':'1 種'],['分類',type.startsWith('mix')?'混合物':'純物質'],['元素種類',type==='element'?'1 種':'2 種']]);note('這是<b>分子型物質</b>的簡化粒子圖。不同顏色區分元素，不代表原子真實顏色、大小比例或運動軌跡；並非所有物質都由獨立分子組成。');});}
-function mountSolution(){frame('溶解量有限 · 質量仍守恆',range('water','水的質量',50,250,100,10,'g')+range('solute','加入溶質',0,150,30,1,'g')+range('solubility','此溫度下溶解度',10,100,36,1,'g / 100 g 水'), '100 g水最多能溶36 g某溶質，加入50 g後，溶液濃度是50/150嗎？','不是。只有36 g溶解，14 g在杯底；溶液質量＝100＋36＝136 g，質量百分濃度＝36/136×100% ≈26.47%。未溶固體不算進溶液質量。');bind(()=>{let w=val('water'),s=val('solute'),sol=val('solubility'),cap=w*sol/100,d=Math.min(cap,s),left=s-d,pct=d/(w+d)*100,level=365-w*.65;let h=`<path d="M280 80V415Q280 425 295 425H605Q620 425 620 415V80" fill="none" stroke="#9fb4b0" stroke-width="5"/><rect x="284" y="${level}" width="332" height="${420-level}" fill="${C.blue}" opacity="${.10+pct/150}"/>${line(284,level,616,level,C.blue,2)}`;for(let i=0;i<Math.min(40,Math.round(d));i++){let x=306+(i*83%289),y=level+18+(i*47%Math.max(20,390-level));h+=`<circle cx="${x}" cy="${y}" r="5" fill="${C.green}" opacity=".5"/>`;}for(let i=0;i<Math.min(30,Math.ceil(left/2));i++)h+=`<rect x="${302+i*39%284}" y="${408-Math.floor(i/8)*9}" width="9" height="9" fill="${C.orange}" rx="2"/>`;h+=text(450,50,s>=cap?'飽和溶液':'未飽和溶液',25,C.ink,'text-anchor="middle"')+text(660,level+40,'已溶解',17,C.green)+text(660,level+65,d.toFixed(1)+' g',20,C.green)+text(660,390,'未溶固體',17,C.orange)+text(660,417,left.toFixed(1)+' g',20,C.orange)+text(450,477,'小點代表溶質分散，不表示真實粒徑或體積加成',14,C.muted,'text-anchor="middle"');draw(h);readouts([['溶液質量',(w+d).toFixed(1)+' g'],['質量百分濃度',pct.toFixed(2)+'%'],['最大溶解量',cap.toFixed(1)+' g']]);note('溶解度是<b>指定溫度</b>下，每100 g水能溶的最大溶質質量。滑桿是抽象物質參數，不暗示所有物質升溫都更易溶。液面僅示意。');});}
-function mountWave(){frame('橫波模型 · 能量前進，介質振動',range('freq','頻率 f',.5,4,1,.1,'Hz')+range('speed','波速 v',1,6,3,.1,'m/s')+range('amp','振幅 A',.1,.8,.4,.05,'m')+`<button class="btn primary" id="play">暫停動畫</button>`, '保持波速不变，把頻率加倍，波長會變成多少？','由v＝fλ可知，波速不變時頻率加倍，波長減半。振幅控制介質振動的最大位移，不直接决定此模型的波速。');let t=0,last=0,run=!matchMedia('(prefers-reduced-motion: reduce)').matches,raf;function render(){let f=val('freq'),v=val('speed'),a=val('amp'),wl=v/f,scale=75,mid=255,h='';for(let x=80;x<=830;x+=75){h+=line(x,95,x,410,'#dfe8df',1);h+=text(x,442,((x-80)/scale).toFixed(0),14,C.muted,'text-anchor="middle"');}h+=line(80,mid,830,mid,'#abc1b5',2);let path='';for(let x=80;x<=830;x+=2){let xx=(x-80)/scale,y=mid-a*120*Math.sin(2*Math.PI*(xx/wl-f*t));path+=(x===80?'M':'L')+x+' '+y;}h+=`<path d="${path}" fill="none" stroke="${C.green}" stroke-width="4"/>`;let xx=4,px=80+xx*scale,py=mid-a*120*Math.sin(2*Math.PI*(xx/wl-f*t));h+=line(px,130,px,380,C.orange,1,'stroke-dasharray="4 5"')+`<circle cx="${px}" cy="${py}" r="9" fill="${C.orange}" stroke="#fff" stroke-width="3"/>`+text(px,115,'追蹤這一個介質點',17,C.orange,'text-anchor="middle"')+text(755,67,'波向右 →',18,C.green)+text(850,442,'m',14,C.muted)+text(450,484,'動畫時間與秒數一致；縱、橫軸採不同繪圖比例',13,C.muted,'text-anchor="middle"');draw(h);readouts([['波長 λ',wl.toFixed(2)+' m'],['週期 T',(1/f).toFixed(2)+' s'],['波速 v',v.toFixed(1)+' m/s']]);note('<b>λ＝v/f，T＝1/f</b><br>橘點只有上下位移，沒有隨波向右移動。這是理想單一頻率橫波，不能直接當作空氣中聲波的振動方向。');}bind(render);let btn=document.getElementById('play');btn.textContent=run?'暫停動畫':'播放動畫';btn.onclick=()=>{run=!run;btn.textContent=run?'暫停動畫':'播放動畫';};function loop(now){if(last&&run)t+=Math.min((now-last)/1000,.1);last=now;render();raf=requestAnimationFrame(loop);}raf=requestAnimationFrame(loop);return()=>cancelAnimationFrame(raf);}
-function mountSound(){frame('空氣縱波與回聲 · 不播放聲音',range('pitch','聲音頻率',100,1000,400,50,'Hz')+range('loud','振動幅度示意',1,10,4,1,'格')+range('distance','人到牆壁距離',5,150,51,1,'m')+`<button class="btn primary" id="echo">播放回聲路徑</button>`, '人離牆51 m，聲速340 m/s，回聲往返要多久？','聲音走102 m，時間＝102/340＝0.30 s。距離＝聲速×往返時間÷2。本模型固定聲速340 m/s；真實聲速會隨溫度與介質而變。');let elapsed=null,last=0,slowTime=0,raf;function render(){let f=val('pitch'),a=val('loud'),d=val('distance'),wl=340/f,rt=2*d/340,phase=elapsed||0;let h=text(78,48,'縱波：粒子左右振動，形成疏密',20,C.ink);for(let j=0;j<5;j++)for(let i=0;i<51;i++){let x=80+i*14.6+a*1.1*Math.sin(i*(f*.00074)-2*Math.PI*(f/1000)*slowTime);h+=`<circle cx="${x}" cy="${93+j*19}" r="3.6" fill="${i===25?C.orange:C.green}" opacity="${i===25?1:.5}"/>`;}h+=text(450,212,'上圖振動時間放慢1000倍；空間尺度僅供比較疏密',13,C.muted,'text-anchor="middle"')+line(80,270,820,270,'#dce5df',1)+`<circle cx="140" cy="330" r="18" fill="${C.green}"/><path d="M140 348V400M140 370L114 384M140 370L166 384M140 400L120 430M140 400L160 430" stroke="${C.green}" stroke-width="5"/><rect x="756" y="300" width="25" height="140" fill="#b0c1b6"/>`+line(175,438,745,438,C.muted,1)+text(450,464,`單程 ${d} m · 往返 ${2*d} m`,17,C.ink,'text-anchor="middle"');if(elapsed!==null){let fraction=Math.min(elapsed/2,1),pos=fraction<.5?fraction*2:2-fraction*2,x=175+pos*570;h+=`<circle cx="${x}" cy="360" r="12" fill="${C.orange}"/>`+text(450,294,fraction<.5?'去程 →':'← 回程',18,C.orange,'text-anchor="middle"');if(fraction===1)h+=text(450,400,'回聲抵達',22,C.orange,'text-anchor="middle"');}draw(h);readouts([['音調對應頻率',f+' Hz'],['實際波長',wl.toFixed(2)+' m'],['回聲往返時間',rt.toFixed(3)+' s']]);note('路徑動畫統一用<b>2秒展示</b>，實際時間看上方數值。為避免教室突然出聲，本頁不發聲；振幅滑桿只改變粒子位移示意，不是分貝刻度。');}bind(render);document.getElementById('echo').onclick=()=>{elapsed=0;last=0;};function loop(now){const dt=last?Math.min((now-last)/1000,.1):0;slowTime+=dt;if(elapsed!==null&&elapsed<2)elapsed=Math.min(2,elapsed+dt);render();last=now;raf=requestAnimationFrame(loop);}render();raf=requestAnimationFrame(loop);return()=>cancelAnimationFrame(raf);}
-const mounts={measure:mountMeasure,density:mountDensity,matter:mountMatter,solution:mountSolution,wave:mountWave,sound:mountSound};
-function activate(key){if(!TOPICS[key])key='lens';cleanup();current=key;let t=TOPICS[key];document.querySelectorAll('nav a').forEach(a=>{a.classList.toggle('active',a.dataset.key===key);if(a.dataset.key===key)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});document.getElementById('eyebrow').textContent=t.group===1?'第一次段考複習 · 測量・物質・波動':'第二次段考預備 · 光學（範圍待公告）';document.getElementById('title').textContent=t.name;document.getElementById('subtitle').textContent=t.subtitle;document.getElementById('lesson-number').textContent=t.n;document.getElementById('teacher-prompt').textContent=t.prompt;document.getElementById('takeaway').textContent=t.take;cleanup=t.group===2?(window.OpticsLab?window.OpticsLab.mount(lab,key):(()=>{lab.innerHTML='<p>光學模組尚未載入，請重新整理。</p>';})()):mounts[key]();if(typeof cleanup!=='function')cleanup=()=>{};fillRanges();const activeLink=document.querySelector('nav a.active');if(activeLink&&matchMedia('(max-width:760px)').matches)activeLink.scrollIntoView({block:'nearest',inline:'center'});document.title=t.name+'｜理化實驗室';}
-let nav='';[1,2].forEach(g=>{nav+=`<div class="nav-group-label">${g===1?'第一次段考 · 複習':'第二次段考 · 光學'}${g===2?'<b>優先備課</b>':''}</div>`;Object.entries(TOPICS).filter(([,t])=>t.group===g).sort((a,b)=>+a[1].n-+b[1].n).forEach(([key,t])=>{nav+=`<a href="#${key}" data-key="${key}"><span class="count" aria-hidden="true">${t.n}</span>${t.name}</a>`;});});document.getElementById('nav').innerHTML=nav;
-window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));document.getElementById('reset').onclick=()=>activate(current);document.getElementById('focus').onclick=()=>{let b=document.body.classList.toggle('projection');document.getElementById('focus').textContent=b?'結束投影':'投影模式';};
-const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-const openInfo=html=>{document.getElementById('info-content').innerHTML=html;dialog.showModal();};
-document.getElementById('guide').onclick=()=>openInfo(`<div class="eyebrow">CLASSROOM GUIDE</div><h2>先讓學生猜，再讓光線回答。</h2><p>適合教師投影示範，也適合學生用自己的瀏覽器操作。先選一個問題，暫時不要展開解釋。</p><ol><li><b>1分鐘預測：</b>只改一項條件，請學生說出預期結果與理由。</li><li><b>3分鐘操作：</b>拖動滑桿，挑兩個反例。例如凸透鏡不一定放大。</li><li><b>2分鐘解釋：</b>用圖和數值解釋，再展開參考答案，比對推理。</li></ol><h3>推薦光學教學路線</h3><p>光的直進與影子 → 平面鏡 → 折射 → 凸／凹透鏡 → RGB光色。初學先看光路，熟悉後才使用公式；折射率與透鏡公式可視班級程度當教師補充。</p><h3>在教室使用</h3><p>按「投影模式」放大操作區。若教室網路不穩，可先下載離線版，雙擊HTML即可使用。離線檔包含互動程式，不需安裝、不需帳號，也不記錄學生個資。</p><h3>範圍提醒</h3><p>第一次範圍已核實為115學年度翰林B3 Ch1～Ch3；第二次光學依去年進度預備，今年仍以老師指定範圍為準。此站是原創教學工具，不是校方公告。</p>`);
-document.getElementById('sources').onclick=()=>openInfo(`<div class="eyebrow">SCOPE & MODELS</div><h2>哪些已確認？哪些是教學模型？</h2><p>截至2026/10/11，校方115學年度第一學期行事曆列第一次段考為10/5–10/6、第二次為11/25–11/26。<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">查看校方行事曆</a>。</p><p>已查到今年正式附件：<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">115學年度第一次段考範圍，第5頁</a>列八年級理化「翰林 B3 Ch1～Ch3」。第二次今年尚未查到公告，光學預備依<a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114學年度第二次修正版，第5頁</a>的B3 4-1～4-5；不可視為今年已確認範圍。</p><h3>模型邊界</h3><ul><li>測量、密度、溶液與波動採理想模型，忽略不影響本課概念的細節。</li><li>光路是幾何光學示意；透鏡採薄透鏡、近軸近似，不含像差或繞射。</li><li>實際光路用實線、反向延長線用虛線。虛像不能直接用屏幕承接。</li><li>折射與薄透鏡公式可作教師補充，不表示國中必須計算所有公式。</li><li>RGB滑桿是螢幕色彩值，不是精密光功率或顏料配比。</li></ul><h3>關於架設</h3><p>網站為純HTML、CSS、JavaScript，沒有後端或付費依賴。index.html是入口檔；GitHub Pages是靜態網站託管。GitHub Free使用Pages時來源儲存庫須公開，教材及原始碼也會公開，適合確認可公開後再部署。</p><p><a href="https://docs.github.com/en/pages/getting-started-with-github-pages/about-github-pages" target="_blank" rel="noopener">GitHub Pages官方說明</a></p>`);
+function setCounts(s,c){for(const k of Object.keys(SPECIES))s.counts[k]=c[k]||0;}
+function lamMark(x1,x2,y,lam,c,label){return L(x1,y,x2,y,{stroke:c,w:2})+L(x1,y-8,x1,y+8,{stroke:c,w:2})+L(x2,y-8,x2,y+8,{stroke:c,w:2})+T((x1+x2)/2,y-10,label||`λ = ${lam.toFixed(2)} m`,{size:15,fill:c,anchor:'middle',weight:700});}
+
+/* ---------- 引擎 ---------- */
+const labEl=document.getElementById('lab');
+let current='lens',cfg=null,state=null,raf=0,drag=null,svgEl=null;
+function snap(key,v){const c=cfg.controls.find(c=>c.type==='range'&&c.key===key);if(!c)return v;const x=Math.round((clamp(v,c.min,c.max)-c.min)/c.step)*c.step+c.min;return +clamp(x,c.min,c.max).toFixed(6);}
+function controlHTML(c,i){
+  const lab=c.label?`<span class="ctl-label">${c.label}</span>`:'';
+  if(c.type==='range')return `<div class="control" data-c="${i}"><label for="c-${c.key}">${c.label}<output></output></label><input id="c-${c.key}" type="range" data-c="${i}" min="${c.min}" max="${c.max}" step="${c.step}"></div>`;
+  if(c.type==='seg')return `<div class="control" data-c="${i}">${lab}<div class="seg" role="group" aria-label="${c.label}">${c.options.map(([,t],j)=>`<button type="button" data-c="${i}" data-o="${j}">${t}</button>`).join('')}</div></div>`;
+  if(c.type==='toggle')return `<div class="control" data-c="${i}"><label class="toggle"><input type="checkbox" data-c="${i}"><span>${c.label}</span></label></div>`;
+  if(c.type==='buttons')return `<div class="control" data-c="${i}">${lab}<div class="control-buttons">${c.items.map(([t],j)=>`<button type="button" class="btn${c.primary?' primary':''}" data-c="${i}" data-a="${j}">${t}</button>`).join('')}</div></div>`;
+  if(c.type==='counter')return `<div class="control" data-c="${i}">${lab}<div class="counter">${c.items.map(([k,t])=>`<div class="count-row"><span>${t}</span><span class="stepper"><button type="button" data-c="${i}" data-k="${k}" data-d="-1" aria-label="減少${t}">−</button><output data-k="${k}"></output><button type="button" data-c="${i}" data-k="${k}" data-d="1" aria-label="增加${t}">＋</button></span></div>`).join('')}</div></div>`;
+  return '';
+}
+function sync(){
+  cfg.controls.forEach((c,i)=>{const box=labEl.querySelector(`.control[data-c="${i}"]`);if(!box)return;box.hidden=c.show?!c.show(state):false;
+    if(c.type==='range'){const el=box.querySelector('input'),v=state[c.key];if(el.value!==String(v))el.value=v;el.style.setProperty('--p',(v-c.min)/(c.max-c.min)*100+'%');box.querySelector('output').textContent=c.fmt?c.fmt(state):`${v}${c.unit||''}`;}
+    else if(c.type==='seg')box.querySelectorAll('button').forEach(b=>{const on=String(c.options[b.dataset.o][0])===String(state[c.key]);b.classList.toggle('active',on);b.setAttribute('aria-pressed',on);});
+    else if(c.type==='toggle')box.querySelector('input').checked=!!state[c.key];
+    else if(c.type==='counter'){const tot=Object.values(state[c.key]).reduce((a,b)=>a+b,0);box.querySelectorAll('output').forEach(o=>o.textContent=state[c.key][o.dataset.k]);box.querySelectorAll('button').forEach(b=>{const n=state[c.key][b.dataset.k];b.disabled=b.dataset.d==='1'?(n>=c.max||tot>=c.total):n<=0;});}});
+}
+const setIf=(el,html)=>{if(el.innerHTML!==html)el.innerHTML=html;};
+function render(){const out=cfg.render(state);svgEl.innerHTML=DEFS+out.svg;setIf(labEl.querySelector('.readouts'),out.reads.map(([a,b])=>`<div class="readout"><span>${a}</span><b>${b}</b></div>`).join(''));setIf(labEl.querySelector('.note'),out.note||'');sync();}
+function activate(key){
+  if(!LABS[key])key='lens';cancelAnimationFrame(raf);current=key;cfg=LABS[key];state=structuredClone(cfg.state);
+  document.querySelectorAll('nav a').forEach(a=>{const on=a.dataset.key===key;a.classList.toggle('active',on);on?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');});
+  document.getElementById('title').textContent=cfg.name;document.getElementById('subtitle').textContent=cfg.subtitle;document.title=cfg.name+'｜理化實驗室';
+  labEl.innerHTML=`<div class="sim-layout"><div class="viz-panel${cfg.dark?' dark':''}"><svg id="scene" viewBox="0 0 900 500" role="img" aria-label="${cfg.name}"></svg>${cfg.drag?'<p class="drag-hint"><i></i>虛線圓圈可以直接拖曳</p>':''}</div><div class="controls">${cfg.controls.map(controlHTML).join('')}<div class="readouts"></div><p class="note"></p><button type="button" class="btn ghost reset">↺ 重設</button></div></div><section class="question"><h3>想一想</h3><p>${cfg.q[0]}</p><details><summary>看解釋</summary><div class="answer">${cfg.q[1]}</div></details></section>`;
+  svgEl=labEl.querySelector('#scene');render();
+  if(cfg.tick){let last=0;const loop=now=>{const dt=last?Math.min((now-last)/1000,0.1):0;last=now;cfg.tick(state,dt);render();raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);}
+  const act=document.querySelector('nav a.active');if(act&&matchMedia('(max-width:760px)').matches)act.scrollIntoView({block:'nearest',inline:'center'});
+}
+labEl.addEventListener('input',e=>{const c=cfg.controls[e.target.dataset.c];if(!c)return;if(c.type==='range')state[c.key]=+e.target.value;else if(c.type==='toggle')state[c.key]=e.target.checked;render();});
+labEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset'))return activate(current);const c=cfg.controls[b.dataset.c];if(!c)return;
+  if(c.type==='seg')state[c.key]=c.options[b.dataset.o][0];else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();});
+const svgPoint=e=>{const p=svgEl.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svgEl.getScreenCTM().inverse());};
+labEl.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-drag]');if(!h||!cfg.drag||!cfg.drag[h.dataset.drag])return;e.preventDefault();drag={name:h.dataset.drag,p0:svgPoint(e),s0:structuredClone(state)};svgEl.setPointerCapture(e.pointerId);labEl.classList.add('dragging');});
+labEl.addEventListener('pointermove',e=>{if(!drag)return;cfg.drag[drag.name](svgPoint(e),state,drag);if(!cfg.tick)render();});
+const endDrag=()=>{drag=null;labEl.classList.remove('dragging');};labEl.addEventListener('pointerup',endDrag);labEl.addEventListener('pointercancel',endDrag);
+
+/* ---------- 頁面 ---------- */
+let nav='';[1,2].forEach(g=>{nav+=`<div class="nav-group-label">${g===1?'第一次段考':'第二次段考 · 光學'}</div>`;Object.entries(LABS).filter(([,t])=>t.group===g).forEach(([key,t])=>{nav+=`<a href="#${key}" data-key="${key}"><span class="count" aria-hidden="true">${t.n}</span>${t.name}</a>`;});});
+document.getElementById('nav').innerHTML=nav;
+window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
+document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';};
+const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
+dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與公式，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學為幾何光學；透鏡採薄透鏡、近軸近似。實線是實際光路，虛線是反向延長線。</li><li>溶解度曲線為常見課本數據的近似值；聲音頁不會發出聲音。</li><li>RGB 是螢幕色彩值，不是光功率。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');

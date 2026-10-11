@@ -27,53 +27,29 @@ a{color:inherit}
 .btn.ghost:hover{background:var(--accent-soft)}
 .btn.primary,.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.primary:hover{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff}
-.text-btn{background:none;border:0;color:var(--muted);padding:0;font-size:13px}
-.text-btn:hover{color:var(--accent-ink);text-decoration:underline}
 
 /* ---------- Top bar ---------- */
 .topbar{position:sticky;top:0;z-index:20;height:64px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:#f6f4efe6;backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line)}
 .brand{display:flex;gap:11px;align-items:center;text-decoration:none}
 .brand-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:var(--ink);color:#e8f2ef}
 .brand-text{font-weight:800;font-size:18px;letter-spacing:.5px;line-height:1.2}
-.brand-text small{display:block;font-size:12px;font-weight:500;letter-spacing:.5px;color:var(--muted)}
 .top-actions{display:flex;gap:8px;align-items:center}
 
 /* ---------- Layout ---------- */
 .page-layout{display:grid;grid-template-columns:260px minmax(0,1fr);max-width:1600px;margin:0 auto}
-.sidebar{position:sticky;top:64px;align-self:start;height:calc(100vh - 64px);overflow-y:auto;padding:28px 18px 24px;display:flex;flex-direction:column}
-.side-head{padding:0 10px}
-.side-title{font-weight:750;font-size:15px}
-.side-caption{font-size:13px;color:var(--muted);margin:4px 0 8px}
+.sidebar{position:sticky;top:64px;align-self:start;height:calc(100vh - 64px);overflow-y:auto;padding:24px 16px;display:flex;flex-direction:column}
 .nav-group-label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);letter-spacing:.8px;margin:22px 10px 8px;font-weight:700}
-.nav-group-label b{background:var(--amber-soft);border:1px solid var(--amber-line);padding:1px 7px;border-radius:999px;color:var(--amber);font-size:11px;font-weight:700;letter-spacing:0}
 nav a{display:flex;align-items:center;gap:11px;padding:8px 10px;margin:2px 0;text-decoration:none;border-radius:12px;font-size:14px;font-weight:550;color:var(--ink-2);transition:background .15s,color .15s}
 nav a .count{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--surface);border:1px solid var(--line);font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
-nav a .nav-icon{display:none}
 nav a:not(.active):hover{background:#ece9e1;color:var(--ink)}
 nav a.active{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:var(--shadow)}
 nav a.active .count{background:var(--accent);border-color:var(--accent);color:#fff}
-.scope-mini{margin-top:auto;font-size:13px;color:var(--ink-2);border:1px solid var(--line);background:var(--surface-2);border-radius:14px;padding:12px 14px;font-weight:600}
-.scope-mini p{font-size:12px;line-height:1.7;margin:6px 0 0;color:var(--muted);font-weight:400}
-.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2f9e6f;margin-right:7px;box-shadow:0 0 0 3px #2f9e6f22}
 main{padding:32px 40px 28px;min-width:0}
 
 /* ---------- Lesson intro ---------- */
-.page-intro{margin-bottom:20px}
-.intro-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.eyebrow{display:inline-block;font-size:12px;letter-spacing:.6px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);padding:3px 10px;border-radius:999px}
-.lesson-number{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1px;font-variant-numeric:tabular-nums}
-.lesson-number:not(:empty)::before{content:"單元 "}
-.lesson-number:not(:empty)::after{content:" / 11"}
-h1{font-size:34px;letter-spacing:-.5px;margin:12px 0 4px;line-height:1.3}
-.page-intro p{font-size:16px;color:var(--ink-2);margin:0;max-width:720px}
-
-/* ---------- Teaching flow ---------- */
-.teaching-flow{display:flex;align-items:center;gap:12px;margin:0 0 18px}
-.steps{display:flex;gap:6px;list-style:none;margin:0;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px}
-.steps li{display:flex;align-items:center;gap:7px;padding:5px 14px 5px 6px;font-size:14px;font-weight:600;color:var(--ink-2);border-radius:999px}
-.steps li+li{position:relative}
-.steps span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:800}
-.teaching-flow .btn{margin-left:auto}
+.page-intro{margin-bottom:18px}
+h1{font-size:32px;letter-spacing:-.5px;margin:0 0 2px;line-height:1.3}
+.page-intro p{font-size:16px;color:var(--ink-2);margin:0;max-width:760px}
 
 /* ---------- Simulation card ---------- */
 .sim-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden;min-height:500px}
@@ -81,20 +57,11 @@ h1{font-size:34px;letter-spacing:-.5px;margin:12px 0 4px;line-height:1.3}
 .viz-panel svg{display:block;width:100%;height:auto;min-width:0;overflow:visible;font-family:inherit;margin:auto 0}
 .viz-panel.dark{background:var(--stage-dark);background-image:radial-gradient(#ffffff0d 1px,transparent 1.2px);background-size:24px 24px}
 .viz-panel.dark svg{overflow:hidden}
-.viz-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
-.viz-heading .tag{font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--muted);border:1px solid var(--line-2);border-radius:999px;padding:2px 9px;background:var(--surface)}
-.viz-panel.dark .viz-heading{color:#d6e2f0}
-.viz-panel.dark .viz-heading .tag{color:#9fb2c8;border-color:#ffffff22;background:#ffffff0a}
-.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2f9e6f;margin-right:8px;box-shadow:0 0 0 3px #2f9e6f26;vertical-align:1px}
-.viz-panel.dark .live-dot{background:#61ddeb;box-shadow:0 0 0 3px #61ddeb2e}
 
 .controls{padding:22px;border-left:1px solid var(--line);background:var(--surface);min-width:0}
-.controls h3{margin:0 0 18px;font-size:12px;letter-spacing:1px;color:var(--muted);font-weight:700}
 .control{margin-bottom:18px}
 .control label,.control>span{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:600;font-size:14px;margin-bottom:6px;color:var(--ink)}
 .control label output,.control label b{color:var(--accent-ink);font-variant-numeric:tabular-nums;font-weight:700;background:var(--accent-soft);padding:0 8px;border-radius:6px;font-size:13px;white-space:nowrap}
-.control label:has(input[type=checkbox]){justify-content:flex-start;align-items:center;cursor:pointer}
-.control input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);margin:0}
 .control select,.control input[type=number]{width:100%;border:1px solid var(--line-2);background:var(--surface-2);padding:9px 12px;border-radius:var(--radius-sm);color:var(--ink);font-size:14px}
 .control small{font-size:12px;display:block;color:var(--muted)}
 .controls>.btn{width:100%;margin-bottom:14px}
@@ -117,40 +84,25 @@ h1{font-size:34px;letter-spacing:-.5px;margin:12px 0 4px;line-height:1.3}
 .note{font-size:14px;line-height:1.8;color:var(--ink-2);margin:14px 0 0;padding:12px 14px;background:var(--accent-soft);border-radius:12px}
 .note:empty{display:none}
 .note b{color:var(--accent-ink)}
-.chip{display:inline-block;border:1px solid var(--line-2);border-radius:999px;font-size:13px;padding:5px 11px;background:#fff;cursor:pointer;color:var(--ink)}
-.chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .control-buttons{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
 .control-buttons .btn{padding:6px 12px;font-size:13px}
-.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:10px;justify-content:center}
-.legend:empty{display:none}
-.legend i{display:inline-block;width:16px;height:3px;background:var(--accent);vertical-align:middle;margin-right:5px}
-.legend i.orange{background:var(--orange)}
-.legend i.blue{background:var(--blue)}
-.model-tag{font-size:12px;color:var(--muted);text-align:center;margin:12px 0 0}
 
-/* ---------- Prediction question ---------- */
-.question{margin-top:18px;background:var(--amber-soft);border:1px solid var(--amber-line);border-radius:var(--radius);padding:18px 22px;font-size:15px;line-height:1.8}
-.question h3{display:flex;align-items:center;gap:8px;font-size:13px;letter-spacing:1px;margin:0 0 4px;color:var(--amber)}
-.question h3::before{content:"?";display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--amber);color:#fff;font-size:13px;letter-spacing:0}
-.question>p{margin:4px 0 10px;font-size:16px;font-weight:600;color:var(--ink)}
-.question summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;list-style:none;color:var(--amber);font-weight:700;font-size:14px;padding:5px 12px;border:1px solid var(--amber-line);border-radius:999px;background:#fff}
+/* ---------- Question ---------- */
+.question{margin-top:16px;background:var(--amber-soft);border:1px solid var(--amber-line);border-radius:var(--radius);padding:16px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.question h3{display:flex;align-items:center;gap:8px;font-size:14px;margin:0;color:var(--amber)}
+.question h3::before{content:"?";display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--amber);color:#fff;font-size:13px}
+.question>p{flex:1 1 320px;margin:0;font-size:16px;font-weight:600;color:var(--ink);line-height:1.7}
+.question details{flex:1 1 100%}
+.question summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;list-style:none;color:var(--amber);font-weight:700;font-size:14px;padding:4px 12px;border:1px solid var(--amber-line);border-radius:999px;background:#fff}
 .question summary::-webkit-details-marker{display:none}
 .question summary::after{content:"▾";transition:transform .2s}
 .question details[open] summary::after{transform:rotate(180deg)}
-.question .answer{margin-top:12px;padding:12px 16px;background:#fff;border-radius:12px;color:var(--ink-2)}
-
-/* ---------- Lesson footer ---------- */
-.lesson-footer{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0 8px}
-.footer-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px}
-.footer-label{display:block;font-size:12px;letter-spacing:1px;font-weight:700;color:var(--accent-ink)}
-.lesson-footer p{font-size:15px;line-height:1.8;margin:6px 0 0;color:var(--ink-2)}
-footer{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:13px;padding-top:18px;margin-top:10px;border-top:1px solid var(--line)}
+.question .answer{margin-top:10px;padding:12px 16px;background:#fff;border-radius:12px;color:var(--ink-2);font-size:15px;line-height:1.8}
 
 /* ---------- Dialog ---------- */
 dialog{border:0;border-radius:22px;padding:32px 36px;max-width:720px;width:calc(100% - 32px);max-height:85vh;color:var(--ink);background:var(--surface);box-shadow:0 24px 80px #0f1b2d40}
 dialog::backdrop{background:#1b2a3366;backdrop-filter:blur(4px)}
 dialog .close{float:right;margin:-6px -8px 0 12px}
-dialog .eyebrow{margin-bottom:4px}
 dialog h2{font-size:24px;line-height:1.4;margin:10px 0 12px}
 dialog h3{font-size:17px;margin:26px 0 6px;padding-top:18px;border-top:1px solid var(--line)}
 dialog p,dialog li{font-size:15px;line-height:1.9;color:var(--ink-2)}
@@ -165,11 +117,10 @@ dialog a{color:var(--accent-ink);font-weight:600}
 .projection .control label,.projection .note,.projection .question{font-size:17px}
 .projection .readout b,.projection .readout strong{font-size:19px}
 .projection .page-intro p{font-size:18px}
+.projection .readouts .readout{font-size:15px}
 .projection h1{font-size:40px}
-.projection .lesson-footer{display:none}
 .projection .viz-panel{min-height:560px}
 
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:white;border-radius:12px;padding:12px 20px;z-index:30;font-size:14px}
 [hidden]{display:none!important}
 
 /* ---------- Responsive ---------- */
@@ -182,7 +133,7 @@ dialog a{color:var(--accent-ink);font-weight:600}
   .sim-layout{grid-template-columns:1fr}
   .controls{border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:0 24px;align-content:start}
   .controls>*{min-width:0}
-  .controls h3,.controls .note,.controls .readouts,.controls .control-buttons,.controls>.btn,.controls>div:not(.control){grid-column:1/-1}
+  .controls .note,.controls .readouts,.controls .control-buttons,.controls>.btn,.controls>div:not(.control){grid-column:1/-1}
   .readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
   .readout+.readout{border-top:0}
   .readout{border-bottom:1px solid var(--line);border-right:1px solid var(--line);margin:0 -1px -1px 0}
@@ -197,7 +148,6 @@ dialog a{color:var(--accent-ink);font-weight:600}
   .top-actions .btn{flex:1;font-size:13px;padding:7px 8px}
   .page-layout{display:block}
   .sidebar{position:sticky;top:0;z-index:15;height:auto;overflow:visible;border-right:0;border-bottom:1px solid var(--line);padding:10px 0;background:#f6f4efeb;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-  .side-head,.scope-mini{display:none}
   nav{display:flex;overflow-x:auto;gap:6px;padding:2px 16px 4px;scrollbar-width:none}
   nav::-webkit-scrollbar{display:none}
   nav .nav-group-label{display:none}
@@ -207,19 +157,41 @@ dialog a{color:var(--accent-ink);font-weight:600}
   main{padding:18px 16px}
   h1{font-size:27px}
   .page-intro p{font-size:15px}
-  .teaching-flow{flex-wrap:wrap}
-  .steps{flex:1 1 100%;justify-content:space-between}
-  .steps li{font-size:13px;padding:4px 10px 4px 4px}
-  .teaching-flow .btn{margin-left:0}
   .viz-panel{padding:12px 10px 14px}
-  .viz-heading{padding:0 4px;font-size:12px}
   .controls{grid-template-columns:1fr;padding:18px 16px}
   .readouts{grid-template-columns:1fr}
   .readout{border-right:0;margin-right:0}
   .question{padding:16px}
-  .lesson-footer{grid-template-columns:1fr;gap:12px}
-  footer{flex-wrap:wrap}
   dialog{padding:24px 20px}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
-.drawing{margin:auto 0}
+
+/* ---------- Controls (v2) ---------- */
+.ctl-label{display:block;font-weight:600;font-size:14px;margin-bottom:6px;color:var(--ink)}
+.seg{display:flex;flex-wrap:wrap;gap:3px;padding:3px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px}
+.seg button{flex:1 1 auto;border:0;background:transparent;padding:6px 10px;border-radius:9px;font-size:13px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.seg button:hover{color:var(--accent-ink)}
+.seg button.active{background:var(--surface);color:var(--accent-ink);box-shadow:0 1px 3px #1b2a3326}
+.toggle{display:flex!important;justify-content:flex-start!important;align-items:center!important;gap:10px;font-size:14px;font-weight:600;cursor:pointer;margin:0!important}
+.toggle input{appearance:none;-webkit-appearance:none;flex:none;width:36px;height:20px;border-radius:999px;background:var(--line-2);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.toggle input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0003;transition:transform .15s}
+.toggle input:checked{background:var(--accent)}
+.toggle input:checked::after{transform:translateX(16px)}
+.control:has(.toggle){margin-bottom:12px}
+.counter{display:flex;flex-direction:column;gap:2px}
+.count-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;padding:3px 0}
+.stepper{display:inline-flex;align-items:center;gap:4px}
+.stepper button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);font-size:16px;font-weight:700;color:var(--ink);line-height:1}
+.stepper button:hover:not(:disabled){border-color:var(--accent);color:var(--accent-ink)}
+.stepper button:disabled{opacity:.35;cursor:default}
+.stepper output{min-width:22px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.controls .reset{width:100%;margin-top:14px}
+.control-buttons .btn.primary{flex:1;padding:9px 14px;font-size:14px}
+.drag-hint{display:flex;align-items:center;gap:8px;margin:6px 0 0;font-size:13px;color:var(--muted)}
+.drag-hint i{width:14px;height:14px;border-radius:50%;border:2px dashed var(--orange)}
+.viz-panel.dark .drag-hint{color:#9fb2c8}
+.viz-panel.dark .drag-hint i{border-color:#ffcc6a}
+.handle,.handle-body{cursor:grab;touch-action:none}
+.handle:hover .ring{fill-opacity:.4}
+.dragging,.dragging *{cursor:grabbing!important}
+dialog .small{font-size:13px;color:var(--muted)}
