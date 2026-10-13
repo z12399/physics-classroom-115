@@ -237,6 +237,23 @@ const REFLECT={apple:['紅蘋果',[1,0,0]],leaf:['綠葉',[0,1,0]],banana:['黃�
 const LIGHTS=[['白光',[255,255,255]],['紅',[255,0,0]],['綠',[0,255,0]],['藍',[0,0,255]],['黃',[255,255,0]],['青',[0,255,255]],['洋紅',[255,0,255]],['關燈',[0,0,0]]];
 function colorName(r,g,b){if(Math.max(r,g,b)<40)return '黑';const k=[r,g,b].map(v=>v>=128?1:0).join('');return {'000':'暗色','100':'紅','010':'綠','001':'藍','110':'黃','011':'青','101':'洋紅','111':'白'}[k];}
 
+/* ---------- 光學共用：開關燈與光路前進 ---------- */
+const SPECTRUM=[['紅','#ff453a'],['橙','#ff9f0a'],['黃','#ffd60a'],['綠','#32d74b'],['藍','#0a84ff'],['靛','#5e5ce6'],['紫','#bf5af2']];
+const replay=s=>{s.prog=0;};
+const LAMP={type:'seg',key:'on',label:'燈',options:[[true,'開燈'],[false,'關燈']],onChange:replay};
+const BEAM={type:'seg',key:'beam',label:'光線',options:[['single','單束光'],['full','全光']],onChange:replay};
+const LIGHT_TICK=(s,dt)=>{if(s.on&&s.prog<30)s.prog+=dt;};
+let REACH=1e9,TRACED=[];
+function beginLight(s){REACH=!s.on?0:reduceMotion?1e9:s.prog*750;TRACED=[];}
+/* 沿折線畫出光，只畫到目前光走到的距離 */
+function ray(pts,c,o={}){const{w=3,op=1,arrow=true,delay=0}=o;let total=delay;for(let i=1;i<pts.length;i++)total+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);TRACED.push(total);
+  let rem=REACH-delay;if(rem<=0)return '';let d=`M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for(let i=1;i<pts.length;i++){const[a,b]=[pts[i-1],pts[i]],l=Math.hypot(b[0]-a[0],b[1]-a[1]);if(rem>=l){d+=`L${b[0].toFixed(1)} ${b[1].toFixed(1)}`;rem-=l;}else{const t=rem/l;d+=`L${(a[0]+(b[0]-a[0])*t).toFixed(1)} ${(a[1]+(b[1]-a[1])*t).toFixed(1)}`;break;}}
+  return `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" opacity="${op}"${arrow?' marker-end="url(#arr)"':''}/>`;}
+const maxTraced=()=>TRACED.length?Math.max(...TRACED.filter(l=>l<2000),0):0;
+const arrived=()=>TRACED.length>0&&REACH>=maxTraced();
+const fadeIn=()=>TRACED.length?clamp((REACH-maxTraced())/200,0,1):0;
+
 const LABS={
 /* ===== 01 測量 ===== */
 measure:{group:1,n:'01',name:'測量與估讀',subtitle:'拖動物件或換一把尺，練習讀出完整的測量值。',
@@ -423,152 +440,229 @@ sound:{group:1,n:'06',name:'聲音與回聲',subtitle:'調整頻率、振幅和�
       note:`<b>距離 = 聲速 × 時間 ÷ 2</b><br>${num(v,0)} × ${t.toFixed(3)} ÷ 2 = ${s.d} m`};}},
 
 /* ===== 07 影子 ===== */
-shadow:{group:2,n:'07',name:'光的直進與影子',subtitle:'拖動物體與屏幕，比較點光源和有大小的光源。',dark:true,
+shadow:{group:2,n:'07',name:'光的直進與影子',subtitle:'開燈看光怎麼走；單束光看路徑，全光看影子怎麼形成。',dark:true,
   q:['物體靠近點光源，屏幕上的影子會變大還是變小？','會變大。屏幕位置不變時，光源到物體的距離 a 減少，影子的放大倍數 D/a 增加。'],
-  state:{src:'point',a:60,D:200,h:40,R:15,rays:true},
-  controls:[
-    {type:'seg',key:'src',label:'光源',options:[['point','點光源'],['area','有大小的光源']]},
+  state:{on:true,beam:'full',prog:0,src:'point',a:60,D:200,h:40,R:15,ang:-16,edges:true},
+  controls:[LAMP,BEAM,
+    {type:'seg',key:'src',label:'光源',options:[['point','點光源'],['area','有大小的光源']],onChange:replay},
     {type:'range',key:'R',label:'光源大小',min:4,max:30,step:1,unit:' cm',show:s=>s.src==='area'},
     {type:'range',key:'a',label:'光源 → 物體 a',min:20,max:150,step:1,unit:' cm'},
     {type:'range',key:'D',label:'光源 → 屏幕 D',min:160,max:300,step:1,unit:' cm'},
     {type:'range',key:'h',label:'物體高度 h',min:10,max:60,step:1,unit:' cm'},
-    {type:'toggle',key:'rays',label:'顯示邊界光線'}],
-  drag:{obj:(p,s)=>{s.a=snap('a',(p.x-100)/(700/300));},top:(p,s)=>{s.h=snap('h',2*(250-p.y)/1.6);},screen:(p,s)=>{s.D=snap('D',(p.x-100)/(700/300));}},
+    {type:'toggle',key:'edges',label:'標出邊界光線',show:s=>s.beam==='full'}],
+  tick:LIGHT_TICK,
+  drag:{obj:(p,s)=>{s.a=snap('a',(p.x-100)/(700/300));},top:(p,s)=>{s.h=snap('h',2*(250-p.y)/1.6);},screen:(p,s)=>{s.D=snap('D',(p.x-100)/(700/300));},aim:(p,s)=>{s.ang=clamp(deg(Math.atan2(p.y-250,p.x-100)),-40,40);}},
   render(s){
+    beginLight(s);
     const k=700/300,vy=1.6,a=Math.min(s.a,s.D-15),Dd=s.D,R=s.src==='area'?s.R:0,PX=x=>100+x*k,PY=y=>250+y*vy;
     const s1=-R,s2=R,ot=-s.h/2,ob=s.h/2,line=(y0,y1)=>x=>y0+(y1-y0)*x/a;
     const uU=line(s1,ot),uL=line(s2,ob),oU=line(s2,ot),oL=line(s1,ob),sx=PX(Dd),ox=PX(a);
-    let h=`<rect x="${sx}" y="30" width="16" height="440" rx="4" fill="#5d7088"/>`;
+    const trace=(y0,ang)=>{const dx=Math.cos(ang),dy=Math.sin(ang),ty=y0+dy*(ox-100)/dx;if(ty>=PY(ot)&&ty<=PY(ob))return{pts:[[100,y0],[ox,ty]],hit:true};return{pts:[[100,y0],[sx,y0+dy*(sx-100)/dx]],hit:false};};
+    let rays='',blocked=false,spot=null;
+    if(s.on&&s.beam==='single'){const t=trace(250,rad(s.ang));blocked=t.hit;rays+=ray(t.pts,'#ffe8a5',{w:3.5});if(!t.hit)spot=t.pts[1];}
+    else if(s.on){const ys=R>0?[PY(s1),250,PY(s2)]:[250];for(const y0 of ys){const n=R>0?13:25,a0=Math.atan2(36-y0,sx-100),a1=Math.atan2(464-y0,sx-100);for(let i=0;i<n;i++)rays+=ray(trace(y0,a0+(a1-a0)*i/(n-1)).pts,'#ffe8a5',{w:1.6,op:R>0?.4:.55,arrow:false});}}
+    const fade=s.beam==='full'?fadeIn():0,lit=fade>0;
+    let h=`<rect x="${sx}" y="30" width="16" height="440" rx="4" fill="${lit?'#d8cda4':'#5d7088'}"/>`;
     const poly=pts=>pts.map(([x,y])=>`${PX(x).toFixed(1)},${PY(y).toFixed(1)}`).join(' ');
-    if(R>0)h+=`<polygon points="${poly([[a,ot],[Dd,oU(Dd)],[Dd,oL(Dd)],[a,ob]])}" fill="#000" opacity=".42"/>`;
-    let umbraH;
-    if(uU(Dd)<uL(Dd)){h+=`<polygon points="${poly([[a,ot],[Dd,uU(Dd)],[Dd,uL(Dd)],[a,ob]])}" fill="#03060b" opacity=".92"/>`;umbraH=uL(Dd)-uU(Dd);}
-    else{const xs=a*(s2-s1)/((s2-s1)-(ob-ot));h+=`<polygon points="${poly([[a,ot],[xs,uU(xs)],[a,ob]])}" fill="#03060b" opacity=".92"/>`;umbraH=0;}
-    if(R>0)h+=`<rect x="${sx}" y="${PY(oU(Dd))}" width="16" height="${(oL(Dd)-oU(Dd))*vy}" fill="#2b3442"/>`;
-    if(umbraH>0)h+=`<rect x="${sx}" y="${PY(uU(Dd))}" width="16" height="${umbraH*vy}" fill="#05080d"/>`;
-    if(s.rays){const ray=(y0,y1,yE,c)=>L(PX(0),PY(y0),PX(Dd),PY(yE),{stroke:c,w:2.5,op:.9});
-      if(R>0)h+=ray(s1,ot,uU(Dd),D.ray)+ray(s2,ob,uL(Dd),D.ray)+ray(s2,ot,oU(Dd),D.second)+ray(s1,ob,oL(Dd),D.second);
-      else h+=ray(0,ot,uU(Dd),D.ray)+ray(0,ob,uL(Dd),D.ray);}
-    h+=R>0?`<rect x="92" y="${PY(s1)}" width="16" height="${2*R*vy}" rx="8" fill="#ffe8a5"/><rect x="84" y="${PY(s1)-8}" width="32" height="${2*R*vy+16}" rx="16" fill="#ffe8a5" opacity=".25"/>`:`<circle cx="100" cy="250" r="11" fill="#ffe8a5"/><circle cx="100" cy="250" r="24" fill="#ffe8a5" opacity=".25"/>`;
+    let umbraH=uU(Dd)<uL(Dd)?uL(Dd)-uU(Dd):0;
+    if(lit){
+      if(R>0)h+=`<polygon points="${poly([[a,ot],[Dd,oU(Dd)],[Dd,oL(Dd)],[a,ob]])}" fill="#000" opacity="${.42*fade}"/>`;
+      if(umbraH>0)h+=`<polygon points="${poly([[a,ot],[Dd,uU(Dd)],[Dd,uL(Dd)],[a,ob]])}" fill="#03060b" opacity="${.92*fade}"/>`;
+      else{const xs=a*(s2-s1)/((s2-s1)-(ob-ot));h+=`<polygon points="${poly([[a,ot],[xs,uU(xs)],[a,ob]])}" fill="#03060b" opacity="${.92*fade}"/>`;}
+      if(R>0)h+=`<rect x="${sx}" y="${PY(oU(Dd))}" width="16" height="${(oL(Dd)-oU(Dd))*vy}" fill="#5c6270" opacity="${fade}"/>`;
+      if(umbraH>0)h+=`<rect x="${sx}" y="${PY(uU(Dd))}" width="16" height="${umbraH*vy}" fill="#05080d" opacity="${fade}"/>`;
+    }
+    h+=rays;
+    if(lit&&s.edges){const e=(y0,y1,yE,c)=>L(PX(0),PY(y0),PX(Dd),PY(yE),{stroke:c,w:2.5,op:.95*fade});h+=R>0?e(s1,ot,uU(Dd),D.ray)+e(s2,ob,uL(Dd),D.ray)+e(s2,ot,oU(Dd),D.second)+e(s1,ob,oL(Dd),D.second):e(0,ot,uU(Dd),D.ray)+e(0,ob,uL(Dd),D.ray);}
+    if(lit&&umbraH>0)h+=T(sx-10,PY(0)+6,'本影',{size:17,fill:D.ink,anchor:'end'});if(lit&&R>0)h+=T(sx-10,PY(oL(Dd))-6,'半影',{size:16,fill:D.muted,anchor:'end'});
+    if(spot&&arrived())h+=`<circle cx="${sx}" cy="${spot[1]}" r="9" fill="#ffe8a5"/><circle cx="${sx}" cy="${spot[1]}" r="20" fill="#ffe8a5" opacity=".3"/>`;
+    if(blocked&&arrived())h+=T(ox+14,PY(ot)-14,'被擋住',{size:16,fill:D.object});
+    const glow=s.on?'#ffe8a5':'#56606e';
+    h+=R>0?`<rect x="92" y="${PY(s1)}" width="16" height="${2*R*vy}" rx="8" fill="${glow}"/>${s.on?`<rect x="84" y="${PY(s1)-8}" width="32" height="${2*R*vy+16}" rx="16" fill="${glow}" opacity=".25"/>`:''}`:`<circle cx="100" cy="250" r="11" fill="${glow}"/>${s.on?`<circle cx="100" cy="250" r="24" fill="${glow}" opacity=".25"/>`:''}`;
     h+=L(ox,PY(ot),ox,PY(ob),{stroke:D.object,w:10})+handle('obj',ox,PY(ob)+30,D.object)+handle('top',ox,PY(ot),D.object,10)+handle('screen',sx+8,52,D.muted);
+    if(s.on&&s.beam==='single')h+=handle('aim',100+120*Math.cos(rad(s.ang)),250+120*Math.sin(rad(s.ang)),'#ffe8a5',11);
     h+=T(100,R>0?PY(s1)-22:214,'光源',{size:19,fill:D.object,anchor:'middle'})+T(sx+8,22,'屏幕',{size:17,fill:D.ink,anchor:'middle'});
-    if(umbraH>0)h+=T(sx-10,PY(0)+6,'本影',{size:17,fill:D.ink,anchor:'end'});if(R>0)h+=T(sx-10,PY(oL(Dd))-6,'半影',{size:16,fill:D.muted,anchor:'end'});
     h+=L(100,462,ox,462,{stroke:D.object,w:1.5,dash:'5 5'})+T((100+ox)/2,456,`a = ${a} cm`,{size:15,fill:D.object,anchor:'middle'})+L(100,488,sx,488,{stroke:D.muted,w:1.5,dash:'5 5'})+T((100+sx)/2+60,483,`D = ${Dd} cm`,{size:15,fill:D.muted,anchor:'middle'});
-    const reads=R>0?[['本影高度',umbraH>0?num(umbraH)+' cm':'沒有本影'],['半影寬度（單側）',num((oL(Dd)-oU(Dd)-umbraH)/2)+' cm'],['物體高度',s.h+' cm']]:[['物體高度 h',s.h+' cm'],['影子高度 H',num(s.h*Dd/a)+' cm'],['放大倍數',num(Dd/a,2)+' 倍']];
-    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,note:R>0?'光源有大小 → 完全照不到的<b>本影</b>＋部分照到的<b>半影</b>':`光沿直線前進。<b>H / h = D / a</b>：${num(s.h*Dd/a)} / ${s.h} = ${Dd} / ${a}`};}},
+    if(!s.on)h+=T(450,250,'按「開燈」',{size:22,fill:D.muted,anchor:'middle'});
+    let reads=R>0?[['本影高度',umbraH>0?num(umbraH)+' cm':'沒有本影'],['半影寬度（單側）',num((oL(Dd)-oU(Dd)-umbraH)/2)+' cm']]:[['影子高度 H',num(s.h*Dd/a)+' cm'],['放大倍數',num(Dd/a,2)+' 倍']];
+    if(s.beam==='single')reads=[['這束光',!s.on?'—':blocked?'被物體擋住':'照到屏幕'],...reads];
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,
+      note:s.beam==='single'?'光在同一介質中<b>沿直線</b>前進。拖動光束旁的圓圈改變方向。':R>0?'光源有大小 → 完全照不到的<b>本影</b>＋部分照到的<b>半影</b>':`被擋住的光到不了屏幕 → 影子。<b>H / h = D / a</b>`};}},
 
 /* ===== 08 平面鏡 ===== */
-mirror:{group:2,n:'08',name:'反射與平面鏡',subtitle:'拖動物體或眼睛，看反射光如何讓你看到鏡後的像。',dark:true,
+mirror:{group:2,n:'08',name:'反射與平面鏡',subtitle:'開燈照亮物體；單束光看反射定律，全光看像怎麼出現。',dark:true,
   q:['物體向鏡面靠近 10 cm，物與像的距離改變多少？','像也向鏡面靠近 10 cm，所以物與像的距離減少 20 cm。'],
-  state:{d:55,h:60,ex:80,ey:110,eye:true,fan:false,ext:true},
-  controls:[
+  state:{on:true,beam:'full',prog:0,d:55,h:60,ex:80,ey:110,eye:true,ext:true,hit:170},
+  controls:[LAMP,BEAM,
     {type:'range',key:'d',label:'物距',min:15,max:110,step:1,unit:' cm'},
     {type:'range',key:'h',label:'物體高度',min:20,max:100,step:1,unit:' cm'},
-    {type:'toggle',key:'eye',label:'進入眼睛的光線'},
-    {type:'toggle',key:'fan',label:'物體頂端發出的多條光線'},
+    {type:'toggle',key:'eye',label:'進入眼睛的光線',show:s=>s.beam==='full'},
     {type:'toggle',key:'ext',label:'反向延長線'}],
-  drag:{obj:(p,s)=>{s.d=snap('d',(450-p.x)/3);},img:(p,s)=>{s.d=snap('d',(p.x-450)/3);},top:(p,s)=>{s.h=snap('h',(400-p.y)/2.6);},eye:(p,s)=>{s.ex=clamp(p.x,40,420);s.ey=clamp(p.y,40,440);}},
+  tick:LIGHT_TICK,
+  drag:{obj:(p,s)=>{s.d=snap('d',(450-p.x)/3);},img:(p,s)=>{s.d=snap('d',(p.x-450)/3);},top:(p,s)=>{s.h=snap('h',(400-p.y)/2.6);},eye:(p,s)=>{s.ex=clamp(p.x,40,420);s.ey=clamp(p.y,40,440);},hit:(p,s)=>{s.hit=clamp(p.y,50,430);}},
   render(s){
-    const mx=450,ox=mx-s.d*3,ix=mx+s.d*3,base=400,top=base-s.h*2.6;
+    beginLight(s);
+    const mx=450,ox=mx-s.d*3,ix=mx+s.d*3,base=400,top=base-s.h*2.6,refl=(Y,hy)=>{const dx=mx-ox,k=(mx-30)/dx;return[mx-dx*k,hy+(hy-Y)*k];};
     let h=`<rect x="450" y="40" width="12" height="400" fill="#72dbe6" opacity=".3"/>`+L(mx,40,mx,440,{stroke:D.ray,w:4})+T(mx,30,'平面鏡',{size:17,fill:D.ray,anchor:'middle'});
-    if(s.fan)for(let i=0;i<6;i++){const hy=60+i*70,dx=mx-ox,dy=hy-top,k=(mx-30)/dx;h+=L(ox,top,mx,hy,{stroke:D.third,w:2,op:.75})+L(mx,hy,mx-dx*k,hy+dy*k,{stroke:D.third,w:2,op:.75,arrow:true});if(s.ext)h+=L(mx,hy,ix,top,{stroke:D.third,w:1.5,dash:'6 6',op:.6});}
-    if(s.eye)[top,base].forEach((Y,i)=>{const hit=s.ey+(Y-s.ey)*(mx-s.ex)/(ix-s.ex),c=i?D.second:D.ray;if(hit<40||hit>440)return;h+=L(ox,Y,mx,hit,{stroke:c,w:3,arrow:true})+L(mx,hit,s.ex,s.ey,{stroke:c,w:3,arrow:true});if(s.ext)h+=L(mx,hit,ix,Y,{stroke:c,w:2,dash:true});});
-    h+=vArrow(ox,base,top,D.object)+vArrow(ix,base,top,D.image,{dash:'7 6'})+T(ox,base+30,'物',{size:20,fill:D.object,anchor:'middle'})+T(ix,base+30,'虛像',{size:20,fill:D.image,anchor:'middle'});
+    let rays='',exts=[],ang=deg(Math.atan(Math.abs(s.hit-top)/(mx-ox)));
+    if(s.on&&s.beam==='single'){rays+=ray([[ox,top],[mx,s.hit],refl(top,s.hit)],D.object,{w:3.5});exts.push([mx,s.hit,ix,top,D.object]);}
+    else if(s.on){for(let i=0;i<7;i++){const hy=60+i*60;rays+=ray([[ox,top],[mx,hy],refl(top,hy)],D.third,{w:1.8,op:.75,arrow:false});exts.push([mx,hy,ix,top,D.third]);}
+      if(s.eye)[top,base].forEach((Y,i)=>{const hy=s.ey+(Y-s.ey)*(mx-s.ex)/(ix-s.ex),c=i?D.second:D.ray;if(hy<40||hy>440)return;rays+=ray([[ox,Y],[mx,hy],[s.ex,s.ey]],c,{w:3});exts.push([mx,hy,ix,Y,c]);});}
+    const fade=fadeIn();
+    if(s.ext&&fade>0)for(const[x1,y1,x2,y2,c]of exts)h+=L(x1,y1,x2,y2,{stroke:c,w:1.6,dash:'6 6',op:.8*fade});
+    h+=rays;
+    if(s.on&&s.beam==='single'&&arrived()){const r=60,th=rad(ang),dir=s.hit<top?-1:1;h+=L(mx-110,s.hit,mx,s.hit,{stroke:D.muted,w:1.5,dash:'4 5'})+T(mx-116,s.hit+5,'法線',{size:14,fill:D.muted,anchor:'end'});
+      h+=`<path d="M${mx-r} ${s.hit}A${r} ${r} 0 0 ${dir<0?1:0} ${mx-r*Math.cos(th)} ${s.hit-dir*r*Math.sin(th)}" fill="none" stroke="${D.object}" stroke-width="2"/><path d="M${mx-r*0.8} ${s.hit}A${r*0.8} ${r*0.8} 0 0 ${dir<0?0:1} ${mx-r*0.8*Math.cos(th)} ${s.hit+dir*r*0.8*Math.sin(th)}" fill="none" stroke="${D.ink}" stroke-width="2"/>`;
+      h+=T(mx-r-8,s.hit-dir*30,`${ang.toFixed(0)}°`,{size:16,fill:D.object,anchor:'end'})+T(mx-r-8,s.hit+dir*38,`${ang.toFixed(0)}°`,{size:16,fill:D.ink,anchor:'end'});}
+    h+=`<g opacity="${s.on?1:.35}">${vArrow(ox,base,top,D.object)}</g>`+T(ox,base+30,'物',{size:20,fill:D.object,anchor:'middle'});
+    if(fade>0)h+=`<g opacity="${fade}">${vArrow(ix,base,top,D.image,{dash:'7 6'})}${T(ix,base+30,'虛像',{size:20,fill:D.image,anchor:'middle'})}</g>`;
     h+=handle('obj',ox,base,D.object)+handle('top',ox,top,D.object,10)+handle('img',ix,base,D.image);
+    if(s.on&&s.beam==='single')h+=handle('hit',mx,s.hit,D.object,11);
     h+=`<path d="M${s.ex-30} ${s.ey}Q${s.ex} ${s.ey-28} ${s.ex+30} ${s.ey}Q${s.ex} ${s.ey+28} ${s.ex-30} ${s.ey}" fill="#e8f3ff"/><circle cx="${s.ex}" cy="${s.ey}" r="10" fill="#162b46"/>`+handle('eye',s.ex,s.ey,D.ink,34);
     h+=L(ox,465,mx,465,{stroke:D.object,w:1.5,dash:'5 5'})+L(mx,465,ix,465,{stroke:D.image,w:1.5,dash:'5 5'})+T((ox+mx)/2,488,`${s.d} cm`,{size:16,fill:D.object,anchor:'middle'})+T((ix+mx)/2,488,`${s.d} cm`,{size:16,fill:D.image,anchor:'middle'});
-    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['物距 = 像距',`${s.d} cm`],['物與像的距離',`${s.d*2} cm`],['像的性質','正立・等大・虛像']],
-      note:'實線是光真正走的路；虛線是反射光的<b>反向延長線</b>，交點就是虛像。'};}},
+    if(!s.on)h+=T(680,250,'關燈時沒有光進入眼睛，看不到像',{size:17,fill:D.muted,anchor:'middle'});
+    const reads=s.beam==='single'?[['入射角 = 反射角',`${ang.toFixed(0)}°`],['物距 = 像距',`${s.d} cm`],['像的性質','正立・等大・虛像']]:[['物距 = 像距',`${s.d} cm`],['物與像的距離',`${s.d*2} cm`],['像的性質','正立・等大・虛像']];
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,
+      note:s.beam==='single'?'<b>入射角 = 反射角</b>（從法線量起）。拖動鏡面上的圓圈換一條光線。':'所有反射光的<b>反向延長線</b>都交在同一點 → 虛像。'};}},
 
 /* ===== 09 折射 ===== */
-refraction:{group:2,n:'09',name:'折射與全反射',subtitle:'換介質、拖動入射光，找出全反射發生的條件。',dark:true,
+refraction:{group:2,n:'09',name:'折射與全反射',subtitle:'單束光看折射角；全光從一點發光，找出全反射從哪裡開始。',dark:true,
   q:['光由水射向空氣，一定會折射出去嗎？','不一定。由折射率大的介質射向折射率小的介質，入射角大於臨界角時，就發生全反射。'],
-  state:{m1:'air',m2:'water',a:40},
-  controls:[
-    {type:'seg',key:'m1',label:'上方介質（光從這裡來）',options:Object.entries(MEDIA).map(([k,v])=>[k,v[0]])},
-    {type:'seg',key:'m2',label:'下方介質',options:Object.entries(MEDIA).map(([k,v])=>[k,v[0]])},
-    {type:'buttons',label:'',items:[['⇅ 上下互換',s=>{[s.m1,s.m2]=[s.m2,s.m1];}]]},
-    {type:'range',key:'a',label:'入射角 θ₁',min:0,max:89,step:1,unit:'°'}],
-  drag:{ray:(p,s)=>{const dx=450-p.x,dy=250-p.y;s.a=dy<=0?89:snap('a',deg(Math.atan2(Math.max(0,dx),dy)));}},
+  state:{on:true,beam:'single',prog:0,m1:'air',m2:'water',a:40,sx:330,sy:120},
+  controls:[LAMP,BEAM,
+    {type:'seg',key:'m1',label:'上方介質（光從這裡來）',options:Object.entries(MEDIA).map(([k,v])=>[k,v[0]]),onChange:replay},
+    {type:'seg',key:'m2',label:'下方介質',options:Object.entries(MEDIA).map(([k,v])=>[k,v[0]]),onChange:replay},
+    {type:'buttons',label:'',items:[['⇅ 上下互換',s=>{[s.m1,s.m2]=[s.m2,s.m1];s.prog=0;}]]},
+    {type:'range',key:'a',label:'入射角 θ₁',min:0,max:89,step:1,unit:'°',show:s=>s.beam==='single'}],
+  tick:LIGHT_TICK,
+  drag:{ray:(p,s)=>{const dx=450-p.x,dy=250-p.y;s.a=dy<=0?89:snap('a',deg(Math.atan2(Math.max(0,dx),dy)));},src:(p,s)=>{s.sx=clamp(p.x,40,860);s.sy=clamp(p.y,40,225);}},
   render(s){
-    const[n1Name,n1,c1]=MEDIA[s.m1],[n2Name,n2,c2]=MEDIA[s.m2],cx=450,cy=250,Ln=210,a=rad(s.a),q=n1*Math.sin(a)/n2,tir=q>1+1e-12,b=tir?null:Math.asin(Math.min(1,q)),crit=n1>n2?deg(Math.asin(n2/n1)):null;
-    const arc=(r,st,en,c)=>`<path d="M${cx+r*Math.cos(st)} ${cy+r*Math.sin(st)}A${r} ${r} 0 0 1 ${cx+r*Math.cos(en)} ${cy+r*Math.sin(en)}" fill="none" stroke="${c}" stroke-width="2"/>`;
-    const sx=cx-Ln*Math.sin(a),sy=cy-Ln*Math.cos(a);
-    let h=`<rect x="10" y="10" width="880" height="240" fill="${c1}"/><rect x="10" y="250" width="880" height="232" fill="${c2}"/>`+L(10,cy,890,cy,{stroke:'#d7edff',w:2})+L(cx,30,cx,470,{stroke:D.muted,w:2,dash:true})+T(cx+12,46,'法線',{size:16,fill:D.muted});
+    beginLight(s);
+    const[n1Name,n1,c1]=MEDIA[s.m1],[n2Name,n2,c2]=MEDIA[s.m2],cx=450,cy=250,Ln=210,crit=n1>n2?deg(Math.asin(n2/n1)):null;
+    let h=`<rect x="10" y="10" width="880" height="240" fill="${c1}"/><rect x="10" y="250" width="880" height="232" fill="${c2}"/>`+L(10,cy,890,cy,{stroke:'#d7edff',w:2});
     h+=T(30,52,`${n1Name}　n = ${n1.toFixed(2)}`,{size:19,fill:D.ink,weight:600})+T(30,462,`${n2Name}　n = ${n2.toFixed(2)}`,{size:19,fill:D.ink,weight:600});
-    if(crit!==null){const cr=rad(crit);h+=L(cx,cy,cx-Ln*Math.sin(cr),cy-Ln*Math.cos(cr),{stroke:'#ffffff',w:1.5,dash:'3 6',op:.5})+T(cx-(Ln+12)*Math.sin(cr),cy-(Ln+12)*Math.cos(cr),`臨界角 ${crit.toFixed(1)}°`,{size:14,fill:D.muted,anchor:'end'});}
-    h+=L(sx,sy,cx,cy,{stroke:D.object,w:4,arrow:true})+L(cx,cy,cx+Ln*Math.sin(a),cy-Ln*Math.cos(a),{stroke:D.second,w:tir?4:2.5,arrow:true,op:tir?1:.55});
-    if(s.a>0)h+=arc(64,-Math.PI/2-a,-Math.PI/2,D.object);
-    h+=T(cx-110,cy-80,`${s.a}°`,{size:19,fill:D.object,anchor:'end'});
-    if(!tir){h+=L(cx,cy,cx+Ln*Math.sin(b),cy+Ln*Math.cos(b),{stroke:D.ray,w:4,arrow:true});if(b>0.001)h+=arc(70,Math.PI/2-b,Math.PI/2,D.ray);h+=T(cx+90,cy+120,`${deg(b).toFixed(1)}°`,{size:19,fill:D.ray});}
-    else h+=T(cx+60,cy+110,'全反射：沒有折射光',{size:22,fill:D.object,weight:700});
-    h+=handle('ray',sx,sy,D.object);
-    const path=tir?'全反射':s.a===0?'垂直入射，不偏折':n2>n1?'偏向法線':n2<n1?'偏離法線':'不偏折';
-    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['入射角',`${s.a}°`],['折射角',tir?'—':`${deg(b).toFixed(1)}°`],['臨界角',crit===null?'不會全反射':`${crit.toFixed(1)}°`],['光的路徑',path]],
-      note:tir?`n₁ ＞ n₂ 且入射角 ＞ 臨界角 → <b>全反射</b>`:`<b>n₁ sin θ₁ = n₂ sin θ₂</b><br>${n1.toFixed(2)} × sin ${s.a}° = ${n2.toFixed(2)} × sin ${deg(b).toFixed(1)}°`};}},
+    const bend=inc=>{const q=n1*Math.sin(inc)/n2;return q>1+1e-12?null:Math.asin(Math.min(1,q));};
+    if(s.beam==='single'){
+      const a=rad(s.a),b=bend(a),tir=b===null,sx=cx-Ln*Math.sin(a),sy=cy-Ln*Math.cos(a);
+      h+=L(cx,30,cx,470,{stroke:D.muted,w:2,dash:true})+T(cx+12,46,'法線',{size:16,fill:D.muted});
+      if(crit!==null){const cr=rad(crit);h+=L(cx,cy,cx-Ln*Math.sin(cr),cy-Ln*Math.cos(cr),{stroke:'#ffffff',w:1.5,dash:'3 6',op:.5})+T(cx-(Ln+12)*Math.sin(cr),cy-(Ln+12)*Math.cos(cr),`臨界角 ${crit.toFixed(1)}°`,{size:14,fill:D.muted,anchor:'end'});}
+      if(s.on){h+=ray([[sx,sy],[cx,cy],[cx+Ln*Math.sin(a),cy-Ln*Math.cos(a)]],D.second,{w:tir?4:2.5,op:tir?1:.55});if(!tir)h+=ray([[sx,sy],[cx,cy],[cx+Ln*Math.sin(b),cy+Ln*Math.cos(b)]],D.ray,{w:4});else h+=ray([[sx,sy],[cx,cy]],D.object,{w:4});}
+      const arc=(r,st,en,c)=>`<path d="M${cx+r*Math.cos(st)} ${cy+r*Math.sin(st)}A${r} ${r} 0 0 1 ${cx+r*Math.cos(en)} ${cy+r*Math.sin(en)}" fill="none" stroke="${c}" stroke-width="2"/>`;
+      if(s.on&&arrived()){if(s.a>0)h+=arc(64,-Math.PI/2-a,-Math.PI/2,D.object);h+=T(cx-110,cy-80,`${s.a}°`,{size:19,fill:D.object,anchor:'end'});
+        if(!tir){if(b>0.001)h+=arc(70,Math.PI/2-b,Math.PI/2,D.ray);h+=T(cx+90,cy+120,`${deg(b).toFixed(1)}°`,{size:19,fill:D.ray});}else h+=T(cx+60,cy+110,'全反射：沒有折射光',{size:22,fill:D.object,weight:700});}
+      h+=`<circle cx="${sx}" cy="${sy}" r="8" fill="${s.on?'#ffe8a5':'#56606e'}"/>`+handle('ray',sx,sy,D.object);
+      const path=!s.on?'—':tir?'全反射':s.a===0?'垂直入射，不偏折':n2>n1?'偏向法線':n2<n1?'偏離法線':'不偏折';
+      return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['入射角',`${s.a}°`],['折射角',tir?'—':`${deg(b).toFixed(1)}°`],['臨界角',crit===null?'不會全反射':`${crit.toFixed(1)}°`],['光的路徑',path]],
+        note:tir?`n₁ ＞ n₂ 且入射角 ＞ 臨界角 → <b>全反射</b>`:`<b>n₁ sin θ₁ = n₂ sin θ₂</b><br>${n1.toFixed(2)} × sin ${s.a}° = ${n2.toFixed(2)} × sin ${deg(b).toFixed(1)}°`};
+    }
+    let nOut=0,nTir=0;
+    if(s.on)for(let d=-80;d<=80;d+=4){const th=rad(d),hx=s.sx+(cy-s.sy)*Math.tan(th),sg=Math.sign(d),inc=Math.abs(th),b=bend(inc);if(hx<-200||hx>1100)continue;
+      const up=[hx+Math.sin(th)*(cy-10)/Math.cos(th),10];
+      if(b===null){nTir++;h+=ray([[s.sx,s.sy],[hx,cy],up],D.object,{w:1.8,op:.9,arrow:false});}
+      else{nOut++;h+=ray([[s.sx,s.sy],[hx,cy],up],D.second,{w:1.2,op:.18,arrow:false})+ray([[s.sx,s.sy],[hx,cy],[hx+sg*Math.tan(b)*(480-cy),480]],D.ray,{w:1.8,op:.8,arrow:false});}}
+    h+=`<circle cx="${s.sx}" cy="${s.sy}" r="10" fill="${s.on?'#ffe8a5':'#56606e'}"/>`+(s.on?`<circle cx="${s.sx}" cy="${s.sy}" r="24" fill="#ffe8a5" opacity=".25"/>`:'')+handle('src',s.sx,s.sy,D.object,16);
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['臨界角',crit===null?'不會全反射':`${crit.toFixed(1)}°`],['折射出去',s.on?`${nOut} 條`:'—'],['全反射（黃）',s.on?`${nTir} 條`:'—']],
+      note:crit===null?'光從 n 小進入 n 大：每一條都能折射進去，而且<b>偏向法線</b>。':'越斜的光入射角越大；超過<b>臨界角</b>的光（黃色）全部反射回來。拖動光源試試。'};}},
 
 /* ===== 10 透鏡 ===== */
-lens:{group:2,n:'10',name:'透鏡與成像',subtitle:'拖動物體穿過焦點，看實像、虛像與大小一起改變。',dark:true,
+lens:{group:2,n:'10',name:'透鏡與成像',subtitle:'開燈看光穿過透鏡；單束光、三條主要光線或全光，比較像怎麼形成。',dark:true,
   q:['凸透鏡的物體放在焦點內，像能接在屏幕上嗎？','不能。折射光發散，只有反向延長線相交，形成正立放大的虛像；屏幕接不到虛像。物體恰在焦點上時，折射光平行，不成像。'],
-  state:{type:1,f:80,u:200,oh:30,r3:true},
-  controls:[
-    {type:'seg',key:'type',label:'透鏡',options:[[1,'凸透鏡'],[-1,'凹透鏡']]},
+  state:{on:true,beam:'main',prog:0,type:1,f:80,u:200,oh:30,aim:20},
+  controls:[LAMP,
+    {type:'seg',key:'beam',label:'光線',options:[['single','單束光'],['main','主要光線'],['full','全光']],onChange:replay},
+    {type:'seg',key:'type',label:'透鏡',options:[[1,'凸透鏡'],[-1,'凹透鏡']],onChange:replay},
     {type:'range',key:'u',label:'物距 u',min:20,max:360,step:1,unit:' cm'},
     {type:'range',key:'f',label:'焦距 |f|',min:40,max:140,step:1,unit:' cm'},
     {type:'range',key:'oh',label:'物高',min:10,max:50,step:1,unit:' cm'},
-    {type:'buttons',label:'跳到關鍵位置',items:[['u > 2f',s=>{s.u=snap('u',s.f*2.6);}],['u = 2f',s=>{s.u=snap('u',s.f*2);}],['f < u < 2f',s=>{s.u=snap('u',s.f*1.5);}],['u = f',s=>{s.u=snap('u',s.f);}],['u < f',s=>{s.u=snap('u',s.f*0.55);}]],show:s=>s.type===1},
-    {type:'toggle',key:'r3',label:'第三條光線（經過焦點）'}],
-  drag:{obj:(p,s)=>{s.u=snap('u',(450-p.x)/1.15);},top:(p,s)=>{s.oh=snap('oh',(250-p.y)/2.4);}},
+    {type:'buttons',label:'跳到關鍵位置',items:[['u > 2f',s=>{s.u=snap('u',s.f*2.6);}],['u = 2f',s=>{s.u=snap('u',s.f*2);}],['f < u < 2f',s=>{s.u=snap('u',s.f*1.5);}],['u = f',s=>{s.u=snap('u',s.f);}],['u < f',s=>{s.u=snap('u',s.f*0.55);}]],show:s=>s.type===1}],
+  tick:LIGHT_TICK,
+  drag:{obj:(p,s)=>{s.u=snap('u',(450-p.x)/1.15);},top:(p,s)=>{s.oh=snap('oh',(250-p.y)/2.4);},aim:(p,s)=>{s.aim=clamp((250-p.y)/2.4,-76,76);}},
   render(s){
+    beginLight(s);
     const f=s.type*s.f,u=s.u,oh=s.oh,inf=Math.abs(u-f)<1e-9,v=inf?null:f*u/(u-f),m=inf?null:-v/u,cx=450,cy=250,X=x=>cx+x*1.15,Y=y=>cy-y*2.4,E=440/1.15;
+    const P=([x,y])=>[X(x),Y(y)],outEnd=yh=>[E,yh+(inf?-oh/u:(m*oh-yh)/v)*E];
     let h=L(15,cy,885,cy,{stroke:D.muted,w:1.5,dash:true});
     for(const sg of[-1,1])for(const k of[1,2]){const x=X(sg*k*s.f);h+=L(x,cy-7,x,cy+7,{stroke:D.muted,w:2})+T(x,cy+28,`${k===2?'2':''}F`,{size:15,fill:D.muted,anchor:'middle'});}
     h+=s.type===1?`<path d="M450 60Q490 250 450 440Q410 250 450 60" fill="#61ddeb22" stroke="${D.ray}" stroke-width="3"/>`:`<path d="M426 60Q462 250 426 440L474 440Q438 250 474 60Z" fill="#61ddeb22" stroke="${D.ray}" stroke-width="3"/>`;
-    const seg=(x1,y1,x2,y2,c,o={})=>L(X(x1),Y(y1),X(x2),Y(y2),{stroke:c,w:o.dash?2:3,...o});
-    h+=seg(-u,oh,0,oh,D.ray,{arrow:true})+seg(0,oh,E,oh-oh*E/f,D.ray,{arrow:true})+seg(-u,oh,0,0,D.second,{arrow:true})+seg(0,0,E,-oh*E/u,D.second,{arrow:true});
-    const y3=inf?null:f*oh/(f-u);
-    if(s.r3&&!inf&&Math.abs(y3)<400)h+=seg(-u,oh,0,y3,D.third,{arrow:true})+seg(0,y3,E,y3,D.third,{arrow:true});
-    if(!inf&&v<0){h+=seg(0,oh,v,m*oh,D.ray,{dash:true})+seg(0,0,v,m*oh,D.second,{dash:true});if(s.r3&&Math.abs(y3)<400)h+=seg(0,y3,v,y3,D.third,{dash:true});}
-    const onStage=!inf&&X(v)>20&&X(v)<880;
-    if(onStage)h+=vArrow(X(v),cy,Y(m*oh),D.image,{dash:v<0?'7 6':false})+T(X(v),Y(m*oh)+(m<0?30:-16),v>0?'實像':'虛像',{size:20,fill:D.image,anchor:'middle',weight:600});
-    h+=vArrow(X(-u),cy,Y(oh),D.object)+T(X(-u),Y(oh)-18,'物',{size:20,fill:D.object,anchor:'middle'})+handle('obj',X(-u),cy,D.object)+handle('top',X(-u),Y(oh),D.object,10);
-    if(inf)h+=T(450,480,'物體在焦點上：折射光平行，不成像',{size:19,fill:D.object,anchor:'middle'});else if(!onStage)h+=T(450,480,'像在畫面外，請看右側像距',{size:18,fill:D.image,anchor:'middle'});
+    const hits=[];
+    if(s.on){
+      if(s.beam==='single')hits.push([s.aim,D.object,3.5,true]);
+      else if(s.beam==='main'){hits.push([oh,D.ray,3,true],[0,D.second,3,true]);const y3=inf?null:f*oh/(f-u);if(!inf&&Math.abs(y3)<400)hits.push([y3,D.third,3,true]);}
+      else for(let i=0;i<11;i++)hits.push([-72+i*14.4,'#ffe8a5',1.8,false]);
+      for(const[yh,c,w,arrow]of hits){h+=ray([P([-u,oh]),P([0,yh]),P(outEnd(yh))],c,{w,arrow,op:s.beam==='full'?.8:1});}
+    }
+    const fade=fadeIn(),onStage=!inf&&X(v)>20&&X(v)<880;
+    if(fade>0&&!inf&&v<0)for(const[yh,c]of hits)h+=L(X(0),Y(yh),X(v),Y(m*oh),{stroke:c,w:1.6,dash:'7 6',op:.85*fade});
+    if(fade>0&&onStage)h+=`<g opacity="${fade}">${vArrow(X(v),cy,Y(m*oh),D.image,{dash:v<0?'7 6':false})}${T(X(v),Y(m*oh)+(m<0?30:-16),v>0?'實像':'虛像',{size:20,fill:D.image,anchor:'middle',weight:600})}</g>`;
+    h+=`<g opacity="${s.on?1:.35}">${vArrow(X(-u),cy,Y(oh),D.object)}</g>`+T(X(-u),Y(oh)-18,'物',{size:20,fill:D.object,anchor:'middle'})+handle('obj',X(-u),cy,D.object)+handle('top',X(-u),Y(oh),D.object,10);
+    if(s.on&&s.beam==='single')h+=handle('aim',X(0),Y(s.aim),D.object,11);
+    if(!s.on)h+=T(450,480,'按「開燈」讓物體發出光線',{size:18,fill:D.muted,anchor:'middle'});
+    else if(fade>0&&inf)h+=T(450,480,'物體在焦點上：折射光平行，不成像',{size:19,fill:D.object,anchor:'middle'});else if(fade>0&&!onStage)h+=T(450,480,'像在畫面外，請看右側像距',{size:18,fill:D.image,anchor:'middle'});
     const prop=inf?'不成像':`${v>0?'實像・倒立':'虛像・正立'}・${Math.abs(Math.abs(m)-1)<1e-6?'等大':Math.abs(m)>1?'放大':'縮小'}`;
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['像距 v',inf?'無窮遠':`${num(v)} cm`],['放大率',inf?'—':`${num(Math.abs(m),2)} 倍`],['成像',prop]],
-      note:inf?'物在焦點 → 不成像':`<b>1/f = 1/u + 1/v</b><br>1/${f<0?`(${f})`:f} = 1/${u} + 1/${v<0?`(${num(v)})`:num(v)}`};}},
+      note:s.beam==='single'?'物體上同一點發出的光，穿過透鏡後都會經過（或延長經過）<b>同一個像點</b>。拖動透鏡上的圓圈試試。':s.beam==='full'?'整片光線會聚（或延長會聚）在同一點 → 像。':inf?'物在焦點 → 不成像':`<b>1/f = 1/u + 1/v</b><br>1/${f<0?`(${f})`:f} = 1/${u} + 1/${v<0?`(${num(v)})`:num(v)}`};}},
 
 /* ===== 11 顏色 ===== */
-color:{group:2,n:'11',name:'光與顏色',subtitle:'混合紅綠藍光，或用色光照物體，看看顏色從哪裡來。',dark:true,
+color:{group:2,n:'11',name:'光與顏色',subtitle:'開燈混合色光、照射物體，或讓白光穿過稜鏡。',dark:true,
   q:['紅光和綠光相加，會變成哪種光？紅蘋果在綠光下是什麼顏色？','紅光＋綠光是黃光。紅蘋果只反射紅光，綠光下沒有紅光可反射，所以看起來是黑色。'],
-  state:{mode:'mix',r:255,g:255,b:0,obj:'apple'},
-  controls:[
-    {type:'seg',key:'mode',label:'模式',options:[['mix','色光混合'],['object','色光照物體']]},
+  state:{on:true,prog:0,mode:'mix',r:255,g:255,b:0,obj:'apple',beam:'full',hue:3},
+  controls:[LAMP,
+    {type:'seg',key:'mode',label:'模式',options:[['mix','色光混合'],['object','照物體'],['prism','稜鏡色散']],onChange:replay},
+    {type:'seg',key:'beam',label:'光線',options:[['full','白光（全光）'],['single','單色光']],show:s=>s.mode==='prism',onChange:replay},
+    {type:'seg',key:'hue',label:'色光',options:SPECTRUM.map(([n],i)=>[i,n]),show:s=>s.mode==='prism'&&s.beam==='single',onChange:replay},
     {type:'seg',key:'obj',label:'物體',options:Object.entries(REFLECT).map(([k,v])=>[k,v[0]]),show:s=>s.mode==='object'},
-    {type:'buttons',label:'光的顏色',items:LIGHTS.map(([n,c])=>[n,s=>{[s.r,s.g,s.b]=c;}])},
-    {type:'range',key:'r',label:'紅光 R',min:0,max:255,step:1},
-    {type:'range',key:'g',label:'綠光 G',min:0,max:255,step:1},
-    {type:'range',key:'b',label:'藍光 B',min:0,max:255,step:1}],
+    {type:'buttons',label:'光的顏色',items:LIGHTS.map(([n,c])=>[n,s=>{[s.r,s.g,s.b]=c;}]),show:s=>s.mode!=='prism'},
+    {type:'range',key:'r',label:'紅光 R',min:0,max:255,step:1,show:s=>s.mode!=='prism'},
+    {type:'range',key:'g',label:'綠光 G',min:0,max:255,step:1,show:s=>s.mode!=='prism'},
+    {type:'range',key:'b',label:'藍光 B',min:0,max:255,step:1,show:s=>s.mode!=='prism'}],
+  tick:LIGHT_TICK,
   render(s){
-    const{r,g,b}=s;let h;
+    beginLight(s);
+    const[r,g,b]=s.on?[s.r,s.g,s.b]:[0,0,0];let h;
     if(s.mode==='mix'){
-      h=`<rect x="35" y="30" width="550" height="440" rx="22" fill="#05080d"/><g style="isolation:isolate"><circle cx="250" cy="200" r="130" fill="rgb(${r},0,0)"/><circle cx="380" cy="200" r="130" fill="rgb(0,${g},0)" style="mix-blend-mode:screen"/><circle cx="315" cy="312" r="130" fill="rgb(0,0,${b})" style="mix-blend-mode:screen"/></g>`;
-      h+=T(200,62,'R',{size:22,fill:'#ff8a8a',anchor:'middle',weight:700})+T(430,62,'G',{size:22,fill:'#8aff9a',anchor:'middle',weight:700})+T(315,462,'B',{size:22,fill:'#8ab4ff',anchor:'middle',weight:700});
-      h+=T(735,72,'重疊後的顏色',{size:18,fill:D.muted,anchor:'middle'})+`<rect x="635" y="95" width="200" height="170" rx="20" fill="rgb(${r},${g},${b})" stroke="#ffffff33"/>`+T(735,305,colorName(r,g,b)+'光',{size:30,fill:D.ink,anchor:'middle',weight:700});
+      const lamps=[[60,60,250,200,'255,60,60',r,'R'],[570,60,380,200,'60,255,90',g,'G'],[315,470,315,312,'80,140,255',b,'B']];
+      h=`<rect x="35" y="30" width="550" height="440" rx="22" fill="#05080d"/>`;
+      const vis=lamps.map(([x0,y0,x1,y1])=>clamp((REACH-Math.hypot(x1-x0,y1-y0))/200,0,1));
+      const[vr,vg,vb]=vis;h+=`<g style="isolation:isolate"><circle cx="250" cy="200" r="130" fill="rgb(${Math.round(r*vr)},0,0)"/><circle cx="380" cy="200" r="130" fill="rgb(0,${Math.round(g*vg)},0)" style="mix-blend-mode:screen"/><circle cx="315" cy="312" r="130" fill="rgb(0,0,${Math.round(b*vb)})" style="mix-blend-mode:screen"/></g>`;
+      lamps.forEach(([x0,y0,x1,y1,c,val,lab])=>{if(val>0)h+=ray([[x0,y0],[x1,y1]],`rgb(${c})`,{w:6,op:.85});h+=`<circle cx="${x0}" cy="${y0}" r="16" fill="${val>0?`rgb(${c})`:'#3a4250'}" stroke="#ffffff55" stroke-width="2"/>`+T(x0,y0+6,lab,{size:15,fill:'#05080d',anchor:'middle',weight:700});});
+      const done=Math.min(...vis.map((v,i)=>[r,g,b][i]>0?v:1)),[mr,mg,mb]=done>=1?[r,g,b]:[0,0,0];
+      h+=T(735,72,'重疊後的顏色',{size:18,fill:D.muted,anchor:'middle'})+`<rect x="635" y="95" width="200" height="170" rx="20" fill="rgb(${mr},${mg},${mb})" stroke="#ffffff33"/>`+T(735,305,!s.on?'沒有光':colorName(mr,mg,mb)+'光',{size:30,fill:D.ink,anchor:'middle',weight:700});
       h+=T(735,370,'紅 + 綠 = 黃',{size:17,fill:D.muted,anchor:'middle'})+T(735,400,'綠 + 藍 = 青',{size:17,fill:D.muted,anchor:'middle'})+T(735,430,'紅 + 藍 = 洋紅',{size:17,fill:D.muted,anchor:'middle'});
-      return {svg:h,reads:[['紅 R',r],['綠 G',g],['藍 B',b],['看到',colorName(r,g,b)+'光']],note:'光的三原色相加會<b>更亮</b>（加色）；三色等量相加 = 白光。'};
+      return {svg:h,reads:[['紅 R',r],['綠 G',g],['藍 B',b],['看到',s.on?colorName(r,g,b)+'光':'—']],note:'光的三原色相加會<b>更亮</b>（加色）；三色等量相加 = 白光。'};
     }
-    const[oname,ref]=REFLECT[s.obj],pr=Math.round(r*ref[0]),pg=Math.round(g*ref[1]),pb=Math.round(b*ref[2]),fill=`rgb(${pr},${pg},${pb})`;
-    const shape=(c,stroke='#ffffff40')=>({apple:`<circle cx="0" cy="0" r="62" fill="${c}" stroke="${stroke}" stroke-width="2"/><path d="M0 -58Q4 -80 18 -88" stroke="#5b4026" stroke-width="7" fill="none" stroke-linecap="round"/>`,
-      leaf:`<path d="M-90 25Q-20 -95 90 -25Q20 75 -90 25Z" fill="${c}" stroke="${stroke}" stroke-width="2"/><path d="M-80 22Q0 -10 80 -22" stroke="#00000040" stroke-width="3" fill="none"/>`,
-      banana:`<path d="M-95 -30Q0 80 95 -35Q86 -12 74 -6Q0 42 -84 -40Z" fill="${c}" stroke="${stroke}" stroke-width="2"/>`,
-      paper:`<rect x="-62" y="-80" width="124" height="160" rx="4" fill="${c}" stroke="${stroke}" stroke-width="2"/>`,
-      cloth:`<path d="M-80 -70Q-40 -82 0 -70T80 -70V70Q40 82 0 70T-80 70Z" fill="${c}" stroke="${stroke}" stroke-width="2"/>`})[s.obj];
-    h=`<rect x="20" y="20" width="560" height="460" rx="20" fill="#05080d"/><polygon points="270,40 330,40 520,420 80,420" fill="rgb(${r},${g},${b})" opacity=".22"/><ellipse cx="300" cy="420" rx="220" ry="34" fill="rgb(${r},${g},${b})" opacity=".35"/><rect x="262" y="24" width="76" height="22" rx="6" fill="#8796a8"/>`;
-    h+=`<g transform="translate(300 330)">${shape(fill)}</g>`;
-    h+=T(735,70,'白光下',{size:17,fill:D.muted,anchor:'middle'})+`<g transform="translate(735 160) scale(.7)">${shape(`rgb(${ref.map(v=>v*255).join(',')})`)}</g>`+T(735,262,oname,{size:18,fill:D.ink,anchor:'middle'});
-    h+=T(735,330,'現在看起來',{size:17,fill:D.muted,anchor:'middle'})+T(735,375,colorName(pr,pg,pb)+'色',{size:32,fill:D.ink,anchor:'middle',weight:700});
-    return {svg:h,reads:[['照射的光',colorName(r,g,b)+'光'],['物體會反射',ref[0]&&ref[1]&&ref[2]?'所有色光':ref.some(Boolean)?['紅','綠','藍'].filter((_,i)=>ref[i]).join('、')+'光':'幾乎不反射'],['看起來',colorName(pr,pg,pb)+'色']],
-      note:'物體只<b>反射</b>和自己同色的光，其餘被吸收；沒有光可反射 → 看起來是黑色。'};}}
+    if(s.mode==='object'){
+      const[oname,ref]=REFLECT[s.obj],reach=s.on?REACH:0,lit=clamp((reach-250)/150,0,1),pr=Math.round(r*ref[0]*lit),pg=Math.round(g*ref[1]*lit),pb=Math.round(b*ref[2]*lit);
+      const shape=(c,stroke='#ffffff40')=>({apple:`<circle cx="0" cy="0" r="62" fill="${c}" stroke="${stroke}" stroke-width="2"/><path d="M0 -58Q4 -80 18 -88" stroke="#5b4026" stroke-width="7" fill="none" stroke-linecap="round"/>`,
+        leaf:`<path d="M-90 25Q-20 -95 90 -25Q20 75 -90 25Z" fill="${c}" stroke="${stroke}" stroke-width="2"/><path d="M-80 22Q0 -10 80 -22" stroke="#00000040" stroke-width="3" fill="none"/>`,
+        banana:`<path d="M-95 -30Q0 80 95 -35Q86 -12 74 -6Q0 42 -84 -40Z" fill="${c}" stroke="${stroke}" stroke-width="2"/>`,
+        paper:`<rect x="-62" y="-80" width="124" height="160" rx="4" fill="${c}" stroke="${stroke}" stroke-width="2"/>`,
+        cloth:`<path d="M-80 -70Q-40 -82 0 -70T80 -70V70Q40 82 0 70T-80 70Z" fill="${c}" stroke="${stroke}" stroke-width="2"/>`})[s.obj];
+      const len=Math.min(reach,380),w=len/380*220;
+      h=`<rect x="20" y="20" width="560" height="460" rx="20" fill="#05080d"/>`;
+      if(len>0&&(r||g||b))h+=`<polygon points="270,40 330,40 ${300+w},${40+len} ${300-w},${40+len}" fill="rgb(${r},${g},${b})" opacity=".22"/>`+(len>=380?`<ellipse cx="300" cy="420" rx="220" ry="34" fill="rgb(${r},${g},${b})" opacity=".35"/>`:'');
+      h+=`<rect x="262" y="24" width="76" height="22" rx="6" fill="${s.on?'#c9d3df':'#5a6573'}"/><g transform="translate(300 330)">${shape(`rgb(${pr},${pg},${pb})`)}</g>`;
+      h+=T(735,70,'白光下',{size:17,fill:D.muted,anchor:'middle'})+`<g transform="translate(735 160) scale(.7)">${shape(`rgb(${ref.map(v=>v*255).join(',')})`)}</g>`+T(735,262,oname,{size:18,fill:D.ink,anchor:'middle'});
+      h+=T(735,330,'現在看起來',{size:17,fill:D.muted,anchor:'middle'})+T(735,375,colorName(pr,pg,pb)+'色',{size:32,fill:D.ink,anchor:'middle',weight:700});
+      return {svg:h,reads:[['照射的光',s.on?colorName(r,g,b)+'光':'沒有光'],['物體會反射',ref[0]&&ref[1]&&ref[2]?'所有色光':ref.some(Boolean)?['紅','綠','藍'].filter((_,i)=>ref[i]).join('、')+'光':'幾乎不反射'],['看起來',colorName(pr,pg,pb)+'色']],
+        note:'物體只<b>反射</b>和自己同色的光，其餘被吸收；沒有光可反射 → 看起來是黑色。'};
+    }
+    /* 稜鏡：真實 Snell 定律，色散程度放大以便觀察 */
+    const A=[450,96.8],B=[300,356.6],C=[600,356.6],src=[40,420],H=[B[0]+0.45*(A[0]-B[0]),B[1]+0.45*(A[1]-B[1])];
+    const norm=v=>{const l=Math.hypot(v[0],v[1]);return[v[0]/l,v[1]/l];},d0=norm([H[0]-src[0],H[1]-src[1]]);
+    const refr=(d,nr,n1,n2)=>{const ci=-(nr[0]*d[0]+nr[1]*d[1]),k=n1/n2,t=1-k*k*(1-ci*ci);if(t<0)return null;const c=k*ci-Math.sqrt(t);return[k*d[0]+c*nr[0],k*d[1]+c*nr[1]];};
+    const hitFace=(p,d,a,b2)=>{const ex=b2[0]-a[0],ey=b2[1]-a[1],den=d[0]*ey-d[1]*ex,t=((a[0]-p[0])*ey-(a[1]-p[1])*ex)/den;return[p[0]+d[0]*t,p[1]+d[1]*t];};
+    const list=s.beam==='full'?SPECTRUM.map((c,i)=>i):[s.hue];
+    h=`<polygon points="${A} ${B} ${C}" fill="#9fd8ff22" stroke="#bfe6ff" stroke-width="2.5"/><rect x="852" y="40" width="18" height="420" rx="4" fill="#3a4554"/>`+T(861,30,'屏幕',{size:15,fill:D.muted,anchor:'middle'});
+    const inC=s.beam==='full'?'#ffffff':SPECTRUM[s.hue][1];
+    if(s.on)h+=ray([src,H],inC,{w:4,arrow:false});
+    const spots=[];
+    for(const i of list){const n=1.50+i*0.02,c=SPECTRUM[i][1],d1=refr(d0,[-0.866,-0.5],1,n),P2=hitFace(H,d1,A,C),d2=refr(d1,[-0.866,0.5],n,1);if(!d2)continue;const t=(852-P2[0])/d2[0],P3=[852,P2[1]+d2[1]*t];spots.push([P3[1],c,SPECTRUM[i][0]]);
+      if(s.on)h+=ray([H,P2,P3],c,{w:s.beam==='full'?2.2:3.5,arrow:false,op:.95,delay:Math.hypot(H[0]-src[0],H[1]-src[1])});}
+    if(s.on&&arrived())spots.forEach(([y,c,n],j)=>{h+=`<rect x="852" y="${y-6}" width="18" height="12" fill="${c}"/>`;if(s.beam==='single'||j===0||j===spots.length-1)h+=T(842,y+6,n,{size:15,fill:c,anchor:'end',weight:700});});
+    h+=`<rect x="18" y="404" width="34" height="22" rx="5" transform="rotate(-29 35 415)" fill="${s.on?'#c9d3df':'#5a6573'}"/>`;
+    const nm=SPECTRUM[s.hue][0];
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:s.beam==='full'?[['入射光','白光'],['射出',s.on?'七種色光':'—'],['偏折最少','紅光'],['偏折最多','紫光']]:[['入射光',nm+'光'],['射出',s.on?nm+'光（不再分散）':'—']],
+      note:s.beam==='full'?'白光由多種色光組成；各色光折射程度不同 → <b>色散</b>（紅光偏折最少、紫光最多）。':'單色光通過稜鏡只會<b>偏折</b>，不會再分出其他顏色。'};}}
 };
 function setCounts(s,c){for(const k of Object.keys(SPECIES))s.counts[k]=c[k]||0;}
 function lamMark(x1,x2,y,lam,c,label){return L(x1,y,x2,y,{stroke:c,w:2})+L(x1,y-8,x1,y+8,{stroke:c,w:2})+L(x2,y-8,x2,y+8,{stroke:c,w:2})+T((x1+x2)/2,y-10,label||`λ = ${lam.toFixed(2)} m`,{size:15,fill:c,anchor:'middle',weight:700});}
@@ -606,7 +700,7 @@ function activate(key){
 }
 labEl.addEventListener('input',e=>{const c=cfg.controls[e.target.dataset.c];if(!c)return;if(c.type==='range')state[c.key]=+e.target.value;else if(c.type==='toggle')state[c.key]=e.target.checked;render();});
 labEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset'))return activate(current);const c=cfg.controls[b.dataset.c];if(!c)return;
-  if(c.type==='seg')state[c.key]=c.options[b.dataset.o][0];else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();});
+  if(c.type==='seg'){state[c.key]=c.options[b.dataset.o][0];if(c.onChange)c.onChange(state);}else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();});
 const svgPoint=e=>{const p=svgEl.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svgEl.getScreenCTM().inverse());};
 labEl.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-drag]');if(!h||!cfg.drag||!cfg.drag[h.dataset.drag])return;e.preventDefault();drag={name:h.dataset.drag,p0:svgPoint(e),s0:structuredClone(state)};svgEl.setPointerCapture(e.pointerId);labEl.classList.add('dragging');});
 labEl.addEventListener('pointermove',e=>{if(!drag)return;cfg.drag[drag.name](svgPoint(e),state,drag);if(!cfg.tick)render();});
@@ -619,6 +713,6 @@ window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與公式，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學為幾何光學；透鏡採薄透鏡、近軸近似。實線是實際光路，虛線是反向延長線。</li><li>溶解度曲線為常見課本數據的近似值；聲音頁不會發出聲音。</li><li>RGB 是螢幕色彩值，不是光功率。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與公式，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學為幾何光學；透鏡採薄透鏡、近軸近似。實線是實際光路，虛線是反向延長線。</li><li>溶解度曲線為常見課本數據的近似值；聲音頁不會發出聲音。</li><li>RGB 是螢幕色彩值，不是光功率。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');
 </script></body></html>
