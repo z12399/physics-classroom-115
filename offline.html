@@ -520,9 +520,13 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
 /* ===== 08 平面鏡 ===== */
 mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = 光進入眼睛。觀察反射定律、光的可逆、鏡面反射與漫反射。',dark:true,
   q:['物體向鏡面靠近 10 cm，物與像的距離改變多少？','像也向鏡面靠近 10 cm，所以物與像的距離減少 20 cm。'],
-  state:{on:true,beam:'full',prog:0,mode:'plane',d:55,h:60,ex:80,ey:110,eye:true,ext:true,hit:170,rev:false,surf:'rough',normals:true},
-  controls:[LAMP,BEAM,
-    {type:'seg',key:'mode',label:'實驗',options:[['plane','平面鏡成像'],['diffuse','鏡面 vs 漫反射']],onChange:replay},
+  state:{on:true,beam:'full',prog:0,mode:'plane',d:55,h:60,ex:80,ey:110,eye:true,ext:true,hit:170,rev:false,surf:'rough',normals:true,i0:40,rot:15,ghost:true,anim:null},
+  controls:[LAMP,{...BEAM,show:s=>s.mode!=='rotate'},
+    {type:'seg',key:'mode',label:'實驗',options:[['plane','平面鏡成像'],['diffuse','鏡面 vs 漫反射'],['rotate','鏡面旋轉']],onChange:replay},
+    {type:'range',key:'i0',label:'原來的入射角',min:10,max:60,step:1,unit:'°',show:s=>s.mode==='rotate'},
+    {type:'range',key:'rot',label:'鏡面轉動 θ',min:-30,max:30,step:1,unit:'°',show:s=>s.mode==='rotate'},
+    {type:'buttons',label:'',items:[['▶ 播放轉動',s=>{s.anim=0;}]],show:s=>s.mode==='rotate',primary:true},
+    {type:'toggle',key:'ghost',label:'顯示原來位置（虛線）',show:s=>s.mode==='rotate'},
     {type:'range',key:'d',label:'物距',min:15,max:110,step:1,unit:' cm',show:s=>s.mode==='plane'},
     {type:'range',key:'h',label:'物體高度',min:20,max:100,step:1,unit:' cm',show:s=>s.mode==='plane'},
     {type:'toggle',key:'rev',label:'光的可逆（反方向射回去）',show:s=>s.mode==='plane'&&s.beam==='single',onChange:replay},
@@ -530,8 +534,32 @@ mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = �
     {type:'toggle',key:'ext',label:'反向延長線',show:s=>s.mode==='plane'},
     {type:'seg',key:'surf',label:'表面',options:[['smooth','光滑（鏡面）'],['rough','粗糙（紙、牆）']],onChange:replay,show:s=>s.mode==='diffuse'},
     {type:'toggle',key:'normals',label:'顯示每一點的法線',show:s=>s.mode==='diffuse'}],
-  tick:LIGHT_TICK,
-  drag:{obj:(p,s)=>{s.d=snap('d',(450-p.x)/3);},img:(p,s)=>{s.d=snap('d',(p.x-450)/3);},top:(p,s)=>{s.h=snap('h',(400-p.y)/2.6);},eye:(p,s)=>{s.ex=clamp(p.x,40,420);s.ey=clamp(p.y,40,440);},hit:(p,s)=>{s.hit=clamp(p.y,50,430);}},
+  tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.anim!==null){s.anim+=dt;if(s.anim>1.6)s.anim=null;}},
+  drag:{obj:(p,s)=>{s.d=snap('d',(450-p.x)/3);},img:(p,s)=>{s.d=snap('d',(p.x-450)/3);},top:(p,s)=>{s.h=snap('h',(400-p.y)/2.6);},eye:(p,s)=>{s.ex=clamp(p.x,40,420);s.ey=clamp(p.y,40,440);},hit:(p,s)=>{s.hit=clamp(p.y,50,430);},turn:(p,s)=>{let a=deg(Math.atan2(-(p.y-340),p.x-450));if(a>90)a-=180;if(a<-90)a+=180;s.rot=snap('rot',a);s.anim=null;}},
+  rotate(s){
+    beginLight(s);
+    /* 入射光固定，鏡面繞入射點轉 θ：法線轉 θ，反射光轉 2θ */
+    const P=[450,340],L0=300,rotV=(v,a)=>[v[0]*Math.cos(a)+v[1]*Math.sin(a),-v[0]*Math.sin(a)+v[1]*Math.cos(a)];
+    const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2,th=s.anim!==null?s.rot*ease(clamp(s.anim/1.5,0,1)):s.rot,a0=rad(s.i0),d=[Math.sin(a0),Math.cos(a0)],S=[P[0]-d[0]*L0,P[1]-d[1]*L0];
+    const state=t=>{const m=rotV([1,0],rad(t)),n=rotV([0,-1],rad(t)),dot=d[0]*n[0]+d[1]*n[1],r=[d[0]-2*dot*n[0],d[1]-2*dot*n[1]];return{m,n,r,back:dot>=0,inc:deg(Math.acos(clamp(-dot,-1,1)))};};
+    const A=state(0),B=state(th),tr=Math.round(Math.abs(th)),at=(v,k)=>[P[0]+v[0]*k,P[1]+v[1]*k];
+    const arc=(v1,v2,R,c,label,lw=2.5)=>{const a1=Math.atan2(v1[1],v1[0]),a2=Math.atan2(v2[1],v2[0]);let da=a2-a1;while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;if(Math.abs(da)<0.01)return '';
+      const p1=[P[0]+R*Math.cos(a1),P[1]+R*Math.sin(a1)],p2=[P[0]+R*Math.cos(a2),P[1]+R*Math.sin(a2)],am=a1+da/2;
+      return `<path d="M${p1[0].toFixed(1)} ${p1[1].toFixed(1)}A${R} ${R} 0 0 ${da>0?1:0} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}" fill="none" stroke="${c}" stroke-width="${lw}"/>`+T(P[0]+(R+22)*Math.cos(am),P[1]+(R+22)*Math.sin(am)+6,label,{size:16,fill:c,anchor:'middle',weight:700});};
+    const mirror=(m,c,dash)=>L(P[0]-m[0]*230,P[1]-m[1]*230,P[0]+m[0]*230,P[1]+m[1]*230,{stroke:c,w:dash?3:6,dash:dash?'8 7':false,op:dash?.55:1});
+    let h='';
+    if(s.ghost){h+=mirror(A.m,D.muted,true)+L(P[0],P[1],...at(A.n,150),{stroke:D.muted,w:1.5,dash:'4 5',op:.6});}
+    h+=mirror(B.m,D.ray,false);for(let k=-200;k<=200;k+=25){const q=at(B.m,k),o=rotV([0,1],rad(th));h+=L(q[0],q[1],q[0]+o[0]*10+B.m[0]*-6,q[1]+o[1]*10+B.m[1]*-6,{stroke:'#6f8196',w:1.5});}
+    h+=L(P[0],P[1],...at(B.n,150),{stroke:D.ink,w:1.5,dash:'4 5'})+T(...at(B.n,168),'法線',{size:14,fill:D.ink,anchor:'middle'});
+    if(s.on){h+=ray([S,P],D.object,{w:4});if(!B.back)h+=ray([S,P,at(B.r,L0)],D.object,{w:4});}
+    if(s.ghost&&s.on&&arrived())h+=L(P[0],P[1],...at(A.r,L0),{stroke:D.second,w:2.5,dash:'8 7',op:.7})+T(...at(A.r,L0+20),'原來的反射光',{size:14,fill:D.second,anchor:'middle'});
+    if(s.on&&arrived()&&!B.back){if(Math.abs(th)>=1){h+=arc(A.r,B.r,190,D.object,`2θ = ${2*tr}°`,3.5);if(s.ghost)h+=arc(A.n,B.n,110,D.ink,`θ`)+arc(A.m,B.m,215,D.ray,`θ = ${tr}°`);}
+      h+=arc([-d[0],-d[1]],B.n,62,'#ffe8a5',`${num(B.inc,0)}°`,2)+arc(B.n,B.r,78,'#ffe8a5',`${num(B.inc,0)}°`,2);}
+    if(B.back)h+=T(450,470,'光照到鏡子背面了，轉小一點',{size:18,fill:D.second,anchor:'middle'});
+    h+=`<circle cx="${S[0]}" cy="${S[1]}" r="9" fill="${s.on?'#ffe8a5':'#56606e'}"/>`+handle('turn',...at(B.m,200),D.ray,12)+`<circle cx="${P[0]}" cy="${P[1]}" r="5" fill="${D.ink}"/>`;
+    if(!s.on)h+=T(450,80,'按「開燈」',{size:20,fill:D.muted,anchor:'middle'});
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['鏡面轉了',`${tr}°`],['法線也轉了',`${tr}°`],['入射角',`${s.i0}° → ${num(B.inc,0)}°`],['反射光轉了',`${2*tr}°`]],
+      note:'入射光不動，鏡面轉 θ → 法線也轉 θ → 入射角、反射角<b>各</b>改變 θ → 反射光一共轉 <b>2θ</b>。'};},
   diffuse(s){
     beginLight(s);
     const sy=360,smooth=s.surf==='smooth',d=[Math.cos(rad(40)),Math.sin(rad(40))],xs=s.beam==='single'?[440]:[260,305,350,395,440,485,530,575,620];
@@ -549,6 +577,7 @@ mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = �
       note:smooth?'光滑表面法線方向都一樣 → 反射光整齊平行，所以鏡子能成像。':'漫反射<b>也遵守反射定律</b>，只是每一點的法線方向不同 → 反射光射向各方向，從哪裡都看得到物體。'};},
   render(s){
     if(s.mode==='diffuse')return this.diffuse(s);
+    if(s.mode==='rotate')return this.rotate(s);
     beginLight(s);
     const mx=450,ox=mx-s.d*3,ix=mx+s.d*3,base=400,top=base-s.h*2.6,refl=(Y,hy)=>{const dx=mx-ox,k=(mx-30)/dx;return[mx-dx*k,hy+(hy-Y)*k];};
     let h=`<rect x="450" y="40" width="12" height="400" fill="#72dbe6" opacity=".3"/>`+L(mx,40,mx,440,{stroke:D.ray,w:4})+T(mx,30,'平面鏡',{size:17,fill:D.ray,anchor:'middle'});
