@@ -52,6 +52,25 @@ const maxTraced=()=>TRACED.length?Math.max(...TRACED):0;
 const arrived=()=>TRACED.length>0&&REACH>=maxTraced();
 const fadeIn=()=>TRACED.length?clamp((REACH-maxTraced())/200,0,1):0;
 
+/* ---------- 聲音共用 ---------- */
+const HEARING=[['人',20,20000],['狗',67,45000],['貓',45,64000],['蝙蝠',2000,110000],['海豚',75,150000],['大象',16,12000]];
+const fmtHz=hz=>{if(hz<1000)return `${Math.round(hz)} Hz`;const k=hz/1000;return `${k>=10||Math.abs(k-Math.round(k))<0.05?Math.round(k):k.toFixed(1)} kHz`;};
+/* 發聲體振動強度隨時間的變化（敲擊、撥弦會衰減；拉弓、說話持續） */
+function srcEnv(s,t){
+  if(s.src==='fork'||s.src==='string'){if(s.t0===null||t<s.t0)return 0;let e=Math.exp(-(t-s.t0)/(s.src==='fork'?2.5:1.4));if(s.td!==null&&s.td>s.t0&&t>s.td)e*=Math.exp(-(t-s.td)/0.06);return e;}
+  const rise=t=>t>=s.ton?1-Math.exp(-(t-s.ton)/0.15):0,fall=t=>t>=s.toff?s.eoff*Math.exp(-(t-s.toff)/0.12):0;
+  return s.bow?(t>=s.ton?rise(t):fall(t)):(t>=s.toff?fall(t):rise(t));}
+function bowSwitch(s){if(s.bow)s.ton=s.t;else{s.eoff=srcEnv({...s,bow:true},s.t);s.toff=s.t;}}
+/* 真的發出聲音（預設關閉） */
+const AUD={};
+function audioSync(on,f,A,tb){
+  if(!on){if(AUD.osc){try{AUD.osc.stop();}catch(e){}AUD.osc.disconnect();AUD.osc=null;AUD.key=null;}return;}
+  try{if(!AUD.ctx)AUD.ctx=new(window.AudioContext||window.webkitAudioContext)();const c=AUD.ctx;if(c.state==='suspended')c.resume();
+    if(!AUD.osc){AUD.gain=c.createGain();AUD.gain.gain.value=0;AUD.gain.connect(c.destination);AUD.osc=c.createOscillator();AUD.osc.connect(AUD.gain);AUD.osc.start();AUD.tb=null;}
+    if(AUD.tb!==tb){const hs=TIMBRE[tb][1],re=new Float32Array(hs.length+1),im=new Float32Array(hs.length+1);hs.forEach((v,i)=>{im[i+1]=v;});AUD.osc.setPeriodicWave(c.createPeriodicWave(re,im));AUD.tb=tb;}
+    const key=f+'|'+A;if(AUD.key!==key){AUD.osc.frequency.setTargetAtTime(f,c.currentTime,0.02);AUD.gain.gain.setTargetAtTime(0.012*A,c.currentTime,0.03);AUD.key=key;}
+  }catch(e){}}
+
 const LABS={
 /* ===== 01 測量 ===== */
 measure:{group:1,n:'01',name:'測量與估讀',subtitle:'拖動物件或換一把尺，練習讀出完整的測量值。',
@@ -159,72 +178,167 @@ solution:{group:1,n:'04',name:'水溶液與溶解度',subtitle:'改變溫度、�
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['溶解度',`${sol.toFixed(1)} g / 100 g 水`],['已溶解',d.toFixed(1)+' g'],['沉在杯底',left.toFixed(1)+' g'],['濃度',pct.toFixed(1)+'%']],
       note:`<b>濃度 = 溶質 ÷ 溶液</b> = ${d.toFixed(1)} ÷ (${s.water} + ${d.toFixed(1)})<br>點在曲線上方 → 多出的溶質溶不了。`};}},
 
-/* ===== 05 波動 ===== */
-wave:{group:1,n:'05',name:'波動與波速',subtitle:'切換橫波與縱波，追蹤一個介質點怎麼動。',
+/* ===== 3-1 波的傳播與性質 ===== */
+wave:{group:1,n:'3-1',name:'波的傳播與性質',subtitle:'波傳遞的是能量，不是物質；認識波的名詞，再看看波需不需要介質。',
   q:['保持波速不變，把頻率加倍，波長會變成多少？','由 v = fλ，波速不變時頻率加倍，波長減半。振幅只影響振動幅度，不影響波速。'],
-  state:{kind:'T',f:1,v:3,A:0.4,run:!reduceMotion,slow:false,showL:true,track:4,t:0},
+  state:{mode:'wave',kind:'T',f:1,v:3,A:0.4,run:!reduceMotion,slow:false,terms:true,track:4,t:0,air:100,ring:true},
   controls:[
-    {type:'seg',key:'kind',label:'波的種類',options:[['T','橫波'],['L','縱波']]},
-    {type:'range',key:'f',label:'頻率 f',min:0.5,max:3,step:0.1,unit:' Hz'},
-    {type:'range',key:'v',label:'波速 v',min:1,max:6,step:0.5,unit:' m/s'},
-    {type:'range',key:'A',label:'振幅 A',min:0.1,max:0.8,step:0.05,unit:' m'},
-    {type:'seg',key:'run',label:'動畫',options:[[true,'播放'],[false,'暫停']]},
-    {type:'toggle',key:'slow',label:'慢動作'},
-    {type:'toggle',key:'showL',label:'標示波長'}],
-  tick:(s,dt)=>{if(s.run)s.t+=dt*(s.slow?0.25:1);},
+    {type:'seg',key:'mode',label:'實驗',options:[['wave','波形與名詞'],['medium','需要介質嗎？']]},
+    {type:'seg',key:'kind',label:'波的種類',options:[['T','橫波'],['L','縱波']],show:s=>s.mode==='wave'},
+    {type:'range',key:'f',label:'頻率 f',min:0.5,max:3,step:0.1,unit:' Hz',show:s=>s.mode==='wave'},
+    {type:'range',key:'v',label:'波速 v（由介質決定）',min:1,max:6,step:0.5,unit:' m/s',show:s=>s.mode==='wave'},
+    {type:'range',key:'A',label:'振幅 A',min:0.1,max:0.8,step:0.05,unit:' m',show:s=>s.mode==='wave'},
+    {type:'seg',key:'run',label:'動畫',options:[[true,'播放'],[false,'暫停']],show:s=>s.mode==='wave'},
+    {type:'toggle',key:'slow',label:'慢動作',show:s=>s.mode==='wave'},
+    {type:'toggle',key:'terms',label:'標示波的名詞',show:s=>s.mode==='wave'},
+    {type:'range',key:'air',label:'鐘罩內的空氣',min:0,max:100,step:5,unit:' %',show:s=>s.mode==='medium'},
+    {type:'toggle',key:'ring',label:'電鈴響',show:s=>s.mode==='medium'}],
+  tick:(s,dt)=>{if(s.mode==='medium'||s.run)s.t+=dt*(s.mode==='wave'&&s.slow?0.25:1);},
   drag:{track:(p,s)=>{s.track=+clamp((p.x-80)/75,0,10).toFixed(1);}},
   render(s){
+    if(s.mode==='medium')return this.medium(s);
     const lam=s.v/s.f,X=x=>80+x*75,mid=250,ph=x=>2*Math.PI*(x/lam-s.f*s.t);let h='';
     for(let x=0;x<=10;x++)h+=L(X(x),110,X(x),400,{stroke:'#e6e1d5',w:1})+T(X(x),432,x,{size:13,fill:P.muted,anchor:'middle'});
     h+=T(X(10)+14,432,'m',{size:13,fill:P.muted})+T(830,74,'傳播方向 →',{size:17,fill:P.accent,anchor:'end',weight:600});
-    let markY;
     if(s.kind==='T'){
-      const Y=x=>mid-s.A*120*Math.sin(ph(x));h+=L(X(0),mid,X(10),mid,{stroke:'#cfd8d2',w:2});
+      const Y=x=>mid-s.A*120*Math.sin(ph(x)),x0=((lam*(0.25+s.f*s.t))%lam+lam)%lam,top=mid-s.A*120;
+      if(s.terms&&x0+lam<=10)h+=`<rect x="${X(x0)}" y="${top-6}" width="${lam*75}" height="${s.A*240+12}" fill="${P.accent}" opacity=".07"/>`+T(X(x0+lam/2),mid+s.A*120+34,'一個完整的波',{size:14,fill:P.accent,anchor:'middle'});
+      h+=L(X(0),mid,X(10),mid,{stroke:'#cfd8d2',w:2});
       let d='';for(let x=0;x<=10.001;x+=0.04)d+=(x?'L':'M')+X(x).toFixed(1)+' '+Y(x).toFixed(1);h+=`<path d="${d}" fill="none" stroke="${P.accent}" stroke-width="4"/>`;
       for(let x=0;x<=10.001;x+=0.5)h+=`<circle cx="${X(x)}" cy="${Y(x)}" r="4" fill="#fff" stroke="${P.accent}" stroke-width="2"/>`;
+      if(s.terms){if(x0+lam<=10)h+=lamMark(X(x0),X(x0+lam),top-26,lam,P.accent);
+        h+=T(X(x0),top-8,'波峰',{size:14,fill:P.ink,anchor:'middle',weight:700});const xt=x0+lam/2<=10?x0+lam/2:x0-lam/2;if(xt>=0)h+=T(X(xt),mid+s.A*120+20,'波谷',{size:14,fill:P.ink,anchor:'middle',weight:700});
+        h+=L(X(x0),mid,X(x0),top,{stroke:P.blue,w:2,dash:'4 3'})+L(X(x0)-6,mid,X(x0)+6,mid,{stroke:P.blue,w:2})+T(X(x0)+8,(mid+top)/2+5,'振幅',{size:14,fill:P.blue,weight:700});}
       const ty=Y(s.track);h+=L(X(s.track),mid-s.A*120-14,X(s.track),mid+s.A*120+14,{stroke:P.orange,w:2,dash:'4 5'})+`<circle cx="${X(s.track)}" cy="${ty}" r="10" fill="${P.orange}" stroke="#fff" stroke-width="3"/>`+handle('track',X(s.track),ty,P.orange,16);
-      markY=mid-s.A*120-30;
-      if(s.showL){const x0=((lam*(0.25+s.f*s.t))%lam+lam)%lam;if(x0+lam<=10)h+=lamMark(X(x0),X(x0+lam),markY,lam,P.accent);}
     }else{
       for(let r=0;r<5;r++)for(let i=0;i<=50;i++){const x0=i*0.2,px=X(x0)+s.A*18*Math.sin(ph(x0)),tr=Math.abs(x0-s.track)<0.1;h+=`<circle cx="${px.toFixed(1)}" cy="${170+r*40}" r="${tr?6:4.5}" fill="${tr?P.orange:P.accent}" opacity="${tr?1:.55}"/>`;}
       const tx=X(s.track)+s.A*18*Math.sin(ph(s.track));h+=L(X(s.track),140,X(s.track),360,{stroke:P.orange,w:1.5,dash:'4 5'})+handle('track',tx,250,P.orange,16);
       const xc=((lam*(0.5+s.f*s.t))%lam+lam)%lam;
-      for(let x=xc;x<=10;x+=lam){h+=T(X(x),140,'密',{size:16,anchor:'middle',fill:P.ink,weight:700});if(x+lam/2<=10)h+=T(X(x+lam/2),140,'疏',{size:16,anchor:'middle',fill:P.muted});}
-      if(s.showL&&xc+lam<=10)h+=lamMark(X(xc),X(xc+lam),395,lam,P.accent);
+      if(s.terms){for(let x=xc;x<=10;x+=lam){h+=T(X(x),140,'密部',{size:15,anchor:'middle',fill:P.ink,weight:700});if(x+lam/2<=10)h+=T(X(x+lam/2),140,'疏部',{size:15,anchor:'middle',fill:P.muted});}if(xc+lam<=10)h+=lamMark(X(xc),X(xc+lam),395,lam,P.accent);}
     }
-    return {svg:h,reads:[['波長 λ',lam.toFixed(2)+' m'],['週期 T',(1/s.f).toFixed(2)+' s'],['波速 v',s.v.toFixed(1)+' m/s']],
-      note:`<b>v = f × λ</b>：${s.v} = ${s.f} × ${lam.toFixed(2)}<br>橘色點只在原地${s.kind==='T'?'上下':'左右'}振動，不會跟著波前進。`};}},
+    return {svg:h,reads:[['波長 λ',lam.toFixed(2)+' m'],['頻率 f',`${s.f} Hz`],['週期 T',(1/s.f).toFixed(2)+' s'],['波速 v',s.v.toFixed(1)+' m/s']],
+      note:`<b>v = f × λ</b>：${s.v} = ${s.f} × ${lam.toFixed(2)}<br>${s.kind==='T'?'<b>橫波</b>：振動方向和傳播方向垂直':'<b>縱波</b>：振動方向和傳播方向平行'}；橘點只在原地振動，波傳的是能量。`};},
+  medium(s){
+    /* 鐘罩抽氣：聲音（力學波）需要介質，光（非力學波）不需要 */
+    const k=s.air/100,cx=300,cy=270;let h='';
+    h+=`<rect x="130" y="390" width="340" height="16" rx="4" fill="#b8c4bc"/>`+`<path d="M170 390V230Q170 120 300 120Q430 120 430 230V390" fill="#e6f1f5" fill-opacity=".55" stroke="#8fb3c0" stroke-width="4"/>`;
+    h+=L(130,398,70,398,{stroke:'#8a9a92',w:8})+`<rect x="28" y="370" width="46" height="60" rx="8" fill="#8a9a92"/>`+T(51,452,'抽氣機',{size:14,fill:P.muted,anchor:'middle'});
+    for(let i=0;i<Math.round(60*k);i++){const x=185+rnd(i)*230,y=140+rnd(i+300)*240;if(Math.hypot((x-300)/130,(y-250)/135)<1)h+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${P.blue}" opacity=".45"/>`;}
+    const vib=s.ring?Math.sin(s.t*40)*4:0;
+    h+=`<path d="M270 300Q270 240 300 240Q330 240 330 300L338 312H262Z" fill="#d9a441" stroke="#a87a25" stroke-width="2"/><circle cx="${300+vib}" cy="318" r="7" fill="#7a5a1c"/>`+L(300,240,300,200,{stroke:'#777',w:3});
+    if(s.ring)for(let j=0;j<4;j++){const r=((s.t*90+j*45)%180)+20;if(r<130)h+=`<path d="M${cx+r*Math.cos(-0.6)} ${cy+r*Math.sin(-0.6)}A${r} ${r} 0 0 1 ${cx+r*Math.cos(0.6)} ${cy+r*Math.sin(0.6)}" fill="none" stroke="${P.orange}" stroke-width="3" opacity="${(k*(1-r/180)).toFixed(2)}"/>`;
+      const x=440+((s.t*140+j*55)%220);h+=`<path d="M${x} ${cy+30}Q${x+16} ${cy+60} ${x} ${cy+90}" fill="none" stroke="${P.orange}" stroke-width="3" opacity="${(k*0.9).toFixed(2)}"/>`;}
+    h+=`<path d="M300 280L700 170" stroke="#e8b84a" stroke-width="3" stroke-dasharray="10 8" opacity=".9"/>`+T(560,190,'光',{size:16,fill:'#b8862a',weight:700});
+    h+=`<path d="M690 170Q720 145 750 170Q720 195 690 170" fill="#fff" stroke="${P.ink}" stroke-width="2"/><circle cx="720" cy="170" r="8" fill="${P.ink}"/>`+T(720,215,'眼睛：看得到',{size:15,fill:P.ink,anchor:'middle'});
+    h+=`<path d="M705 330Q705 300 730 300Q755 300 755 330Q755 350 735 360Q730 375 718 372" fill="none" stroke="${P.ink}" stroke-width="3"/>`+T(730,400,k>0.6?'耳朵：聽得到':k>0.15?'耳朵：聲音變小':'耳朵：幾乎聽不到',{size:15,fill:P.ink,anchor:'middle'});
+    h+=T(300,96,s.air===0?'接近真空':`空氣 ${s.air}%`,{size:18,fill:P.ink,anchor:'middle',weight:700});
+    return {svg:h,reads:[['鐘罩內空氣',`${s.air}%`],['聲音（力學波）',!s.ring?'電鈴沒響':k>0.6?'聽得到':k>0.15?'變小':'幾乎聽不到'],['光（非力學波）','看得到']],
+      note:'聲音是<b>力學波</b>，要靠介質（空氣）傳播；抽掉空氣就傳不出來。光是<b>非力學波</b>，真空中也能傳播，所以還看得到電鈴。'};}},
 
-/* ===== 06 聲音 ===== */
-sound:{group:1,n:'06',name:'聲音與回聲',subtitle:'調整頻率、振幅和波形，看聲音的三要素；或量量回聲。',
-  q:['人離牆 51 m，聲速 340 m/s，回聲往返要多久？','聲音走 102 m，時間 = 102 ÷ 340 = 0.30 s。距離 = 聲速 × 往返時間 ÷ 2。'],
-  state:{mode:'tone',f:400,A:6,timbre:'pure',d:51,medium:'air',temp:15,echo:null,t:0},
+/* ===== 3-2 聲音的形成 ===== */
+source:{group:1,n:'3-2',name:'聲音的形成',subtitle:'聲音來自物體的快速振動：敲、撥、摩擦、說話，都是讓東西振動起來。',
+  q:['用手按住正在響的音叉，聲音為什麼馬上停止？','聲音是物體振動產生的。按住音叉讓振動停止，就不再推動空氣，聲音也跟著停止。'],
+  state:{src:'fork',t:0,t0:null,td:null,bow:false,ton:0,toff:-99,eoff:0,slow:true,ball:true},
   controls:[
-    {type:'seg',key:'mode',label:'模式',options:[['tone','聲音三要素'],['echo','回聲測距']]},
-    {type:'range',key:'f',label:'頻率 → 音調',min:100,max:1000,step:10,unit:' Hz',show:s=>s.mode==='tone'},
-    {type:'range',key:'A',label:'振幅 → 響度',min:1,max:10,step:1,unit:' 格',show:s=>s.mode==='tone'},
-    {type:'seg',key:'timbre',label:'波形 → 音色',options:Object.entries(TIMBRE).map(([k,v])=>[k,v[0]]),show:s=>s.mode==='tone'},
+    {type:'seg',key:'src',label:'發聲方式',options:[['fork','敲擊（音叉）'],['string','撥弦（吉他）'],['bow','摩擦（拉弓）'],['voice','說話（聲帶）']],onChange:s=>{s.t0=null;s.td=null;s.bow=false;s.eoff=0;s.toff=-99;}},
+    {type:'buttons',label:'',items:[['🔨 敲一下',s=>{s.t0=s.t;s.td=null;}],['✋ 用手按住',s=>{s.td=s.t;}]],show:s=>s.src==='fork',primary:true},
+    {type:'buttons',label:'',items:[['撥一下',s=>{s.t0=s.t;s.td=null;}],['✋ 用手按住',s=>{s.td=s.t;}]],show:s=>s.src==='string',primary:true},
+    {type:'toggle',key:'bow',label:'拉弓（弓和弦摩擦）',show:s=>s.src==='bow',onChange:bowSwitch},
+    {type:'toggle',key:'bow',label:'發出聲音（氣流通過聲帶）',show:s=>s.src==='voice',onChange:bowSwitch},
+    {type:'toggle',key:'ball',label:'在音叉旁放乒乓球',show:s=>s.src==='fork'},
+    {type:'toggle',key:'slow',label:'慢動作'}],
+  tick:(s,dt)=>{s.t+=dt;},
+  render(s){
+    const fv=s.slow?2:9,E=tt=>srcEnv(s,tt),disp=tt=>E(tt)*Math.sin(2*Math.PI*fv*tt)*(s.src==='voice'?0.75+0.25*Math.sin(4*Math.PI*fv*tt):1),e=E(s.t),d=disp(s.t);let h='';
+    if(s.src==='fork'){
+      const off=d*10;h+=`<rect x="${178-off}" y="140" width="16" height="170" rx="6" fill="#9aa7b0"/><rect x="${226+off}" y="140" width="16" height="170" rx="6" fill="#9aa7b0"/><path d="M178 300Q210 340 242 300" fill="none" stroke="#9aa7b0" stroke-width="16"/><rect x="202" y="320" width="16" height="70" rx="4" fill="#9aa7b0"/>`;
+      if(s.t0!==null&&s.t-s.t0<0.35)h+=`<g transform="rotate(${-20+60*(s.t-s.t0)} 120 160)"><rect x="60" y="150" width="70" height="10" rx="4" fill="#8a6a45"/><rect x="118" y="135" width="26" height="40" rx="6" fill="#c25b3f"/></g>`;
+      if(s.ball){const push=Math.min(1,e*1.4),bx=255+off+push*45*Math.abs(Math.sin(s.t*3));h+=L(bx,40,bx,200,{stroke:'#bbb',w:1.2})+`<circle cx="${bx}" cy="212" r="13" fill="#ffffff" stroke="#d0c8b0" stroke-width="2"/>`;}
+    }else if(s.src==='string'||s.src==='bow'){
+      h+=`<ellipse cx="210" cy="300" rx="150" ry="70" fill="#d9a46b" opacity=".35"/>`;let p='';for(let x=70;x<=350;x+=5){const u=(x-70)/280;p+=(x===70?'M':'L')+x+' '+(250+d*28*Math.sin(Math.PI*u)).toFixed(1);}
+      h+=`<path d="${p}" fill="none" stroke="#6b4b2a" stroke-width="3"/><rect x="62" y="236" width="10" height="28" fill="#555"/><rect x="348" y="236" width="10" height="28" fill="#555"/>`;
+      if(s.src==='bow'){const bx=210+(s.bow?70*Math.sin(s.t*1.6):0);h+=`<rect x="${bx-120}" y="218" width="240" height="8" rx="3" fill="#7a5230"/>`+L(bx-120,214,bx+120,214,{stroke:'#eee7d6',w:3});}
+      else if(s.t0!==null&&s.t-s.t0<0.3)h+=`<circle cx="210" cy="${250-24+(s.t-s.t0)*60}" r="12" fill="#f0c9a6" stroke="#b98d6a"/>`;
+    }else{
+      const open=8+(s.bow?10*Math.abs(Math.sin(2*Math.PI*fv*s.t)):0);
+      h+=`<path d="M150 80V420M270 80V420" stroke="#d9a0a0" stroke-width="10" fill="none"/><ellipse cx="${210-open/2-22}" cy="250" rx="26" ry="12" fill="#c46a6a"/><ellipse cx="${210+open/2+22}" cy="250" rx="26" ry="12" fill="#c46a6a"/>`+T(210,222,'聲帶',{size:15,fill:P.ink,anchor:'middle'});
+      if(s.bow)for(let j=0;j<3;j++){const y=420-((s.t*120+j*50)%160);h+=L(210,y,210,y-24,{stroke:P.blue,w:3,arrow:true,op:.7});}
+      h+=T(210,446,'↑ 從肺部來的氣流',{size:14,fill:P.blue,anchor:'middle'});
+    }
+    const cv=s.slow?160:480;for(let r=0;r<5;r++)for(let i=0;i<34;i++){const x0=390+i*14,tt=s.t-(x0-390)/cv,dx=10*disp(tt);h+=`<circle cx="${(x0+dx).toFixed(1)}" cy="${150+r*30}" r="3.6" fill="${P.accent}" opacity=".55"/>`;}
+    h+=T(620,128,'空氣被推動 → 疏密波',{size:14,fill:P.muted,anchor:'middle'});
+    let g='';for(let i=0;i<=300;i++){const tt=s.t-3+i/100;g+=(i?'L':'M')+(390+i*1.57).toFixed(1)+' '+(410-28*disp(tt)).toFixed(1);}
+    h+=`<rect x="384" y="368" width="484" height="86" rx="10" fill="#fff" stroke="#e1ddd2"/>`+L(390,410,862,410,{stroke:'#e6e1d5',w:1})+`<path d="${g}" fill="none" stroke="${P.orange}" stroke-width="2"/>`+T(392,386,'振動（位移 − 時間）',{size:13,fill:P.muted});
+    const on=e>0.03,name={fork:'敲擊',string:'撥弦',bow:'摩擦',voice:'聲帶振動'}[s.src];
+    h+=T(620,90,on?'物體在振動 → 有聲音':'沒有振動 → 沒有聲音',{size:20,fill:on?P.accent:P.muted,anchor:'middle',weight:700});
+    return {svg:h,reads:[['發聲方式',name],['物體振動',on?'有':'沒有'],['聲音',on?'有':'沒有']],
+      note:{fork:'敲擊讓音叉<b>快速振動</b>，推動空氣形成疏密波。用手按住，振動停止，聲音也停止。',string:'撥弦讓弦<b>快速振動</b>；振動越來越小，聲音也越來越小。',bow:'弓和弦<b>摩擦</b>，一下黏住、一下滑開，讓弦持續振動。',voice:'氣流通過聲帶，讓聲帶<b>快速振動</b>而發聲。'}[s.src]};}},
+
+/* ===== 3-3 多變的聲音 ===== */
+sound:{group:1,n:'3-3',name:'多變的聲音',subtitle:'響度、音調、音色：分別由振幅、頻率、波形決定。',
+  q:['兩個聲音的波形週期相同、振幅不同，它們哪裡不一樣？','週期相同 → 頻率相同 → 音調相同；振幅不同 → 響度不同。'],
+  state:{f:400,A:6,timbre:'pure',t:0,ref:null,audio:false},
+  controls:[
+    {type:'range',key:'f',label:'頻率 → 音調',min:100,max:1000,step:10,unit:' Hz'},
+    {type:'range',key:'A',label:'振幅 → 響度',min:1,max:10,step:1,unit:' 格'},
+    {type:'seg',key:'timbre',label:'波形 → 音色',options:Object.entries(TIMBRE).map(([k,v])=>[k,v[0]])},
+    {type:'buttons',label:'比較兩個聲音',items:[['📌 固定為比較波形',s=>{s.ref={f:s.f,A:s.A,timbre:s.timbre};}],['清除',s=>{s.ref=null;}]]},
+    {type:'toggle',key:'audio',label:'🔊 真的播放聲音（注意音量）'}],
+  tick:(s,dt)=>{s.t+=dt;},
+  render(s){
+    audioSync(s.audio,s.f,s.A,s.timbre);
+    const X=ms=>80+ms*76,wave=(f,A,tb,c,w,dash)=>{const hs=TIMBRE[tb][1],fn=x=>hs.reduce((a,cc,i)=>a+cc*Math.sin((i+1)*x),0);let norm=0;for(let i=0;i<200;i++)norm=Math.max(norm,Math.abs(fn(i/200*2*Math.PI)));let d='';for(let i=0;i<=600;i++){const ms=i/60;d+=(i?'L':'M')+X(ms).toFixed(1)+' '+(180-fn(2*Math.PI*f*ms/1000)*A*10/norm).toFixed(1);}return `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}"${dash?' stroke-dasharray="6 5"':''}/>`;};
+    let h=`<rect x="70" y="36" width="780" height="280" rx="12" fill="#fff" stroke="#e1ddd2"/>`+L(80,180,840,180,{stroke:'#d8d3c6',w:1});
+    for(let ms=0;ms<=10;ms+=2)h+=L(X(ms),44,X(ms),308,{stroke:'#efebe2',w:1})+T(X(ms),336,ms,{size:13,fill:P.muted,anchor:'middle'});
+    h+=T(848,336,'ms',{size:13,fill:P.muted});
+    if(s.ref)h+=wave(s.ref.f,s.ref.A,s.ref.timbre,'#b9b3a5',2.5,true)+T(842,304,'灰色虛線：比較波形',{size:13,fill:P.muted,anchor:'end'});
+    h+=wave(s.f,s.A,s.timbre,P.accent,3);
+    const per=1000/s.f;if(per<=10)h+=lamMark(X(0.25*per),X(1.25*per),66,null,P.orange,`週期 ${per.toFixed(2)} ms`);
+    for(let r=0;r<3;r++)for(let i=0;i<51;i++){const x=80+i*15+s.A*1.1*Math.sin(i*s.f*0.00074*2-2*Math.PI*(s.f/1000)*(reduceMotion?0:s.t));h+=`<circle cx="${x.toFixed(1)}" cy="${380+r*24}" r="3.6" fill="${P.accent}" opacity=".5"/>`;}
+    h+=T(450,470,'空氣粒子疏密（放慢 1000 倍）',{size:13,fill:P.muted,anchor:'middle'});
+    const pitch=s.f<300?'低':s.f<650?'中':'高',cmp=(a,b,hi,lo)=>a>b?hi:a<b?lo:'相同';
+    const reads=[['音調',`${s.f} Hz（${pitch}）`],['響度',`振幅 ${s.A} 格`],['音色',TIMBRE[s.timbre][0]]];
+    if(s.ref)reads.push(['和比較波形相比',`音調${cmp(s.f,s.ref.f,'較高','較低')}・響度${cmp(s.A,s.ref.A,'較大','較小')}・音色${s.timbre===s.ref.timbre?'相同':'不同'}`]);
+    return {svg:h,reads,note:'頻率越高 → <b>音調</b>越高（週期越短）<br>振幅越大 → <b>響度</b>越大<br>波形不同 → <b>音色</b>不同'};}},
+
+/* ===== 3-4 聲音的傳播與應用 ===== */
+echo:{group:1,n:'3-4',name:'聲音的傳播與應用',subtitle:'聲音在不同介質中速度不同；利用回聲可以測距離、測海深。',
+  q:['人離牆 51 m，聲速 340 m/s，回聲往返要多久？','聲音走 102 m，時間 = 102 ÷ 340 = 0.30 s。距離 = 聲速 × 往返時間 ÷ 2。'],
+  state:{mode:'echo',d:51,medium:'air',temp:15,echo:null,t:0,sx:420,sonar:null,lg:3},
+  controls:[
+    {type:'seg',key:'mode',label:'實驗',options:[['echo','回聲測距'],['sonar','聲納測海深'],['hear','聽得到嗎？']],onChange:s=>{s.echo=null;s.sonar=null;}},
     {type:'range',key:'d',label:'到牆的距離',min:5,max:500,step:1,unit:' m',show:s=>s.mode==='echo'},
     {type:'seg',key:'medium',label:'介質',options:Object.entries(SOUND_SPEED),show:s=>s.mode==='echo'},
     {type:'range',key:'temp',label:'氣溫',min:0,max:40,step:1,unit:' °C',show:s=>s.mode==='echo'&&s.medium==='air'},
-    {type:'buttons',label:'',items:[['📢 發出聲音',s=>{s.echo=0;}]],show:s=>s.mode==='echo',primary:true}],
-  tick:(s,dt)=>{s.t+=dt;if(s.echo!==null&&s.echo<2)s.echo=Math.min(2,s.echo+dt);},
+    {type:'buttons',label:'',items:[['📢 發出聲音',s=>{s.echo=0;}]],show:s=>s.mode==='echo',primary:true},
+    {type:'range',key:'sx',label:'船的位置',min:60,max:840,step:5,fmt:()=>'',show:s=>s.mode==='sonar'},
+    {type:'buttons',label:'',items:[['📡 發出超聲波',s=>{s.sonar=0;}]],show:s=>s.mode==='sonar',primary:true},
+    {type:'range',key:'lg',label:'聲音頻率',min:0,max:5.3,step:0.01,fmt:s=>fmtHz(Math.pow(10,s.lg)),show:s=>s.mode==='hear'}],
+  tick:(s,dt)=>{s.t+=dt;if(s.echo!==null&&s.echo<2)s.echo=Math.min(2,s.echo+dt);if(s.sonar!==null&&s.sonar<2.4)s.sonar=Math.min(2.4,s.sonar+dt);},
+  drag:{ship:(p,s)=>{s.sx=snap('sx',p.x);s.sonar=null;},hz:(p,s)=>{s.lg=snap('lg',(p.x-80)/780*5.3);}},
   render(s){
     let h='';
-    if(s.mode==='tone'){
-      const hs=TIMBRE[s.timbre][1],w=x=>hs.reduce((a,c,i)=>a+c*Math.sin((i+1)*x),0);let norm=0;for(let i=0;i<200;i++)norm=Math.max(norm,Math.abs(w(i/200*2*Math.PI)));
-      const X=ms=>80+ms*76,Y=y=>180-y*s.A*10/norm;
-      h+=`<rect x="70" y="36" width="780" height="280" rx="12" fill="#fff" stroke="#e1ddd2"/>`+L(80,180,840,180,{stroke:'#d8d3c6',w:1});
-      for(let ms=0;ms<=10;ms+=2)h+=L(X(ms),44,X(ms),308,{stroke:'#efebe2',w:1})+T(X(ms),336,ms,{size:13,fill:P.muted,anchor:'middle'});
-      h+=T(848,336,'ms',{size:13,fill:P.muted});
-      let d='';for(let i=0;i<=600;i++){const ms=i/60;d+=(i?'L':'M')+X(ms).toFixed(1)+' '+Y(w(2*Math.PI*s.f*ms/1000)).toFixed(1);}
-      h+=`<path d="${d}" fill="none" stroke="${P.accent}" stroke-width="3"/>`;
-      const per=1000/s.f;if(per<=10)h+=lamMark(X(0.25*per),X(1.25*per),66,null,P.orange,`週期 ${per.toFixed(2)} ms`);
-      for(let r=0;r<3;r++)for(let i=0;i<51;i++){const x=80+i*15+s.A*1.1*Math.sin(i*s.f*0.00074*2-2*Math.PI*(s.f/1000)*(reduceMotion?0:s.t));h+=`<circle cx="${x.toFixed(1)}" cy="${380+r*24}" r="3.6" fill="${P.accent}" opacity=".5"/>`;}
-      h+=T(450,470,'空氣粒子疏密（放慢 1000 倍）',{size:13,fill:P.muted,anchor:'middle'});
-      const pitch=s.f<300?'低':s.f<650?'中':'高';
-      return {svg:h,reads:[['音調',`${s.f} Hz（${pitch}）`],['響度',`振幅 ${s.A} 格`],['音色',TIMBRE[s.timbre][0]]],
-        note:'頻率越高 → <b>音調</b>越高<br>振幅越大 → <b>響度</b>越大<br>波形不同 → <b>音色</b>不同'};
+    if(s.mode==='sonar'){
+      const depth=x=>2300+1300*Math.sin(x/130)+500*Math.sin(x/47+1),SY=x=>120+depth(x)/4500*340,dep=depth(s.sx),t=2*dep/1500;
+      h+=`<rect x="10" y="10" width="880" height="110" fill="#e9f3f8"/><rect x="10" y="120" width="880" height="372" fill="#bcd9e6"/>`;
+      let sb='M10 492';for(let x=10;x<=890;x+=10)sb+=`L${x} ${SY(x).toFixed(1)}`;h+=`<path d="${sb}L890 492Z" fill="#c9b48c"/>`;
+      h+=`<g data-drag="ship" class="handle-body"><path d="M${s.sx-50} 104L${s.sx+50} 104L${s.sx+36} 124L${s.sx-36} 124Z" fill="#5d7088"/><rect x="${s.sx-14}" y="84" width="28" height="20" fill="#8aa0b8"/></g>`+handle('ship',s.sx,104,P.orange,10);
+      if(s.sonar!==null){const fr=s.sonar/2.4,y=fr<0.5?124+(SY(s.sx)-124)*fr*2:SY(s.sx)-(SY(s.sx)-124)*(fr-0.5)*2,up=fr>=0.5;
+        if(fr<1)for(let k=0;k<3;k++){const yy=y+(up?k*12:-k*12),w=30-k*6;h+=`<path d="M${s.sx-w} ${yy}Q${s.sx} ${yy+(up?-12:12)} ${s.sx+w} ${yy}" fill="none" stroke="${P.orange}" stroke-width="${4-k}" opacity="${1-k*.3}"/>`;}
+        else h+=L(s.sx,124,s.sx,SY(s.sx),{stroke:P.orange,w:1.5,dash:'5 5'})+T(s.sx+12,(124+SY(s.sx))/2,`${num(dep,0)} m`,{size:17,fill:P.ink,weight:700});}
+      h+=T(30,40,'聲納：船底發出超聲波，量回聲時間算海深',{size:16,fill:P.ink,weight:600});
+      return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['水中聲速','1500 m/s'],['回聲時間',s.sonar!==null&&s.sonar>=2.4?`${t.toFixed(2)} s`:'按「發出超聲波」'],['海深',s.sonar!==null&&s.sonar>=2.4?`${num(dep,0)} m`:'—']],
+        note:`<b>海深 = 聲速 × 時間 ÷ 2</b>${s.sonar!==null&&s.sonar>=2.4?` = 1500 × ${t.toFixed(2)} ÷ 2 = ${num(dep,0)} m`:''}<br>聲納用<b>超聲波</b>（高於 20000 Hz），方向性好、人耳聽不到。拖動船換位置。`};
+    }
+    if(s.mode==='hear'){
+      const X=lg=>80+lg/5.3*780,hz=Math.pow(10,s.lg),bands=[[0,Math.log10(20),'#efe7f6','次聲波'],[Math.log10(20),Math.log10(20000),'#e2f0ec','可聽聲（人）'],[Math.log10(20000),5.3,'#fdf0e1','超聲波']];
+      for(const[a,b,c,t]of bands)h+=`<rect x="${X(a)}" y="50" width="${X(b)-X(a)}" height="370" fill="${c}"/>`+T((X(a)+X(b))/2,72,t,{size:15,fill:P.ink,anchor:'middle',weight:700});
+      HEARING.forEach(([n,lo,hi],i)=>{const y=110+i*50,on=hz>=lo&&hz<=hi;h+=T(70,y+7,n,{size:16,fill:P.ink,anchor:'end',weight:on?700:400})+`<rect x="${X(Math.log10(lo))}" y="${y-9}" width="${X(Math.log10(hi))-X(Math.log10(lo))}" height="18" rx="9" fill="${on?P.accent:'#cfc9ba'}"/>`;});
+      for(let e=0;e<=5;e++)h+=L(X(e),420,X(e),428,{stroke:P.muted})+T(X(e),448,fmtHz(Math.pow(10,e)),{size:13,fill:P.muted,anchor:'middle'});
+      h+=L(X(s.lg),50,X(s.lg),420,{stroke:P.orange,w:3})+handle('hz',X(s.lg),40,P.orange,11);
+      const who=HEARING.filter(([,lo,hi])=>hz>=lo&&hz<=hi).map(a=>a[0]),kind=hz<20?'次聲波':hz>20000?'超聲波':'可聽聲';
+      return {svg:h,reads:[['頻率',fmtHz(hz)],['種類',kind],['聽得到的',who.length?who.join('、'):'都聽不到']],
+        note:'人耳約可聽 <b>20～20000 Hz</b>；低於 20 Hz 是<b>次聲波</b>，高於 20000 Hz 是<b>超聲波</b>。動物的數值為約略範圍。'};
     }
     const v=s.medium==='air'?331+0.6*s.temp:s.medium==='water'?1500:5200,t=2*s.d/v,ok=t>=0.1;
     h+=T(60,60,`介質：${SOUND_SPEED[s.medium]}${s.medium==='air'?`（${s.temp} °C）`:''}　聲速 ${num(v,0)} m/s`,{size:17,fill:P.ink,weight:600});
@@ -235,7 +349,7 @@ sound:{group:1,n:'06',name:'聲音與回聲',subtitle:'調整頻率、振幅和�
       if(fr<1)for(let k=0;k<3;k++){const xx=x+(out?-k*16:k*16),c=out?1:-1;h+=`<path d="M${xx} ${290-40+k*4}Q${xx+c*22} 290 ${xx} ${290+40-k*4}" fill="none" stroke="${P.orange}" stroke-width="${4-k}" opacity="${1-k*.28}"/>`;}
       h+=T(475,240,fr<0.5?'去程 →':fr<1?'← 回程':ok?'聽到回聲！':'回聲和原聲混在一起',{size:22,anchor:'middle',fill:P.orange,weight:700});}
     return {svg:h,reads:[['聲速',`${num(v,0)} m/s`],['往返路程',`${2*s.d} m`],['回聲時間',`${t.toFixed(3)} s`],['能分辨回聲？',ok?'可以':'不行（< 0.1 s）']],
-      note:`<b>距離 = 聲速 × 時間 ÷ 2</b><br>${num(v,0)} × ${t.toFixed(3)} ÷ 2 = ${s.d} m`};}},
+      note:`<b>距離 = 聲速 × 時間 ÷ 2</b><br>${num(v,0)} × ${t.toFixed(3)} ÷ 2 = ${s.d} m　（聲速：固體 ＞ 液體 ＞ 氣體）`};}},
 
 /* ===== 07 影子 ===== */
 shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿直線前進：用影子和針孔成像來證明。',dark:true,
@@ -717,7 +831,7 @@ function sync(){
 const setIf=(el,html)=>{if(el.innerHTML!==html)el.innerHTML=html;};
 function render(){const out=cfg.render(state);svgEl.innerHTML=DEFS+out.svg;setIf(labEl.querySelector('.readouts'),out.reads.map(([a,b])=>`<div class="readout"><span>${a}</span><b>${b}</b></div>`).join(''));setIf(labEl.querySelector('.note'),out.note||'');sync();}
 function activate(key){
-  if(!LABS[key])key='lens';cancelAnimationFrame(raf);current=key;cfg=LABS[key];state=structuredClone(cfg.state);
+  if(!LABS[key])key='lens';cancelAnimationFrame(raf);audioSync(false);current=key;cfg=LABS[key];state=structuredClone(cfg.state);
   document.querySelectorAll('nav a').forEach(a=>{const on=a.dataset.key===key;a.classList.toggle('active',on);on?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');});
   document.getElementById('title').textContent=cfg.name;document.getElementById('subtitle').textContent=cfg.subtitle;document.title=cfg.name+'｜理化實驗室';
   labEl.innerHTML=`<div class="sim-layout"><div class="viz-panel${cfg.dark?' dark':''}"><svg id="scene" viewBox="0 0 900 500" role="img" aria-label="${cfg.name}"></svg>${cfg.drag?'<p class="drag-hint"><i></i>虛線圓圈可以直接拖曳</p>':''}</div><div class="controls">${cfg.controls.map(controlHTML).join('')}<div class="readouts"></div><p class="note"></p><button type="button" class="btn ghost reset">↺ 重設</button></div></div><section class="question"><h3>想一想</h3><p>${cfg.q[0]}</p><details><summary>看解釋</summary><div class="answer">${cfg.q[1]}</div></details></section>`;
@@ -740,5 +854,5 @@ window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與公式，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的眼睛與相機尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值；聲音頁不會發出聲音。</li><li>RGB 是螢幕色彩值，不是光功率。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與公式，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的眼睛與相機尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>RGB 是螢幕色彩值，不是光功率。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');
