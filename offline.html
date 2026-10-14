@@ -233,7 +233,6 @@ const liquid=v=>LIQUIDS.find(l=>l[0]===v);
 const MEDIA={air:['空氣',1.00,'#14263d'],water:['水',1.33,'#1b4560'],glass:['玻璃',1.50,'#24516b'],diamond:['鑽石',2.42,'#36497a']};
 const TIMBRE={pure:['音叉',[1]],flute:['笛子',[1,.35,.12]],violin:['小提琴',[1,.55,.4,.28,.2,.12]]};
 const SOUND_SPEED={air:'空氣',water:'水',steel:'鋼鐵'};
-const FILTERS={none:['無',null],red:['紅',[1,0,0]],green:['綠',[0,1,0]],blue:['藍',[0,0,1]],yellow:['黃',[1,1,0]],cyan:['青',[0,1,1]],magenta:['洋紅',[1,0,1]]};
 const REFLECT={apple:['紅蘋果',[1,0,0]],leaf:['綠葉',[0,1,0]],banana:['黃香蕉',[1,1,0]],paper:['白紙',[1,1,1]],cloth:['黑布',[0,0,0]]};
 const LIGHTS=[['白光',[255,255,255]],['紅',[255,0,0]],['綠',[0,255,0]],['藍',[0,0,255]],['黃',[255,255,0]],['青',[0,255,255]],['洋紅',[255,0,255]],['關燈',[0,0,0]]];
 function colorName(r,g,b){if(Math.max(r,g,b)<40)return '黑';const k=[r,g,b].map(v=>v>=128?1:0).join('');return {'000':'暗色','100':'紅','010':'綠','001':'藍','110':'黃','011':'青','101':'洋紅','111':'白'}[k];}
@@ -761,20 +760,25 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'眼睛、眼鏡和相�
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:s.dev==='myopia'?[['眼球','太長（或水晶體太凸）'],['光會聚在',where],['看遠處',ok?'清楚':'模糊'],['矯正','凹透鏡（發散）']]:[['眼球','太短（或水晶體太扁）'],['光會聚在',where],['看近處',ok?'清楚':'模糊'],['矯正','凸透鏡（會聚）']],
       note:s.dev==='myopia'?'近視：光會聚在視網膜<b>前方</b> → 戴<b>凹透鏡</b>讓光先發散一點。':'遠視：光會聚在視網膜<b>後方</b> → 戴<b>凸透鏡</b>幫忙會聚。'};}},
 /* ===== 11 顏色 ===== */
-color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光通過稜鏡分出色光；物體的顏色看它透射或反射哪些色光。',dark:true,
+color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光可以分開、也可以疊回來；物體的顏色看它透射或反射哪些色光。',dark:true,
   q:['紅光和綠光相加，會變成哪種光？紅蘋果在綠光下是什麼顏色？','紅光＋綠光是黃光。紅蘋果只反射紅光，綠光下沒有紅光可反射，所以看起來是黑色。'],
-  state:{on:true,prog:0,mode:'prism',r:255,g:255,b:255,obj:'apple',beam:'full',hue:3,f1:'red',f2:'none'},
+  state:{on:true,prog:0,mode:'prism',r:255,g:255,b:255,obj:'apple',beam:'full',hue:3,fR:true,fG:true,fB:true,pc:true,pm:true,py:true,compare:false},
   controls:[LAMP,
-    {type:'seg',key:'mode',label:'實驗',options:[['prism','色散'],['filter','透射（透明物體）'],['object','反射（不透明物體）'],['mix','色光混合']],onChange:replay},
-    {type:'seg',key:'f1',label:'濾色片 1',options:Object.entries(FILTERS).filter(([k])=>k!=='none').map(([k,v])=>[k,v[0]]),show:s=>s.mode==='filter',onChange:replay},
-    {type:'seg',key:'f2',label:'濾色片 2（疊上去）',options:Object.entries(FILTERS).map(([k,v])=>[k,v[0]]),show:s=>s.mode==='filter',onChange:replay},
+    {type:'seg',key:'mode',label:'實驗',options:[['prism','色散'],['filter','透射'],['object','反射'],['mix','色光混合'],['paint','顏料混色']],onChange:replay},
+    {type:'toggle',key:'fR',label:'紅色濾色片',show:s=>s.mode==='filter'},
+    {type:'toggle',key:'fG',label:'綠色濾色片',show:s=>s.mode==='filter'},
+    {type:'toggle',key:'fB',label:'藍色濾色片',show:s=>s.mode==='filter'},
+    {type:'toggle',key:'pc',label:'青色顏料',show:s=>s.mode==='paint',onChange:replay},
+    {type:'toggle',key:'pm',label:'洋紅色顏料',show:s=>s.mode==='paint',onChange:replay},
+    {type:'toggle',key:'py',label:'黃色顏料',show:s=>s.mode==='paint',onChange:replay},
+    {type:'toggle',key:'compare',label:'和色光混合（加色）對照',show:s=>s.mode==='paint'},
     {type:'seg',key:'beam',label:'光線',options:[['full','白光（全光）'],['single','單色光']],show:s=>s.mode==='prism',onChange:replay},
     {type:'seg',key:'hue',label:'色光',options:SPECTRUM.map(([n],i)=>[i,n]),show:s=>s.mode==='prism'&&s.beam==='single',onChange:replay},
     {type:'seg',key:'obj',label:'物體',options:Object.entries(REFLECT).map(([k,v])=>[k,v[0]]),show:s=>s.mode==='object'},
-    {type:'buttons',label:'光的顏色',items:LIGHTS.map(([n,c])=>[n,s=>{[s.r,s.g,s.b]=c;}]),show:s=>s.mode!=='prism'},
-    {type:'range',key:'r',label:'紅光 R',min:0,max:255,step:1,show:s=>s.mode!=='prism'},
-    {type:'range',key:'g',label:'綠光 G',min:0,max:255,step:1,show:s=>s.mode!=='prism'},
-    {type:'range',key:'b',label:'藍光 B',min:0,max:255,step:1,show:s=>s.mode!=='prism'}],
+    {type:'buttons',label:'光的顏色',items:LIGHTS.map(([n,c])=>[n,s=>{[s.r,s.g,s.b]=c;}]),show:s=>s.mode!=='prism'&&s.mode!=='paint'},
+    {type:'range',key:'r',label:'紅光 R',min:0,max:255,step:1,show:s=>s.mode!=='prism'&&s.mode!=='paint'},
+    {type:'range',key:'g',label:'綠光 G',min:0,max:255,step:1,show:s=>s.mode!=='prism'&&s.mode!=='paint'},
+    {type:'range',key:'b',label:'藍光 B',min:0,max:255,step:1,show:s=>s.mode!=='prism'&&s.mode!=='paint'}],
   tick:LIGHT_TICK,
   render(s){
     beginLight(s);
@@ -790,17 +794,43 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光通過稜鏡分出
       h+=T(735,370,'紅 + 綠 = 黃',{size:17,fill:D.muted,anchor:'middle'})+T(735,400,'綠 + 藍 = 青',{size:17,fill:D.muted,anchor:'middle'})+T(735,430,'紅 + 藍 = 洋紅',{size:17,fill:D.muted,anchor:'middle'});
       return {svg:h,reads:[['紅 R',r],['綠 G',g],['藍 B',b],['看到',s.on?colorName(r,g,b)+'光':'—']],note:'光的三原色相加會<b>更亮</b>（加色）；三色等量相加 = 白光。'};
     }
+    const rgb=c=>`rgb(${c.map(v=>Math.round(clamp(v,0,255))).join(',')})`,lname=c=>Math.max(...c)<40?'沒有光':colorName(...c)+'光';
     if(s.mode==='filter'){
-      const pass=(c,f)=>f?c.map((v,i)=>v*f[i]):c,F1=FILTERS[s.f1],F2=FILTERS[s.f2],c0=[r,g,b],c1=pass(c0,F1[1]),c2=pass(c1,F2[1]),rgb=c=>`rgb(${c.map(Math.round).join(',')})`,nm=c=>Math.max(...c)<40?'沒有光':colorName(...c)+'光';
-      h=`<rect x="20" y="20" width="860" height="460" rx="20" fill="#05080d"/><rect x="30" y="226" width="40" height="48" rx="8" fill="${s.on?'#c9d3df':'#5a6573'}"/>`;
-      const segs=[[70,330,c0],[350,560,c1],[580,820,F2[1]?c2:c1]];if(!F2[1])segs[1][1]=820;
-      segs.forEach(([x0,x1,c],i)=>{if(i===2&&!F2[1])return;if(s.on&&Math.max(...c)>=40)h+=ray([[x0,250],[x1,250]],rgb(c),{w:36,arrow:false,op:.75,delay:i?segs[0][1]-segs[0][0]+(i>1?segs[1][1]-segs[1][0]+20:20):0});});
-      const filt=(x,f,lab)=>`<rect x="${x}" y="140" width="20" height="220" rx="4" fill="rgb(${f[1].map(v=>v*255).join(',')})" opacity=".6" stroke="#ffffff55"/>`+T(x+10,128,lab,{size:15,fill:D.ink,anchor:'middle'});
-      h+=filt(330,F1,`${F1[0]}色濾色片`);if(F2[1])h+=filt(560,F2,`${F2[0]}色濾色片`);
-      const fin=F2[1]?c2:c1,done=arrived();h+=`<rect x="820" y="120" width="22" height="260" rx="4" fill="#3a4554"/>`+(done&&Math.max(...fin)>=40?`<rect x="820" y="230" width="22" height="40" fill="${rgb(fin)}"/>`:'')+T(831,108,'屏幕',{size:15,fill:D.muted,anchor:'middle'});
-      h+=T(450,440,done?`屏幕上：${s.on?nm(fin):'沒有光'}`:'',{size:22,fill:D.ink,anchor:'middle',weight:700});
-      return {svg:h,reads:[['照射的光',s.on?nm(c0):'沒有光'],['穿過濾色片 1',s.on?nm(c1):'—'],...(F2[1]?[['穿過濾色片 2',s.on?nm(c2):'—']]:[]),['屏幕上',s.on?nm(fin):'—']],
-        note:'透明物體只讓和自己同色的光<b>透射</b>過去，其他色光被吸收。兩片疊在一起 → 只剩兩片都能通過的光。'};
+      /* 白光 → 紅綠藍濾色片 → 三道色光疊在屏幕上 */
+      const F=[['紅',[1,0,0],s.fR,130,[690,190]],['綠',[0,1,0],s.fG,250,[790,190]],['藍',[0,0,1],s.fB,370,[740,280]]],c0=[r,g,b];
+      h=`<rect x="20" y="20" width="860" height="460" rx="20" fill="#05080d"/><rect x="560" y="70" width="300" height="340" rx="10" fill="#0b0f16" stroke="#3a4554" stroke-width="2"/>`+T(710,58,'白色屏幕',{size:15,fill:D.muted,anchor:'middle'});
+      h+=`<rect x="34" y="226" width="40" height="48" rx="8" fill="${s.on?'#c9d3df':'#5a6573'}"/>`;
+      const outs=F.map(([n,f,on])=>on?c0.map((v,i)=>v*f[i]):[0,0,0]),vis=[];
+      F.forEach(([n,f,on,fy,[tx,ty]],i)=>{const d1=Math.hypot(300-74,fy-250),c=outs[i];
+        if(s.on&&Math.max(...c0)>=40)h+=ray([[74,250],[300,fy]],rgb(c0),{w:9,arrow:false,op:.8});
+        if(s.on&&on&&Math.max(...c)>=40)h+=ray([[318,fy],[tx,ty]],rgb(c),{w:9,arrow:false,op:.85,delay:d1+18});
+        vis.push(on&&s.on?clamp((REACH-d1-18-Math.hypot(tx-318,ty-fy))/200,0,1):0);
+        h+=on?`<rect x="300" y="${fy-40}" width="18" height="80" rx="4" fill="${rgb(f.map(v=>v*255))}" opacity=".75" stroke="#ffffff55"/>`+T(309,fy-48,`${n}色濾色片`,{size:14,fill:D.ink,anchor:'middle'}):`<rect x="300" y="${fy-40}" width="18" height="80" rx="4" fill="none" stroke="#ffffff33" stroke-dasharray="4 4"/>`+T(309,fy-48,'已移除',{size:14,fill:D.muted,anchor:'middle'});});
+      h+=`<g style="isolation:isolate">${F.map(([,,,,[tx,ty]],i)=>`<circle cx="${tx}" cy="${ty}" r="78" fill="${rgb(outs[i].map(v=>v*vis[i]))}" style="mix-blend-mode:screen"/>`).join('')}</g>`;
+      const sum=outs.reduce((a,c)=>a.map((v,i)=>Math.min(255,v+c[i])),[0,0,0]),done=vis.every((v,i)=>v>=1||!F[i][2]);
+      h+=T(710,450,done&&s.on?`中央重疊：${lname(sum)}`:'',{size:21,fill:D.ink,anchor:'middle',weight:700});
+      return {svg:h,reads:[['照射的光',s.on?lname(c0):'沒有光'],...F.map(([n,,on],i)=>[`穿過${n}色濾色片`,!on?'（已移除）':s.on?lname(outs[i]):'—']),['三道光疊在一起',s.on?lname(sum):'—']],
+        note:'白光含有紅、綠、藍光。每片濾色片只讓自己顏色的光<b>透射</b>，三道色光在屏幕上再疊回去 → 又是<b>白光</b>；兩兩重疊是黃、青、洋紅。'};
+    }
+    if(s.mode==='paint'){
+      /* 顏料三原色：每種吸收一種色光（減色） */
+      const P3=[['青',[0,1,1],s.pc,[230,190]],['洋紅',[1,0,1],s.pm,[350,190]],['黃',[1,1,0],s.py,[290,295]]],sel=P3.filter(p=>p[2]),ref=sel.reduce((a,p)=>a.map((v,i)=>v*p[1][i]),[1,1,1]),look=ref.map(v=>v*255);
+      h=`<rect x="40" y="30" width="500" height="440" rx="20" fill="#fbfaf6"/><g style="isolation:isolate">${P3.map(([,c,on,[x,y]])=>on?`<circle cx="${x}" cy="${y}" r="105" fill="${rgb(c.map(v=>v*255))}" style="mix-blend-mode:multiply"/>`:'').join('')}</g>`;
+      P3.forEach(([n,,on,[x,y]],i)=>{if(on)h+=T(x+[-60,60,0][i],y+[-70,-70,85][i],n,{size:18,fill:'#1b2a33',anchor:'middle',weight:700});});
+      const pair=(a,b,x,y,t)=>P3[a][2]&&P3[b][2]?T(x,y,t,{size:15,fill:'#ffffff',anchor:'middle',weight:700}):'';
+      h+=pair(0,1,290,160,'藍')+pair(1,2,345,262,'紅')+pair(0,2,235,262,'綠')+(sel.length===3?T(290,228,'黑',{size:15,fill:'#ffffff',anchor:'middle',weight:700}):'');
+      if(!s.on)h+=`<rect x="40" y="30" width="500" height="440" rx="20" fill="#05080d" opacity=".88"/>`+T(290,250,'沒有光照，看不到顏色',{size:18,fill:D.muted,anchor:'middle'});
+      if(s.compare){
+        h+=T(730,60,'色光混合（加色）',{size:17,fill:D.ink,anchor:'middle',weight:700})+`<rect x="600" y="75" width="260" height="210" rx="16" fill="#05080d" stroke="#3a4554"/><g style="isolation:isolate"><circle cx="700" cy="150" r="58" fill="#ff0000"/><circle cx="760" cy="150" r="58" fill="#00ff00" style="mix-blend-mode:screen"/><circle cx="730" cy="205" r="58" fill="#0000ff" style="mix-blend-mode:screen"/></g>`;
+        h+=T(730,320,'色光：越加越亮 → 白',{size:16,fill:D.ink,anchor:'middle'})+T(730,348,'顏料：越混越暗 → 黑',{size:16,fill:D.ink,anchor:'middle'})+T(730,392,'色光兩兩相加 ＝ 顏料三原色',{size:15,fill:D.muted,anchor:'middle'})+T(730,418,'顏料兩兩相混 ＝ 光的三原色',{size:15,fill:D.muted,anchor:'middle'});
+      }else{
+        h+=T(730,60,'白光照到顏料上',{size:17,fill:D.ink,anchor:'middle',weight:700})+`<rect x="620" y="360" width="220" height="44" rx="8" fill="${rgb(look)}" stroke="#ffffff55"/>`+T(730,436,`看起來：${colorName(...look)}色`,{size:18,fill:D.ink,anchor:'middle',weight:700});
+        [['#ff453a',0],['#32d74b',1],['#0a84ff',2]].forEach(([c,i],k)=>{const x0=600+k*28,x1=680+k*30,inLen=Math.hypot(x1-x0,358-90);if(s.on)h+=ray([[x0,90],[x1,358]],c,{w:4});
+          if(ref[i]>0.5){if(s.on)h+=ray([[x1,358],[x1+110,100]],c,{w:4,delay:inLen});}else if(s.on&&REACH>inLen)h+=T(x1,390,'×',{size:22,fill:'#ffffff',anchor:'middle',weight:700});});
+      }
+      const abs=['紅','綠','藍'].filter((_,i)=>ref[i]<0.5),refl=['紅','綠','藍'].filter((_,i)=>ref[i]>0.5);
+      return {svg:h,reads:[['顏料',sel.length?sel.map(p=>p[0]).join(' ＋ '):'（白紙）'],['吸收',abs.length?abs.join('、')+'光':'沒有'],['反射',refl.length?refl.join('、')+'光':'沒有'],['看起來',colorName(...look)+'色']],
+        note:'顏料三原色是<b>青、洋紅、黃</b>：青吸收紅光、洋紅吸收綠光、黃吸收藍光。混得越多吸收越多 → 越暗（<b>減色</b>）。濾色片疊在一起也是同樣道理。'};
     }
     if(s.mode==='object'){
       const[oname,ref]=REFLECT[s.obj],reach=s.on?REACH:0,lit=clamp((reach-250)/150,0,1),pr=Math.round(r*ref[0]*lit),pg=Math.round(g*ref[1]*lit),pb=Math.round(b*ref[2]*lit);
@@ -885,6 +915,6 @@ window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與公式，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的眼睛與相機尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值；聲音頁不會發出聲音。</li><li>RGB 是螢幕色彩值，不是光功率。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與公式，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的眼睛與相機尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值；聲音頁不會發出聲音。</li><li>RGB 是螢幕色彩值，不是光功率。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');
 </script></body></html>
