@@ -195,3 +195,20 @@ dialog a{color:var(--accent-ink);font-weight:600}
 .handle:hover .ring{fill-opacity:.4}
 .dragging,.dragging *{cursor:grabbing!important}
 dialog .small{font-size:13px;color:var(--muted)}
+
+/* ---------- Example question ---------- */
+.question:has(.ex-q){display:block}
+.ex-q{font-size:15px;line-height:1.9;color:var(--ink);margin:6px 0 10px}
+.ex-opts{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 12px}
+.ex-opts figure{margin:0;background:#fff;border:1px solid var(--amber-line);border-radius:12px;padding:6px 12px 4px;text-align:center}
+.ex-opts figcaption{font-size:13px;color:var(--ink-2);font-weight:600}
+.ex-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:6px 0}
+.ex-who{min-width:72px;font-weight:700;font-size:14px;color:var(--ink)}
+.qopt{border:1px solid var(--line-2);background:#fff;border-radius:999px;padding:5px 14px;font-size:14px;font-weight:700;color:var(--ink-2)}
+.qopt:hover{border-color:var(--amber)}
+.qopt.picked{background:var(--amber);border-color:var(--amber);color:#fff}
+.qopt.right{background:#2f9e6f;border-color:#2f9e6f;color:#fff}
+.qopt.wrong{background:#c8553d;border-color:#c8553d;color:#fff}
+.ex-mark{font-size:14px;font-weight:700;color:var(--ink-2);margin-left:4px}
+.ex-tools{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.ex-tools .btn{font-size:13px;padding:6px 12px}
