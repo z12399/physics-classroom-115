@@ -71,6 +71,18 @@ function audioSync(on,f,A,tb){
     const key=f+'|'+A;if(AUD.key!==key){AUD.osc.frequency.setTargetAtTime(f,c.currentTime,0.02);AUD.gain.gain.setTargetAtTime(0.012*A,c.currentTime,0.03);AUD.key=key;}
   }catch(e){}}
 
+/* ---------- 針孔成像例題：視角決定看到的形狀 ---------- */
+const F_OPTS=[['A','正常','',' '],['B','左右相反','scale(-1 1)'],['C','上下顛倒','scale(1 -1)'],['D','轉 180°','rotate(180)']];
+const fGlyph=(t,c='#1b2a33')=>`<svg viewBox="-30 -36 60 72" width="54" height="64" aria-hidden="true"><g transform="${t}"><path d="M-14 -30H16V-20H-4V-5H10V5H-4V30H-14Z" fill="${c}"/></g></svg>`;
+function pinholeExample(s){
+  const ans={a:'D',b:'C'},row=(k,who)=>`<div class="ex-row"><span class="ex-who">${who}</span>${F_OPTS.map(([id])=>{const pick=s['ex'+k.toUpperCase()]===id,cls=pick?(s.exChk?(id===ans[k]?' right':' wrong'):' picked'):'';return `<button type="button" class="qopt${cls}" data-qa="${k}:${id}">(${id})</button>`;}).join('')}${s.exChk&&s['ex'+k.toUpperCase()]?`<span class="ex-mark">${s['ex'+k.toUpperCase()]===ans[k]?'✓ 正確':'✗ 再想想'}</span>`:''}</div>`;
+  const q=`<b>例題</b>　用針孔成像觀察一個發光的字母「F」。從針孔這一側<b>面向物體</b>看，它是正常的 F。<br>・<b>小明</b>站在紙屏<b>後面</b>，面向針孔看紙屏上的像（像用針孔成像筒那樣）。<br>・<b>小華</b>站在針孔和紙屏<b>之間</b>，背對針孔看紙屏。<br>兩人看到的像分別是下列哪一個？`;
+  const opts=`<div class="ex-opts">${F_OPTS.map(([id,name,t])=>`<figure>${fGlyph(t)}<figcaption>(${id}) ${name}</figcaption></figure>`).join('')}</div>`;
+  const tools=`<div class="ex-tools"><button type="button" class="btn primary" data-qa="check">對答案</button><button type="button" class="btn" data-qa="view:A">用立體圖驗證：小明的方向</button><button type="button" class="btn" data-qa="view:B">小華的方向</button><button type="button" class="btn ghost" data-qa="sol">${s.exSol?'收起解析':'看解析'}</button></div>`;
+  const sol=s.exSol?`<div class="answer"><b>答案：小明 (D)、小華 (C)</b><br>關鍵是先確定<b>從哪個方向看</b>。<br>・小明在紙屏後面面向針孔，和「面向物體」是<b>同一個方向</b> → 上下顛倒、左右相反，等於轉 180°。<br>・小華背對針孔看，觀看方向和面向物體<b>相反</b>，左右又被反一次，所以只剩<b>上下顛倒</b>。<br>課本說的「上下顛倒、左右相反」，是指用同一個方向比較物體和像。按上面的驗證按鈕，對照立體圖下方的小窗。</div>`:'';
+  return {html:`<h3>想一想：視角決定形狀</h3><div class="ex-q">${q}</div>${opts}${row('a','小明看到')}${row('b','小華看到')}${tools}${sol}`};
+}
+
 const LABS={
 /* ===== 01 測量 ===== */
 measure:{group:1,n:'01',name:'測量與估讀',subtitle:'拖動物件或換一把尺，練習讀出完整的測量值。',
@@ -353,8 +365,10 @@ echo:{group:1,n:'3-4',name:'聲音的傳播與應用',subtitle:'聲音在不同�
 
 /* ===== 07 影子 ===== */
 shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿直線前進：用影子和針孔成像來證明。',dark:true,
-  q:['物體靠近點光源，屏幕上的影子會變大還是變小？','會變大。屏幕位置不變時，光源到物體的距離 a 減少，影子的放大倍數 D/a 增加。'],
-  state:{on:true,beam:'full',prog:0,mode:'shadow',src:'point',a:60,D:200,h:40,R:15,ang:-16,edges:true,pa:80,pb:60,ph:40,hole:1,tri:true,view:'2d',yaw:50,pitch:18,spin:false,rays3:true,insets:true},
+  q:s=>s.mode==='pinhole'&&s.view==='3d'?pinholeExample(s):['物體靠近點光源，屏幕上的影子會變大還是變小？','會變大。屏幕位置不變時，光源到物體的距離 a 減少，影子的放大倍數 D/a 增加。'],
+  qAction(s,v){const[k,x]=v.split(':');if(k==='a'||k==='b'){s[k==='a'?'exA':'exB']=x;s.exChk=false;}else if(k==='check')s.exChk=true;else if(k==='sol')s.exSol=!s.exSol;
+    else if(k==='view'){s.obj3='F';s.spin=false;s.insets=true;if(x==='A'){s.yaw=0;s.pitch=6;}else{s.yaw=180;s.pitch=6;}}},
+  state:{on:true,beam:'full',prog:0,mode:'shadow',src:'point',a:60,D:200,h:40,R:15,ang:-16,edges:true,pa:80,pb:60,ph:40,hole:1,tri:true,view:'2d',yaw:50,pitch:18,spin:false,rays3:true,insets:true,obj3:'man',exA:null,exB:null,exChk:false,exSol:false},
   controls:[LAMP,BEAM,
     {type:'seg',key:'mode',label:'實驗',options:[['shadow','影子'],['pinhole','針孔成像']],onChange:replay},
     {type:'seg',key:'src',label:'光源',options:[['point','點光源'],['area','有大小的光源']],onChange:replay,show:s=>s.mode==='shadow'},
@@ -364,9 +378,10 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
     {type:'range',key:'h',label:'物體高度 h',min:10,max:60,step:1,unit:' cm',show:s=>s.mode==='shadow'},
     {type:'toggle',key:'edges',label:'標出邊界光線',show:s=>s.mode==='shadow'&&s.beam==='full'},
     {type:'seg',key:'view',label:'視角',options:[['2d','剖面圖'],['3d','立體 360°']],show:s=>s.mode==='pinhole'},
+    {type:'seg',key:'obj3',label:'物體',options:[['man','立體小人'],['F','字母 F']],show:s=>s.mode==='pinhole'&&s.view==='3d'},
     {type:'buttons',label:'換個角度看',items:[['側面',s=>{s.yaw=90;s.pitch=12;s.spin=false;}],['從紙屏後面',s=>{s.yaw=0;s.pitch=6;s.spin=false;}],['從物體後面',s=>{s.yaw=180;s.pitch=6;s.spin=false;}],['斜上方',s=>{s.yaw=50;s.pitch=18;s.spin=false;}]],show:s=>s.mode==='pinhole'&&s.view==='3d'},
     {type:'toggle',key:'spin',label:'自動旋轉',show:s=>s.mode==='pinhole'&&s.view==='3d'},
-    {type:'toggle',key:'rays3',label:'顯示光線（頭、紅手、綠手、腳）',show:s=>s.mode==='pinhole'&&s.view==='3d'},
+    {type:'toggle',key:'rays3',label:'顯示光線',show:s=>s.mode==='pinhole'&&s.view==='3d'},
     {type:'toggle',key:'insets',label:'對照：直接看物體 vs 看紙屏上的像',show:s=>s.mode==='pinhole'&&s.view==='3d'},
     {type:'range',key:'pa',label:'物體 → 針孔（物距）',min:30,max:150,step:1,unit:' cm',show:s=>s.mode==='pinhole'},
     {type:'range',key:'pb',label:'針孔 → 屏幕（像距）',min:20,max:150,step:1,unit:' cm',show:s=>s.mode==='pinhole'},
@@ -385,7 +400,7 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
     const poly=(pts,fill,op=1,stroke='#00000033')=>{const q=pts.map(pr);return{z:q.reduce((a,p)=>a+p[2],0)/q.length,svg:`<polygon points="${q.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="${fill}" opacity="${op}" stroke="${stroke}" stroke-width="1"/>`};};
     /* 小人：黃頭、紅手舉高（+y 側）、綠手平舉（−y 側），上下左右都不對稱 */
     const box=(c,sz,col)=>{const[x,y,z]=c,[a,b,h]=sz.map(v=>v/2),V=[[-a,-b,-h],[a,-b,-h],[a,b,-h],[-a,b,-h],[-a,-b,h],[a,-b,h],[a,b,h],[-a,b,h]].map(p=>[x+p[0],y+p[1],z+p[2]]);return[[0,1,2,3],[4,5,6,7],[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7]].map(f=>({pts:f.map(i=>V[i]),col}));};
-    const parts=[box([0,5,-14],[4,3,12],'#5b6b74'),box([0,-5,-14],[4,3,12],'#5b6b74'),box([0,0,0],[6,9,16],'#4c85bb'),box([0,0,14],[8,8,10],'#ffcc6a'),box([0,12,12],[3,3,14],'#e5484d'),box([0,-15,4],[3,12,3],'#32b45a'),box([4.2,2.2,15.5],[0.4,1.6,1.6],'#1b2a33'),box([4.2,-2.2,15.5],[0.4,1.6,1.6],'#1b2a33')].flat()
+    const isF=s.obj3==='F',parts=(isF?[box([0,-8,0],[4,5,40],'#ffcc6a'),box([0,4,17.5],[4,19,5],'#ff9f43'),box([0,1.5,0],[4,14,5],'#e5484d')]:[box([0,5,-14],[4,3,12],'#5b6b74'),box([0,-5,-14],[4,3,12],'#5b6b74'),box([0,0,0],[6,9,16],'#4c85bb'),box([0,0,14],[8,8,10],'#ffcc6a'),box([0,12,12],[3,3,14],'#e5484d'),box([0,-15,4],[3,12,3],'#32b45a'),box([4.2,2.2,15.5],[0.4,1.6,1.6],'#1b2a33'),box([4.2,-2.2,15.5],[0.4,1.6,1.6],'#1b2a33')]).flat()
       .map(f=>({pts:f.pts.map(p=>[p[0]-d,p[1],p[2]]),col:f.col}));
     const toImg=p=>{const k=Dd/-p[0];return[Dd,-p[1]*k,-p[2]*k];};
     const items=[];
@@ -397,7 +412,7 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
     items.push({z:scr.z,svg:scr.svg+img});
     items.sort((a,b)=>b.z-a.z);
     let scene=`<rect x="0" y="0" width="900" height="500" fill="transparent"/>`+items.map(i=>i.svg).join('');
-    const keys=[[[-d,0,19],'#ffcc6a','頭'],[[-d,12,19],'#e5484d','紅手'],[[-d,-21,4],'#32b45a','綠手'],[[-d,5,-20],'#9fb2c8','腳']];
+    const keys=isF?[[[-d,13.5,17.5],'#ff9f43'],[[-d,8.5,0],'#e5484d'],[[-d,-8,-20],'#ffcc6a']]:[[[-d,0,19],'#ffcc6a','頭'],[[-d,12,19],'#e5484d','紅手'],[[-d,-21,4],'#32b45a','綠手'],[[-d,5,-20],'#9fb2c8','腳']];
     if(s.on&&s.rays3)for(const[P,c]of keys){const a=pr(P),o=pr([0,0,0]),b=pr(toImg(P));scene+=`<polyline points="${a[0].toFixed(1)},${a[1].toFixed(1)} ${o[0].toFixed(1)},${o[1].toFixed(1)} ${b[0].toFixed(1)},${b[1].toFixed(1)}" fill="none" stroke="${c}" stroke-width="2.2" opacity=".95"/><circle cx="${b[0]}" cy="${b[1]}" r="4" fill="${c}"/>`;}
     const o=pr([0,0,0]);scene+=`<circle cx="${o[0]}" cy="${o[1]}" r="4" fill="#fff"/>`;
     const lab=(P,t,c)=>{const q=pr(P);return T(q[0],q[1],t,{size:15,fill:c,anchor:'middle',weight:700});};
@@ -407,15 +422,15 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
       /* 同一個觀看方向（朝 −x，往物體看）：左＝直接看物體，右＝從紙屏後面看像 */
       const panel=(x0,title,mapPts,order)=>{let g=`<rect x="${x0}" y="384" width="190" height="108" rx="12" fill="#05080d" stroke="#3a4554"/>`+T(x0+95,403,title,{size:14,fill:D.ink,anchor:'middle',weight:700});
         for(const f of order)g+=`<polygon points="${mapPts(f.pts).map(p=>p.join(',')).join(' ')}" fill="${s.on?f.col:'#56606e'}" stroke="#00000033"/>`;return g;};
-      const m=(x0,flip)=>pts=>pts.map(p=>{const y=flip?-p[1]:p[1],z=flip?-p[2]:p[2];return[(x0+95+y*1.55).toFixed(1),(447-z*1.55).toFixed(1)];});
+      const m=(x0,sy,sz)=>pts=>pts.map(p=>[(x0+95+sy*p[1]*1.55).toFixed(1),(447-sz*p[2]*1.55).toFixed(1)]),back=Math.cos(yaw)>=0;
       const front=[...parts].sort((a,b)=>a.pts.reduce((s2,p)=>s2+p[0],0)-b.pts.reduce((s2,p)=>s2+p[0],0));
       const imgOrder=parts.map(f=>({f,dist:f.pts.reduce((a,p)=>a+Math.hypot(...p),0)/4})).sort((a,b)=>b.dist-a.dist).map(x=>x.f);
-      h+=panel(20,'直接看物體',m(20,false),front)+(s.on?panel(690,'從紙屏後面看像',m(690,true),imgOrder):`<rect x="690" y="384" width="190" height="108" rx="12" fill="#05080d" stroke="#3a4554"/>`+T(785,445,'關燈：沒有像',{size:14,fill:D.muted,anchor:'middle'}));
-      h+=T(450,440,'兩邊都是「面向物體」的方向看',{size:14,fill:D.muted,anchor:'middle'})+T(450,462,'→ 像轉了 180°',{size:15,fill:D.ink,anchor:'middle',weight:700});
+      h+=panel(20,'直接看物體',m(20,1,1),front)+(s.on?panel(690,back?'從紙屏後面看像':'從紙屏前面看像',m(690,back?-1:1,-1),imgOrder):`<rect x="690" y="384" width="190" height="108" rx="12" fill="#05080d" stroke="#3a4554"/>`+T(785,445,'關燈：沒有像',{size:14,fill:D.muted,anchor:'middle'}));
+      h+=back?T(450,440,'兩邊都是「面向物體」的方向看',{size:14,fill:D.muted,anchor:'middle'})+T(450,462,'→ 像轉了 180°',{size:15,fill:D.ink,anchor:'middle',weight:700}):T(450,440,'右邊改成背對針孔看（方向相反）',{size:14,fill:D.muted,anchor:'middle'})+T(450,462,'→ 只剩上下顛倒',{size:15,fill:D.ink,anchor:'middle',weight:700});
     }
     h+=T(450,28,'拖曳畫面可旋轉視角',{size:13,fill:D.muted,anchor:'middle'});
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['像','上下顛倒・左右相反'],['像高 ÷ 物高',`${num(k0,2)} 倍（= 像距 ÷ 物距）`],['同方向比較','像 = 物體轉 180°']],
-      note:'每條光線都直直穿過針孔：<b>上面</b>的點（頭、紅手）跑到<b>下面</b>，<b>左邊</b>的紅手跑到<b>右邊</b>。從紙屏後面看，和直接看物體比 → 上下顛倒、左右相反。'};},
+      note:isF?'每條光線都直直穿過針孔：F 的<b>上方</b>橫槓跑到<b>下方</b>、往<b>右</b>伸的橫槓變成往<b>左</b>。要判斷像的形狀，先說清楚<b>從哪個方向看</b>。':'每條光線都直直穿過針孔：<b>上面</b>的點（頭、紅手）跑到<b>下面</b>，<b>左邊</b>的紅手跑到<b>右邊</b>。從紙屏後面看，和直接看物體比 → 上下顛倒、左右相反。'};},
   pinhole(s){
     if(s.view==='3d')return this.pinhole3d(s);
     beginLight(s);
@@ -876,18 +891,20 @@ function sync(){
     else if(c.type==='counter'){const tot=Object.values(state[c.key]).reduce((a,b)=>a+b,0);box.querySelectorAll('output').forEach(o=>o.textContent=state[c.key][o.dataset.k]);box.querySelectorAll('button').forEach(b=>{const n=state[c.key][b.dataset.k];b.disabled=b.dataset.d==='1'?(n>=c.max||tot>=c.total):n<=0;});}});
 }
 const setIf=(el,html)=>{if(el.innerHTML!==html)el.innerHTML=html;};
-function render(){const out=cfg.render(state);svgEl.innerHTML=DEFS+out.svg;setIf(labEl.querySelector('.readouts'),out.reads.map(([a,b])=>`<div class="readout"><span>${a}</span><b>${b}</b></div>`).join(''));setIf(labEl.querySelector('.note'),out.note||'');sync();}
+function questionHTML(){const q=typeof cfg.q==='function'?cfg.q(state):cfg.q;return q.html||`<h3>想一想</h3><p>${q[0]}</p><details><summary>看解釋</summary><div class="answer">${q[1]}</div></details>`;}
+let lastQ='';
+function render(){const out=cfg.render(state);if(typeof cfg.q==='function'){const qh=questionHTML();if(qh!==lastQ){labEl.querySelector('.question').innerHTML=qh;lastQ=qh;}}svgEl.innerHTML=DEFS+out.svg;setIf(labEl.querySelector('.readouts'),out.reads.map(([a,b])=>`<div class="readout"><span>${a}</span><b>${b}</b></div>`).join(''));setIf(labEl.querySelector('.note'),out.note||'');sync();}
 function activate(key){
   if(!LABS[key])key='lens';cancelAnimationFrame(raf);audioSync(false);current=key;cfg=LABS[key];state=structuredClone(cfg.state);
   document.querySelectorAll('nav a').forEach(a=>{const on=a.dataset.key===key;a.classList.toggle('active',on);on?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');});
   document.getElementById('title').textContent=cfg.name;document.getElementById('subtitle').textContent=cfg.subtitle;document.title=cfg.name+'｜理化實驗室';
-  labEl.innerHTML=`<div class="sim-layout"><div class="viz-panel${cfg.dark?' dark':''}"><svg id="scene" viewBox="0 0 900 500" role="img" aria-label="${cfg.name}"></svg>${cfg.drag?'<p class="drag-hint"><i></i>虛線圓圈可以直接拖曳</p>':''}</div><div class="controls">${cfg.controls.map(controlHTML).join('')}<div class="readouts"></div><p class="note"></p><button type="button" class="btn ghost reset">↺ 重設</button></div></div><section class="question"><h3>想一想</h3><p>${cfg.q[0]}</p><details><summary>看解釋</summary><div class="answer">${cfg.q[1]}</div></details></section>`;
+  labEl.innerHTML=`<div class="sim-layout"><div class="viz-panel${cfg.dark?' dark':''}"><svg id="scene" viewBox="0 0 900 500" role="img" aria-label="${cfg.name}"></svg>${cfg.drag?'<p class="drag-hint"><i></i>虛線圓圈可以直接拖曳</p>':''}</div><div class="controls">${cfg.controls.map(controlHTML).join('')}<div class="readouts"></div><p class="note"></p><button type="button" class="btn ghost reset">↺ 重設</button></div></div><section class="question">${lastQ=questionHTML()}</section>`;
   svgEl=labEl.querySelector('#scene');render();
   if(cfg.tick){let last=0;const loop=now=>{const dt=last?Math.min((now-last)/1000,0.1):0;last=now;cfg.tick(state,dt);render();raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);}
   const act=document.querySelector('nav a.active');if(act&&matchMedia('(max-width:760px)').matches)act.scrollIntoView({block:'nearest',inline:'center'});
 }
 labEl.addEventListener('input',e=>{const c=cfg.controls[e.target.dataset.c];if(!c)return;if(c.type==='range')state[c.key]=+e.target.value;else if(c.type==='toggle'){state[c.key]=e.target.checked;if(c.onChange)c.onChange(state);}render();});
-labEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset'))return activate(current);const c=cfg.controls[b.dataset.c];if(!c)return;
+labEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset'))return activate(current);if(b.dataset.qa&&cfg.qAction){cfg.qAction(state,b.dataset.qa);render();return;}const c=cfg.controls[b.dataset.c];if(!c)return;
   if(c.type==='seg'){state[c.key]=c.options[b.dataset.o][0];if(c.onChange)c.onChange(state);}else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();});
 const svgPoint=e=>{const p=svgEl.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svgEl.getScreenCTM().inverse());};
 labEl.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-drag]');if(!h||!cfg.drag||!cfg.drag[h.dataset.drag])return;e.preventDefault();drag={name:h.dataset.drag,p0:svgPoint(e),s0:structuredClone(state)};svgEl.setPointerCapture(e.pointerId);labEl.classList.add('dragging');});
