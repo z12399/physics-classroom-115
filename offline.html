@@ -713,7 +713,7 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
 /* ===== 08 平面鏡 ===== */
 mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = 光進入眼睛。觀察反射定律、光的可逆、鏡面反射與漫反射。',dark:true,
   q:['物體向鏡面靠近 10 cm，物與像的距離改變多少？','像也向鏡面靠近 10 cm，所以物與像的距離減少 20 cm。'],
-  state:{on:true,beam:'full',prog:0,mode:'plane',d:55,h:60,ex:80,ey:110,eye:true,ext:true,hit:170,rev:false,surf:'rough',normals:true,i0:40,rot:15,ghost:true,anim:null},
+  state:{on:true,beam:'full',prog:0,mode:'plane',d:55,h:60,ex:80,ey:110,eye:true,ext:true,hit:170,rev:false,surf:'rough',normals:true,zoom:0,zoomT:0,pick:4,mag:true,i0:40,rot:15,ghost:true,anim:null},
   controls:[LAMP,{...BEAM,show:s=>s.mode!=='rotate'},
     {type:'seg',key:'mode',label:'實驗',options:[['plane','平面鏡成像'],['diffuse','鏡面 vs 漫反射'],['rotate','鏡面旋轉']],onChange:replay},
     {type:'range',key:'i0',label:'原來的入射角',min:10,max:60,step:1,unit:'°',show:s=>s.mode==='rotate'},
@@ -726,9 +726,11 @@ mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = �
     {type:'toggle',key:'eye',label:'進入眼睛的光線',show:s=>s.mode==='plane'&&s.beam==='full'},
     {type:'toggle',key:'ext',label:'反向延長線',show:s=>s.mode==='plane'},
     {type:'seg',key:'surf',label:'表面',options:[['smooth','光滑（鏡面）'],['rough','粗糙（紙、牆）']],onChange:replay,show:s=>s.mode==='diffuse'},
+    {type:'seg',key:'zoomT',label:'放大表面',options:[[0,'肉眼看'],[0.5,'放大'],[1,'再放大']],show:s=>s.mode==='diffuse'&&s.surf==='rough'},
+    {type:'toggle',key:'mag',label:'放大鏡：看選中的那一點',show:s=>s.mode==='diffuse'},
     {type:'toggle',key:'normals',label:'顯示每一點的法線',show:s=>s.mode==='diffuse'}],
-  tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.anim!==null){s.anim+=dt;if(s.anim>1.6)s.anim=null;}},
-  drag:{obj:(p,s)=>{s.d=snap('d',(450-p.x)/3);},img:(p,s)=>{s.d=snap('d',(p.x-450)/3);},top:(p,s)=>{s.h=snap('h',(400-p.y)/2.6);},eye:(p,s)=>{s.ex=clamp(p.x,40,420);s.ey=clamp(p.y,40,440);},hit:(p,s)=>{s.hit=clamp(p.y,50,430);},turn:(p,s)=>{let a=deg(Math.atan2(-(p.y-340),p.x-450));if(a>90)a-=180;if(a<-90)a+=180;s.rot=snap('rot',a);s.anim=null;}},
+  tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.anim!==null){s.anim+=dt;if(s.anim>1.6)s.anim=null;}s.zoom+=(s.zoomT-s.zoom)*Math.min(1,dt*3);},
+  drag:{obj:(p,s)=>{s.d=snap('d',(450-p.x)/3);},img:(p,s)=>{s.d=snap('d',(p.x-450)/3);},top:(p,s)=>{s.h=snap('h',(400-p.y)/2.6);},eye:(p,s)=>{s.ex=clamp(p.x,40,420);s.ey=clamp(p.y,40,440);},hit:(p,s)=>{s.hit=clamp(p.y,50,430);},pick:(p,s)=>{s.pick=clamp(Math.round((p.x-230)/52),0,8);},turn:(p,s)=>{let a=deg(Math.atan2(-(p.y-340),p.x-450));if(a>90)a-=180;if(a<-90)a+=180;s.rot=snap('rot',a);s.anim=null;}},
   rotate(s){
     beginLight(s);
     /* 入射光固定，鏡面繞入射點轉 θ：法線轉 θ，反射光轉 2θ */
@@ -755,19 +757,41 @@ mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = �
       note:'入射光不動，鏡面轉 θ → 法線也轉 θ → 入射角、反射角<b>各</b>改變 θ → 反射光一共轉 <b>2θ</b>。'};},
   diffuse(s){
     beginLight(s);
-    const sy=360,smooth=s.surf==='smooth',d=[Math.cos(rad(40)),Math.sin(rad(40))],xs=s.beam==='single'?[440]:[260,305,350,395,440,485,530,575,620];
+    /* 表面由很多小平面組成；粗糙表面每片傾斜不同。放大倍率只影響「畫出來的凹凸」，反射永遠用真實的小平面 */
+    const smooth=s.surf==='smooth',sy=360,w=26,x0=110,N=26,ANG=[-28,17,-9,31,-20,6,25,-33,12,-15,29,-6,21,-31,9,-24,33,-12,18,-27,4,26,-19,14,-8,30];
+    const phi=i=>smooth?0:rad(ANG[i%ANG.length]*0.7);let ys=[0];for(let i=0;i<N;i++)ys.push(ys[i]+Math.tan(phi(i))*w);const mean=ys.reduce((a,b)=>a+b,0)/ys.length;ys=ys.map(y=>y-mean);
+    const z=clamp(s.zoom,0,1),Yd=y=>sy+y*z,surfY=x=>{const i=clamp(Math.floor((x-x0)/w),0,N-1);return Yd(ys[i]+Math.tan(phi(i))*(x-x0-i*w));};
+    const d=[Math.cos(rad(55)),Math.sin(rad(55))],xs=[230,282,334,386,438,490,542,594,646],pick=clamp(s.pick,0,8),idx=s.beam==='single'?[pick]:xs.map((_,i)=>i);
     let h='',sp='';
-    if(smooth)h+=`<rect x="110" y="${sy}" width="680" height="40" fill="#5d7088"/>`+L(110,sy,790,sy,{stroke:'#d7edff',w:3});
-    else{let z=`M110 ${sy}`;for(let x=110;x<=790;x+=15)z+=`L${x} ${sy+((x/15)%2?-7:5)}`;h+=`<path d="${z}L790 ${sy+40}L110 ${sy+40}Z" fill="#5d7088"/>`+`<path d="${z}" fill="none" stroke="#d7edff" stroke-width="2.5"/>`;}
-    const geo=xs.map((x,i)=>{const phi=smooth?0:rad([-28,17,-9,31,-20,6,25,-33,12][i%9]),n=[Math.sin(phi),-Math.cos(phi)],dot=d[0]*n[0]+d[1]*n[1],r=[d[0]-2*dot*n[0],d[1]-2*dot*n[1]];if(s.on)sp+=ray([[x-d[0]*330,sy-d[1]*330],[x,sy],[x+r[0]*240,sy+r[1]*240]],'#ffe8a5',{w:s.beam==='single'?3.5:2,arrow:true,op:.9});return{x,phi,n};});
+    let surf=`M${x0} ${Yd(ys[0]).toFixed(1)}`;for(let i=1;i<=N;i++)surf+=`L${x0+i*w} ${Yd(ys[i]).toFixed(1)}`;
+    h+=`<path d="${surf}L${x0+N*w} ${sy+60}L${x0} ${sy+60}Z" fill="${smooth?'#5d7088':'#7d8794'}"/><path d="${surf}" fill="none" stroke="#d7edff" stroke-width="2.5"/>`;
+    const geo={};
+    for(const i of idx){const x=xs[i],k=clamp(Math.floor((x-x0)/w),0,N-1),f=phi(k),n=[Math.sin(f),-Math.cos(f)],dt=d[0]*n[0]+d[1]*n[1],r=[d[0]-2*dt*n[0],d[1]-2*dt*n[1]],y=surfY(x),th=deg(Math.acos(clamp(-dt,-1,1)));
+      geo[i]={x,y,f,n,r,th};if(s.on)sp+=ray([[x-d[0]*300,y-d[1]*300],[x,y],[x+r[0]*250,y+r[1]*250]],i===pick?D.object:'#ffe8a5',{w:i===pick?3.5:2,arrow:true,op:i===pick?1:.75});}
     const fade=fadeIn();
-    geo.forEach(({x,phi,n})=>{
-      if(!smooth)h+=L(x-16*Math.cos(phi),sy-16*Math.sin(phi),x+16*Math.cos(phi),sy+16*Math.sin(phi),{stroke:'#fff',w:3});
-      if(s.normals&&fade>0)h+=L(x,sy,x+n[0]*70,sy+n[1]*70,{stroke:D.muted,w:1.4,dash:'4 4',op:fade});});
-    h+=sp+T(450,440,smooth?'光滑表面':'粗糙表面（放大）',{size:17,fill:D.muted,anchor:'middle'});
+    if(s.normals&&fade>0&&z>0.35||smooth&&s.normals&&fade>0)for(const i of idx){const g=geo[i];h+=L(g.x,g.y,g.x+g.n[0]*60,g.y+g.n[1]*60,{stroke:D.muted,w:1.4,dash:'4 4',op:fade});}
+    h+=sp;
+    const g=geo[pick];
+    if(g){
+      if(z>0.35||smooth)h+=L(g.x-15*Math.cos(g.f),Yd(0)===sy?g.y-15*Math.sin(g.f)*z:g.y,g.x+15*Math.cos(g.f),g.y+15*Math.sin(g.f)*z,{stroke:'#ffffff',w:4});
+      h+=handle('pick',g.x,g.y,D.object,11);
+      if(s.mag&&s.on&&arrived()){
+        const C=[765,118],R=88,t=[Math.cos(g.f),Math.sin(g.f)],n=g.n,r=g.r,pp=[-n[1],n[0]],side=Math.sign(-pp[0]*d[0]-pp[1]*d[1])||1;
+        const lab=(sg,txt,c)=>{const q=[C[0]+n[0]*52+pp[0]*sg*side*24,C[1]+n[1]*52+pp[1]*sg*side*24+5];return T(q[0],q[1],txt,{size:14,fill:c,anchor:'middle',weight:700});};
+        h+=L(g.x,g.y,C[0]-R*0.7,C[1]+R*0.7,{stroke:'#ffffff55',w:1.5,dash:'3 4'});
+        h+=`<clipPath id="magc"><circle cx="${C[0]}" cy="${C[1]}" r="${R}"/></clipPath><circle cx="${C[0]}" cy="${C[1]}" r="${R}" fill="#0b1422"/><g clip-path="url(#magc)">`
+          +`<polygon points="${C[0]-t[0]*R*1.5},${C[1]-t[1]*R*1.5} ${C[0]+t[0]*R*1.5},${C[1]+t[1]*R*1.5} ${C[0]+t[0]*R*1.5-n[0]*R*1.5},${C[1]+t[1]*R*1.5-n[1]*R*1.5} ${C[0]-t[0]*R*1.5-n[0]*R*1.5},${C[1]-t[1]*R*1.5-n[1]*R*1.5}" fill="#7d8794"/>`
+          +L(C[0]-t[0]*R,C[1]-t[1]*R,C[0]+t[0]*R,C[1]+t[1]*R,{stroke:'#ffffff',w:4})
+          +L(C[0],C[1],C[0]+n[0]*R,C[1]+n[1]*R,{stroke:D.muted,w:1.5,dash:'4 4'})
+          +L(C[0]-d[0]*R,C[1]-d[1]*R,C[0],C[1],{stroke:D.object,w:3.5,arrow:true})+L(C[0],C[1],C[0]+r[0]*R*0.95,C[1]+r[1]*R*0.95,{stroke:D.object,w:3.5,arrow:true})
+          +`</g><circle cx="${C[0]}" cy="${C[1]}" r="${R}" fill="none" stroke="#c9d6e6" stroke-width="3"/>`
+          +lab(1,`入 ${g.th.toFixed(0)}°`,D.object)+lab(-1,`反 ${g.th.toFixed(0)}°`,D.ink)+T(C[0],C[1]+R+22,'放大這一點：就是一小片平面鏡',{size:14,fill:D.ink,anchor:'middle',weight:600});
+      }
+    }
+    h+=T(450,446,smooth?'光滑表面（鏡子）':z<0.15?'粗糙表面：肉眼看起來平平的':'粗糙表面放大：其實凹凸不平',{size:17,fill:D.muted,anchor:'middle'});
     if(!s.on)h+=T(450,200,'按「開燈」',{size:20,fill:D.muted,anchor:'middle'});
-    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['表面',smooth?'光滑':'粗糙'],['反射光',smooth?'平行射出（鏡面反射）':'射向各方向（漫反射）'],['反射定律','每一條都遵守']],
-      note:smooth?'光滑表面法線方向都一樣 → 反射光整齊平行，所以鏡子能成像。':'漫反射<b>也遵守反射定律</b>，只是每一點的法線方向不同 → 反射光射向各方向，從哪裡都看得到物體。'};},
+    const note=smooth?'光滑表面每一小塊的方向都一樣 → 反射光整齊平行（<b>鏡面反射</b>），所以鏡子能成像。':z<0.15?'看起來平平的，反射光卻射向各處……按「放大」看看表面！':'每一小塊都是一片<b>小平面鏡</b>，都遵守<b>入射角 = 反射角</b>；只是每塊方向不同 → 反射光射向各方向（<b>漫反射</b>）。';
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['表面',smooth?'光滑':'粗糙'],['反射光',smooth?'平行射出（鏡面反射）':'射向各方向（漫反射）'],['選中的這一點',g?`入射角 = 反射角 = ${g.th.toFixed(0)}°`:'—']],note};},
   render(s){
     if(s.mode==='diffuse')return this.diffuse(s);
     if(s.mode==='rotate')return this.rotate(s);
