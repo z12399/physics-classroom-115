@@ -83,6 +83,15 @@ function pinholeExample(s){
   return {html:`<h3>想一想：視角決定形狀</h3><div class="ex-q">${q}</div>${opts}${row('a','小明看到')}${row('b','小華看到')}${tools}${sol}`};
 }
 
+/* ---------- 相似三角形例題（講義）---------- */
+function simExample(s){
+  const row=(key,label,opts,ans)=>`<div class="ex-row"><span class="ex-who">${label}</span>${opts.map(o=>{const pick=s[key]===o,cls=pick?(s.exSChk?(o===ans?' right':' wrong'):' picked'):'';return `<button type="button" class="qopt${cls}" data-qa="${key}:${o}">${o}</button>`;}).join('')}${s.exSChk&&s[key]?`<span class="ex-mark">${s[key]===ans?'✓ 正確':'✗ 再想想'}</span>`:''}</div>`;
+  const q=`<b>例題</b>　簡易針孔成像裝置：文字「d」與小孔相距 <b>10 cm</b>，紙屏與小孔相距 <b>15 cm</b>。<br>(1) 若「d」高 <b>6 cm</b>，紙屏上的像高是多少？<br>(2) 從紙屏後面看，像是哪一個字母？`;
+  const tools=`<div class="ex-tools"><button type="button" class="btn primary" data-qa="scheck">對答案</button><button type="button" class="btn" data-qa="sview">用圖算算看</button><button type="button" class="btn ghost" data-qa="ssol">${s.exSSol?'收起解析':'看解析'}</button></div>`;
+  const sol=s.exSSol?`<div class="answer"><b>答案：(1) 9 cm　(2) p</b><br>(1) 針孔兩邊的三角形相似。像距 15 是物距 10 的 <b>1.5 倍</b>，所以像高也是物高的 1.5 倍：6 × 1.5 = 9 cm。<br>也可以寫成 6 : 像高 = 10 : 15。<br>(2) 從紙屏後面看，像上下顛倒、左右相反，等於轉 180°，「d」轉 180° 就是「p」。（可以切到「立體 360°」看看）</div>`:'';
+  return {html:`<h3>想一想：講義例題</h3><div class="ex-q">${q}</div>${row('exS1','(1) 像高',['4 cm','9 cm','10 cm','15 cm'],'9 cm')}${row('exS2','(2) 字母',['d','b','p','q'],'p')}${tools}${sol}`};
+}
+
 const LABS={
 /* ===== 01 測量 ===== */
 measure:{group:1,n:'01',name:'測量與估讀',subtitle:'拖動物件或換一把尺，練習讀出完整的測量值。',
@@ -365,10 +374,10 @@ echo:{group:1,n:'3-4',name:'聲音的傳播與應用',subtitle:'聲音在不同�
 
 /* ===== 07 影子 ===== */
 shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿直線前進：用影子和針孔成像來證明。',dark:true,
-  q:s=>s.mode==='pinhole'&&s.view==='3d'?pinholeExample(s):['物體靠近點光源，屏幕上的影子會變大還是變小？','會變大。屏幕位置不變時，光源到物體的距離 a 減少，影子的放大倍數 D/a 增加。'],
-  qAction(s,v){const[k,x]=v.split(':');if(k==='a'||k==='b'){s[k==='a'?'exA':'exB']=x;s.exChk=false;}else if(k==='check')s.exChk=true;else if(k==='sol')s.exSol=!s.exSol;
+  q:s=>s.mode==='pinhole'&&s.view==='3d'?pinholeExample(s):s.mode==='pinhole'&&s.view==='sim'?simExample(s):['物體靠近點光源，屏幕上的影子會變大還是變小？','會變大。屏幕位置不變時，光源到物體的距離 a 減少，影子的放大倍數 D/a 增加。'],
+  qAction(s,v){const[k,x]=v.split(':');if(k==='exS1'||k==='exS2'){s[k]=x;s.exSChk=false;return;}if(k==='scheck'){s.exSChk=true;return;}if(k==='ssol'){s.exSSol=!s.exSSol;return;}if(k==='sview'){s.tri3='pinhole';s.pd=10;s.ph3=6;s.pD=15;s.turnT=0;return;}if(k==='a'||k==='b'){s[k==='a'?'exA':'exB']=x;s.exChk=false;}else if(k==='check')s.exChk=true;else if(k==='sol')s.exSol=!s.exSol;
     else if(k==='view'){s.obj3='F';s.spin=false;s.insets=true;if(x==='A'){s.yaw=0;s.pitch=6;}else{s.yaw=180;s.pitch=6;}}},
-  state:{on:true,beam:'full',prog:0,mode:'shadow',src:'point',a:60,D:200,h:40,R:15,ang:-16,edges:true,pa:80,pb:60,ph:40,hole:1,tri:true,view:'2d',tri3:'define',k:2,overlap:false,yaw:50,pitch:18,spin:false,rays3:true,insets:true,obj3:'man',exA:null,exB:null,exChk:false,exSol:false},
+  state:{on:true,beam:'full',prog:0,mode:'shadow',src:'point',a:60,D:200,h:40,R:15,ang:-16,edges:true,pa:80,pb:60,ph:40,hole:1,tri:true,view:'2d',tri3:'define',k:2,overlap:false,stretch:'all',animK:null,pd:4,ph3:3,pD:8,turn:0,turnT:0,exS1:null,exS2:null,exSChk:false,exSSol:false,yaw:50,pitch:18,spin:false,rays3:true,insets:true,obj3:'man',exA:null,exB:null,exChk:false,exSol:false},
   controls:[LAMP,BEAM,
     {type:'seg',key:'mode',label:'實驗',options:[['shadow','影子'],['pinhole','針孔成像']],onChange:replay},
     {type:'seg',key:'src',label:'光源',options:[['point','點光源'],['area','有大小的光源']],onChange:replay,show:s=>s.mode==='shadow'},
@@ -379,8 +388,15 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
     {type:'toggle',key:'edges',label:'標出邊界光線',show:s=>s.mode==='shadow'&&s.beam==='full'},
     {type:'seg',key:'view',label:'視角',options:[['2d','剖面圖'],['3d','立體 360°'],['sim','相似三角形']],show:s=>s.mode==='pinhole'},
     {type:'seg',key:'tri3',label:'相似三角形',options:[['define','什麼是相似'],['pinhole','用在針孔成像']],show:s=>s.mode==='pinhole'&&s.view==='sim'},
-    {type:'range',key:'k',label:'放大倍數',min:0.5,max:2.5,step:0.5,unit:' 倍',show:s=>s.mode==='pinhole'&&s.view==='sim'},
+    {type:'seg',key:'stretch',label:'怎麼放大',options:[['all','每一邊都放大'],['one','只放大底邊']],show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='define'},
+    {type:'range',key:'k',label:'放大倍數',min:0.5,max:2.5,step:0.5,unit:' 倍',show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='define'},
+    {type:'buttons',label:'',items:[['▶ 從小變大',s=>{s.animK=0;}]],show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='define',primary:true},
     {type:'toggle',key:'overlap',label:'疊在一起看',show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='define'},
+    {type:'range',key:'pd',label:'物距',min:2,max:10,step:1,unit:' cm',show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='pinhole'},
+    {type:'range',key:'ph3',label:'物高',min:1,max:6,step:1,unit:' cm',show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='pinhole'},
+    {type:'range',key:'pD',label:'像距',min:2,max:15,step:1,unit:' cm',show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='pinhole'},
+    {type:'buttons',label:'例子',items:[['3-4-5 → 6-8-10',s=>{s.pd=4;s.ph3=3;s.pD=8;s.turnT=0;}],['講義例題',s=>{s.pd=10;s.ph3=6;s.pD=15;s.turnT=0;}],['像比物小',s=>{s.pd=8;s.ph3=4;s.pD=4;s.turnT=0;}]],show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='pinhole'},
+    {type:'buttons',label:'',items:[['🔄 轉過來疊疊看',s=>{s.turnT=s.turnT>0.5?0:1;}]],show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='pinhole',primary:true},
     {type:'seg',key:'obj3',label:'物體',options:[['man','立體小人'],['F','字母 F']],show:s=>s.mode==='pinhole'&&s.view==='3d'},
     {type:'buttons',label:'換個角度看',items:[['側面',s=>{s.yaw=90;s.pitch=12;s.spin=false;}],['從紙屏後面',s=>{s.yaw=0;s.pitch=6;s.spin=false;}],['從物體後面',s=>{s.yaw=180;s.pitch=6;s.spin=false;}],['斜上方',s=>{s.yaw=50;s.pitch=18;s.spin=false;}]],show:s=>s.mode==='pinhole'&&s.view==='3d'},
     {type:'toggle',key:'spin',label:'自動旋轉',show:s=>s.mode==='pinhole'&&s.view==='3d'},
@@ -391,42 +407,54 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
     {type:'range',key:'ph',label:'物高',min:10,max:50,step:1,unit:' cm',show:s=>s.mode==='pinhole'&&s.view==='2d'},
     {type:'range',key:'hole',label:'針孔大小',min:0.5,max:8,step:0.5,unit:' cm',show:s=>s.mode==='pinhole'&&s.view==='2d'},
     {type:'toggle',key:'tri',label:'顯示相似三角形',show:s=>s.mode==='pinhole'&&s.view==='2d'}],
-  tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.spin&&s.mode==='pinhole'&&s.view==='3d')s.yaw=(s.yaw+dt*25)%360;},
+  tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.spin&&s.mode==='pinhole'&&s.view==='3d')s.yaw=(s.yaw+dt*25)%360;if(s.animK!==null){s.animK+=dt;if(s.animK>1.6)s.animK=null;}s.turn+=(s.turnT-s.turn)*Math.min(1,dt*2.5);},
   drag:{obj:(p,s)=>{s.a=snap('a',(p.x-100)/(700/300));},top:(p,s)=>{s.h=snap('h',2*(250-p.y)/1.6);},screen:(p,s)=>{s.D=snap('D',(p.x-100)/(700/300));},aim:(p,s)=>{s.ang=clamp(deg(Math.atan2(p.y-250,p.x-100)),-40,40);},pobj:(p,s)=>{s.pa=snap('pa',(450-p.x)/2.5);},pscr:(p,s)=>{s.pb=snap('pb',(p.x-450)/2.5);},orbit:(p,s,c)=>{s.yaw=c.s0.yaw-(p.x-c.p0.x)*0.45;s.pitch=clamp(c.s0.pitch+(p.y-c.p0.y)*0.3,-60,75);s.spin=false;}},
   similar(s){
-    /* 相似三角形：3-4-5 直角三角形每邊乘上同一個倍數 k */
-    const k=s.k,kk=v=>+(v*k).toFixed(2),A1=deg(Math.atan(3/4)),A2=90-A1,fmt=v=>Number.isInteger(v)?v:v.toFixed(1);
-    const poly=(pts,fill,op,stroke)=>`<polygon points="${pts.map(p=>p.join(',')).join(' ')}" fill="${fill}" fill-opacity="${op}" stroke="${stroke}" stroke-width="3" stroke-linejoin="round"/>`;
-    const arc=(c,r,a0,a1,col)=>{const p0=[c[0]+r*Math.cos(rad(a0)),c[1]-r*Math.sin(rad(a0))],p1=[c[0]+r*Math.cos(rad(a1)),c[1]-r*Math.sin(rad(a1))];return `<path d="M${p0[0].toFixed(1)} ${p0[1].toFixed(1)}A${r} ${r} 0 0 0 ${p1[0].toFixed(1)} ${p1[1].toFixed(1)}" fill="none" stroke="${col}" stroke-width="3"/>`;};
+    /* 相似三角形：三種邊固定三種顏色（底藍、高綠、斜邊橘），同色＝互相對應 */
+    const CB='#7fb3ff',CH='#9be38b',CS='#ffb86b',CA='#ff92bc',fmt=v=>Math.abs(v-Math.round(v))<1e-6?String(Math.round(v)):v.toFixed(1);
+    const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    const lab=(x,y,t,c,anchor='middle',size=17)=>T(x,y,t,{size,fill:c,anchor,weight:700});
+    const sideL=(a,b,c,w=4)=>L(a[0],a[1],b[0],b[1],{stroke:c,w});
+    /* 斜邊每 1 單位畫一個刻度，讓斜邊也能「數」 */
+    const ticks=(a,b,units,u,c)=>{if(units>24)return '';const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy),nx=-dy/len,ny=dx/len;let g='';for(let i=1;i<units-1e-6;i++){const t=i*u/len,px=a[0]+dx*t,py=a[1]+dy*t;g+=L(px-nx*6,py-ny*6,px+nx*6,py+ny*6,{stroke:c,w:2});}return g;};
     const sq=(c,sx,sy)=>`<path d="M${c[0]+sx*14} ${c[1]}V${c[1]+sy*14}H${c[0]}" fill="none" stroke="${D.ink}" stroke-width="2"/>`;
-    const lab=(x,y,t,c=D.ink,anchor='middle')=>T(x,y,t,{size:18,fill:c,anchor,weight:700});
+    const arcAt=(c,r,a0,a1,col)=>{const p0=[c[0]+r*Math.cos(rad(a0)),c[1]-r*Math.sin(rad(a0))],p1=[c[0]+r*Math.cos(rad(a1)),c[1]-r*Math.sin(rad(a1))],big=Math.abs(a1-a0)>180?1:0;return `<path d="M${p0[0].toFixed(1)} ${p0[1].toFixed(1)}A${r} ${r} 0 ${big} 0 ${p1[0].toFixed(1)} ${p1[1].toFixed(1)}" fill="none" stroke="${col}" stroke-width="3"/>`;};
     let h='';
     if(s.tri3==='define'){
-      const u=34,y0=420,x0=150,X1=360;
-      for(let x=x0;x<=X1+4*2.5*u;x+=u)h+=L(x,y0-3*2.5*u-10,x,y0,{stroke:'#ffffff12',w:1});for(let y=y0;y>=y0-3*2.5*u-10;y-=u)h+=L(x0,y,X1+4*2.5*u,y,{stroke:'#ffffff12',w:1});
-      const tri=(ox,sc)=>[[ox,y0],[ox+4*sc*u,y0],[ox,y0-3*sc*u]];
-      const draw=(ox,sc,col,a,b,c,op=.25)=>{const[P,Q,R]=tri(ox,sc);return poly([P,Q,R],col,op,col)+sq(P,1,-1)+arc(Q,30,180-A1,180,'#ff92bc')+arc(R,26,270,270+A2,'#9be38b')
-        +lab((P[0]+Q[0])/2,y0+26,a)+lab(P[0]-12,(P[1]+R[1])/2+6,b,D.ink,'end')+lab((Q[0]+R[0])/2+14,(Q[1]+R[1])/2-8,c,D.ink,'start');};
-      h+=draw(x0,1,D.object,'4','3','5');
-      h+=draw(X1,k,D.image,`${fmt(kk(4))}`,`${fmt(kk(3))}`,`${fmt(kk(5))}`);
-      if(s.overlap){const[P,Q,R]=tri(X1,1);h+=poly([P,Q,R],D.object,.45,D.object)+T(X1+8,y0-3*u-10,'小三角形',{size:14,fill:D.object});}
-      h+=T(x0+2*u,y0-3*u-40,'原來的三角形',{size:16,fill:D.object,anchor:'middle'})+T(X1+2*k*u,y0-3*k*u-40,`每邊 × ${fmt(k)}`,{size:16,fill:D.image,anchor:'middle',weight:700});
-      h+=T(450,478,'粉紅色的角一樣大、綠色的角一樣大、直角也一樣 → 形狀相同',{size:15,fill:D.muted,anchor:'middle'});
-      return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['原來','3、4、5'],['放大後',`${fmt(kk(3))}、${fmt(kk(4))}、${fmt(kk(5))}`],['每邊的比例',`${fmt(kk(3))}÷3 = ${fmt(kk(4))}÷4 = ${fmt(kk(5))}÷5 = ${fmt(k)}`],['三個角','90°、36.9°、53.1°（都不變）']],
-        note:'<b>相似三角形</b>：形狀一樣（三個角都相同），大小不同；每一邊都放大（或縮小）<b>同一個倍數</b>。'};
+      const kd=s.animK!==null?1+(s.k-1)*ease(clamp(s.animK/1.5,0,1)):s.k,kx=kd,ky=s.stretch==='all'?kd:1,u=40,y0=410,x0=80,X1=290;
+      for(let x=x0-u;x<=X1+4*2.5*u+u;x+=u)h+=L(x,y0-3*2.5*u-u,x,y0+u*0.4,{stroke:'#ffffff10',w:1});for(let y=y0;y>=y0-3*2.5*u-u;y-=u)h+=L(x0-u,y,X1+4*2.5*u+u,y,{stroke:'#ffffff10',w:1});
+      const draw=(ox,sx,sy,fill,showLab)=>{const P=[ox,y0],Q=[ox+4*sx*u,y0],R=[ox,y0-3*sy*u],hyp=Math.hypot(4*sx,3*sy),aB=deg(Math.atan2(3*sy,4*sx)),aT=90-aB;
+        let g=`<polygon points="${P} ${Q} ${R}" fill="${fill}" fill-opacity=".14"/>`+sideL(P,Q,CB)+sideL(P,R,CH)+sideL(R,Q,CS)+ticks(R,Q,hyp,u,CS)+sq(P,1,-1)+arcAt(Q,32,180-aB,180,CA)+arcAt(R,30,270,270+aT,'#c6a6ff');
+        if(showLab)g+=lab((P[0]+Q[0])/2,y0+26,fmt(4*sx),CB)+lab(P[0]-12,(P[1]+R[1])/2+6,fmt(3*sy),CH,'end')+lab((Q[0]+R[0])/2+14,(Q[1]+R[1])/2-10,fmt(hyp),CS,'start')
+          +T(Q[0]-48,y0-8,`${aB.toFixed(1)}°`,{size:14,fill:CA,anchor:'end'})+T(R[0]+10,R[1]+44,`${aT.toFixed(1)}°`,{size:14,fill:'#c6a6ff'});
+        return g;};
+      h+=draw(x0,1,1,D.object,true)+draw(X1,kx,ky,D.image,true);
+      if(s.overlap)h+=`<polygon points="${X1},${y0} ${X1+4*u},${y0} ${X1},${y0-3*u}" fill="${D.object}" fill-opacity=".45" stroke="${D.object}" stroke-width="2.5"/>`+T(X1+6,y0-3*u-8,'小三角形',{size:13,fill:D.object});
+      h+=T(x0+2*u,y0-3*u-50,'原來的三角形',{size:16,fill:D.object,anchor:'middle'})+T(X1+2*kx*u,y0-3*ky*u-50,s.stretch==='all'?`每一邊都 × ${fmt(kd)}`:`只有底邊 × ${fmt(kd)}`,{size:16,fill:D.image,anchor:'middle',weight:700});
+      const same=s.stretch==='all'||Math.abs(kd-1)<1e-6,hyp2=Math.hypot(4*kx,3*ky);
+      h+=T(450,470,same?'同顏色的角一樣大 → 形狀相同 → 相似':'角度變了 → 形狀不同 → 不相似',{size:16,fill:same?D.ink:'#ff8a7a',anchor:'middle',weight:700});
+      return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['原來','底 4、高 3、斜邊 5'],['新的三角形',`底 ${fmt(4*kx)}、高 ${fmt(3*ky)}、斜邊 ${fmt(hyp2)}`],['各邊放大的倍數',`${fmt(kx)}、${fmt(ky)}、${fmt(hyp2/5)}`],['相似嗎？',same?'相似（倍數都一樣）':'不相似（倍數不一樣）']],
+        note:same?'<b>相似</b>：每一邊都放大<b>同一個倍數</b>，形狀不變（三個角都一樣）。斜邊上的刻度可以數：5 格變成 '+fmt(hyp2)+' 格。':'只拉長底邊：三邊的倍數不一樣，角度跟著改變，形狀變了，所以<b>不相似</b>。'};
     }
-    /* 用在針孔成像：物側 4-3-5，像側 4k-3k-5k */
-    const u=30,cy=250,hx=450,ox=hx-4*u,ix=hx+4*k*u,oT=cy-3*u,iB=cy+3*k*u;
-    h+=L(30,cy,880,cy,{stroke:D.muted,w:1.5,dash:true})+L(hx,40,hx,cy-8,{stroke:'#8aa0b8',w:7})+L(hx,cy+8,hx,480,{stroke:'#8aa0b8',w:7})+T(hx,30,'針孔',{size:15,fill:D.muted,anchor:'middle'});
-    h+=poly([[hx,cy],[ox,cy],[ox,oT]],D.object,.22,D.object)+poly([[hx,cy],[ix,cy],[ix,iB]],D.image,.22,D.image);
-    h+=sq([ox,cy],1,-1)+sq([ix,cy],-1,1);
-    h+=arc([hx,cy],40,180-A1,180,'#ff92bc')+arc([hx,cy],40,-A1,0,'#ff92bc')+T(hx+48,cy+30,'對頂角相等',{size:14,fill:'#ff92bc'});
-    h+=vArrow(ox,cy,oT,D.object)+vArrow(ix,cy,iB,D.image);
-    h+=L(ox,oT,ix,iB,{stroke:'#ffe8a5',w:2.5});
-    h+=lab((ox+hx)/2,cy+26,'物距 4')+lab(ox-12,(cy+oT)/2+6,'物高 3',D.object,'end')+lab((ox+hx)/2+8,(cy+oT)/2-8,'5',D.object,'start');
-    h+=lab((ix+hx)/2,cy-12,`像距 ${fmt(kk(4))}`)+lab(ix+12,(cy+iB)/2+6,`像高 ${fmt(kk(3))}`,D.image,'start')+lab((ix+hx)/2-12,(cy+iB)/2+22,`${fmt(kk(5))}`,D.image,'end');
-    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['物側三角形','3、4、5'],['像側三角形',`${fmt(kk(3))}、${fmt(kk(4))}、${fmt(kk(5))}`],['像距 ÷ 物距',`${fmt(kk(4))} ÷ 4 = ${fmt(k)}`],['像高 ÷ 物高',`${fmt(kk(3))} ÷ 3 = ${fmt(k)}`]],
-      note:`針孔兩邊各有一個直角三角形，在針孔處的角是<b>對頂角</b>，所以兩個三角形<b>相似</b>。像距是物距的 ${fmt(k)} 倍 → 像高也是物高的 ${fmt(k)} 倍。`};},
+    /* 用在針孔成像：物側三角形（物距、物高、光線）與像側三角形 */
+    const d=s.pd,hh=s.ph3,Dd=s.pD,k=Dd/d,H=hh*k,Lo=Math.hypot(d,hh),Li=Lo*k;
+    const u=Math.min(44,800/(d+Dd+1.5),360/(hh+H)),objH=hh*u,imgH=H*u,cy=50+objH+Math.max(0,(410-objH-imgH)/2),hx=450-(Dd-d)*u/2,ox=hx-d*u,ix=hx+Dd*u;
+    for(let x=hx;x>=ox-u;x-=u)h+=L(x,cy-objH-u,x,cy+imgH+u,{stroke:'#ffffff10',w:1});for(let x=hx;x<=ix+u;x+=u)h+=L(x,cy-objH-u,x,cy+imgH+u,{stroke:'#ffffff10',w:1});
+    for(let y=cy;y>=cy-objH-u;y-=u)h+=L(ox-u,y,ix+u,y,{stroke:'#ffffff10',w:1});for(let y=cy;y<=cy+imgH+u;y+=u)h+=L(ox-u,y,ix+u,y,{stroke:'#ffffff10',w:1});
+    h+=L(20,cy,880,cy,{stroke:D.muted,w:1.2,dash:true,op:.6})+L(hx,Math.max(34,cy-objH-u*1.5),hx,cy-6,{stroke:'#8aa0b8',w:6})+L(hx,cy+6,hx,cy+imgH+u*1.5,{stroke:'#8aa0b8',w:6})+T(hx,Math.max(26,cy-objH-u*1.5-8),'針孔',{size:14,fill:D.muted,anchor:'middle'});
+    const O=[hx,cy],oB=[ox,cy],oT=[ox,cy-objH],iB=[ix,cy],iT=[ix,cy+imgH];
+    h+=`<polygon points="${O} ${oB} ${oT}" fill="${D.object}" fill-opacity=".14"/>`+sideL(O,oB,CB)+sideL(oB,oT,CH)+sideL(oT,O,CS)+ticks(O,oT,Lo,u,CS)+sq(oB,1,-1);
+    const tw=clamp(s.turn,0,1),sc=1+(1/k-1)*tw,imgTri=`<polygon points="${O} ${iB} ${iT}" fill="${D.image}" fill-opacity=".16"/>`+sideL(O,iB,CB)+sideL(iB,iT,CH)+sideL(iT,O,CS)+ticks(O,iT,Li,u,CS)+sq(iB,-1,1);
+    h+=`<g transform="translate(${hx} ${cy}) rotate(${180*tw}) scale(${sc}) translate(${-hx} ${-cy})">${imgTri}</g>`;
+    const aO=deg(Math.atan2(hh,d));
+    h+=vArrow(ox,cy,cy-objH,D.object);
+    if(tw<0.02){h+=arcAt(O,Math.min(44,d*u*0.6),180-aO,180,CA)+arcAt(O,Math.min(44,d*u*0.6),-aO,0,CA)+T(hx+50,cy+(imgH>40?34:-12),'對頂角相等',{size:14,fill:CA});
+      h+=vArrow(ix,cy,cy+imgH,D.image)+L(ox,cy-objH,ix,cy+imgH,{stroke:'#ffe8a5',w:1.5,op:.5});
+      h+=lab((ox+hx)/2,cy+24,`物距 ${d}`,CB)+lab(ox-12,cy-objH/2+6,`物高 ${hh}`,CH,'end')+lab((ox+hx)/2+8,cy-objH/2-8,fmt(Lo),CS,'start');
+      h+=lab((ix+hx)/2,cy-12,`像距 ${Dd}`,CB)+lab(ix+12,cy+imgH/2+6,`像高 ${fmt(H)}`,CH,'start')+lab((ix+hx)/2-12,cy+imgH/2+22,fmt(Li),CS,'end');}
+    else if(tw>0.98)h+=T(450,474,'像那邊的三角形轉 180°、縮小後，和物體這邊完全疊合 → 相似！',{size:16,fill:D.ink,anchor:'middle',weight:700});
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['物側三角形',`底 ${d}、高 ${hh}、斜邊 ${fmt(Lo)}`],['像側三角形',`底 ${Dd}、高 ${fmt(H)}、斜邊 ${fmt(Li)}`],['像距是物距的',`${fmt(k)} 倍`],['所以像高',`${hh} × ${fmt(k)} = ${fmt(H)}`]],
+      note:`針孔兩邊的三角形，在針孔處的角是<b>對頂角</b>、另一個角都是直角 → 形狀相同（相似）。像距是物距的 <b>${fmt(k)} 倍</b>，像高就是物高的 ${fmt(k)} 倍。`};},
   pinhole3d(s){
     /* 簡易 3D：x 為光前進方向（物體在 −x，針孔在原點，紙屏在 +x），y 向左，z 向上 */
     const d=s.pa,Dd=s.pb,k0=Dd/d,yaw=rad(s.yaw),pit=rad(s.pitch),tgt=[(Dd-d)/2,0,0],R=Math.max(250,(d+Dd)*1.35),F=900,cx=450,cy=s.insets?180:250;
