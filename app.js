@@ -167,6 +167,7 @@ const LENS_QUIZ=[
     sol:'凹透鏡讓光發散，折射光只有反向延長線會相交 → 一定是<b>正立、縮小的虛像</b>，在物體同一側。拖動物體試試看。',go:s=>{s.mode='image';s.type=-1;s.beam='main';s.block=false;s.sweep=null;}}];
 /* 光具座實驗：記錄一次結果 */
 function benchLog(s){
+  if(!s.on){s.flash='先開燈，點燃蠟燭';s.flashT=3;return;}
   const f=s.bf,u=s.bu,inf=u===f,v=inf?Infinity:f*u/(u-f),real=!inf&&v>0,b=inf?8:8*Math.abs(s.bv-v)/Math.abs(v),m=v/u;let row;
   if(real&&b<0.3)row={u,v:String(s.bv),p:`倒立・${Math.abs(m-1)<0.02?'等大':m>1?'放大':'縮小'}・實像`};
   else if(u<f)row={u,v:'—',p:'接不到（正立放大虛像）'};
@@ -1040,12 +1041,12 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
       h+=T(ix+iw-12,iy+ihh-12,sharp?`清楚：倒立・${Math.abs(m-1)<0.02?'等大':m>1?'放大':'縮小'}`:b>4?'只有一片模糊的光':'模糊',{size:13,fill:sharp?'#0f766e':'#6f6448',anchor:'end',weight:700});}
     else h+=T(cxI,iy+90,s.on?'':'蠟燭沒點燃',{size:14,fill:'#6f6448',anchor:'middle'});
     /* 實驗紀錄 */
-    h+=`<rect x="20" y="12" width="440" height="164" rx="10" fill="#0b1422" stroke="#3a4554"/>`+T(36,38,'物距 u',{size:13,fill:D.muted,weight:700})+T(128,38,'像距 v',{size:13,fill:D.muted,weight:700})+T(220,38,`像的性質（f = ${f} cm）`,{size:13,fill:D.muted,weight:700})+L(30,46,450,46,{stroke:'#3a4554',w:1});
+    h+=`<rect x="20" y="12" width="440" height="164" rx="10" fill="#0b1422" stroke="#3a4554"/>`+T(36,38,'物距',{size:13,fill:D.muted,weight:700})+T(128,38,'像距',{size:13,fill:D.muted,weight:700})+T(220,38,`像的性質（f = ${f} cm）`,{size:13,fill:D.muted,weight:700})+L(30,46,450,46,{stroke:'#3a4554',w:1});
     if(!s.log.length)h+=T(240,100,'找到清楚的像後，按「記錄這一次」',{size:14,fill:D.muted,anchor:'middle'});
     [...s.log].sort((a,b)=>b.u-a.u).forEach((r,i)=>{const y=68+i*21;h+=T(36,y,`${r.u} cm`,{size:14,fill:D.object})+T(128,y,r.v==='—'?'—':`${r.v} cm`,{size:14,fill:D.image})+T(220,y,r.p,{size:14,fill:D.ink});});
     if(!s.on)h+=T(250,300,'按「開燈」點燃蠟燭',{size:18,fill:D.muted,anchor:'middle'});
     const where=['2F 以外','2F 上','F 與 2F 之間','F 上','F 以內'][lensRow(u,f)];
-    const reads=[['蠟燭位置',`u = ${u} cm（${where}）`],['紙屏位置',`${sv} cm`],['紙屏上',!s.on?'—':sharp?'清楚的像':real&&!far?'模糊（再移動紙屏）':'接不到清楚的像'],['像的性質',sharp?`倒立・${Math.abs(m-1)<0.02?'等大':m>1?'放大':'縮小'}・實像`:'—']];
+    const reads=[['蠟燭位置',`${u} cm（${where}）`],['紙屏位置',`${sv} cm`],['紙屏上',!s.on?'—':sharp?'清楚的像':real&&!far?'模糊（再移動紙屏）':'接不到清楚的像'],['像的性質',sharp?`倒立・${Math.abs(m-1)<0.02?'等大':m>1?'放大':'縮小'}・實像`:'—']];
     const flash=s.flashT>0&&s.flash?`<b>${s.flash}</b><br>`:'';
     const note=flash+(!s.on?'按「開燈」點燃蠟燭。':u<f?'蠟燭在<b>焦點以內</b>：紙屏怎麼移都接不到像。從紙屏這一側<b>透過透鏡看</b>，會看到正立、放大的<b>虛像</b>（放大鏡）。':inf?'蠟燭在<b>焦點上</b>：折射光平行，紙屏上只有一片亮光，<b>不成像</b>。'
       :far?`像距約 ${num(v)} cm，超出光具座，紙屏放不到。把蠟燭往遠離透鏡的方向移一點。`:sharp?'找到了！<b>實像</b>可以用紙屏接到。按「記錄這一次」，再換一個蠟燭位置。':'前後移動紙屏，找到<b>最清楚</b>的像（光點最小、邊緣最銳利）。');
