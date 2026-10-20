@@ -719,7 +719,7 @@ curved:{group:2,n:'4-2',name:'凹面鏡與凸面鏡',subtitle:'從每一條光�
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['像的位置',inf?'無窮遠':v>0?`鏡前 ${num(v)} cm`:`鏡後 ${num(-v)} cm`],['放大率',inf?'—':`${num(Math.abs(m),2)} 倍`],['成像',prop]],
       note:s.beam==='main'?'平行主軸 → 經過 F；經過 F → 平行主軸；經過 C → 原路反射。':'物體同一點發出的光，反射後（或延長線）交在同一點 → 像。'};}},
 /* ===== 09 折射 ===== */
-refraction:{group:2,n:'4-3',name:'光的折射與全反射',subtitle:'單束光看折射角；全光從一點發光，找出全反射（延伸）從哪裡開始。',dark:true,
+refraction:{group:2,n:'4-3',name:'光的折射與全反射',subtitle:'單束光看折射角；全光從一點發光，找出全反射從哪裡開始（全反射為延伸內容）。',dark:true,
   q:['光由水射向空氣，一定會折射出去嗎？','不一定。光從光速<b>慢</b>的水射向光速<b>快</b>的空氣，折射光偏離法線；入射角大於<b>臨界角</b>時，沒有折射光、全部反射回水中，這就是<b>全反射</b>。'],
   state:{on:true,beam:'single',prog:0,m1:'air',m2:'water',a:40,sx:330,sy:120,rev:false,view:'ray',wt:0,slowW:false,cart:true,col:'mono'},
   controls:[LAMP,BEAM,
@@ -737,12 +737,12 @@ refraction:{group:2,n:'4-3',name:'光的折射與全反射',subtitle:'單束光�
   drag:{ray:(p,s)=>{const dx=450-p.x,dy=250-p.y;s.a=dy<=0?89:snap('a',deg(Math.atan2(Math.max(0,dx),dy)));},src:(p,s)=>{s.sx=clamp(p.x,40,860);s.sy=clamp(p.y,40,225);}},
   /* 紫光在空氣以外的介質都比紅光慢一點（折射率稍大，差異已放大）；空氣不變 */
   nOf:(k,col)=>{const n=MEDIA[k][1];return col==='v'&&n>1?n+0.12*(n-1)/0.5:n;},
-  mLabel:(nm,n)=>`${nm}　光速約 ${(3/n).toFixed(2)}×10⁸ m/s（n = ${n.toFixed(2)}）`,
+  mLabel:(nm,n)=>`${nm}<tspan font-size="15" font-weight="400">　光速約 ${(3/n).toFixed(2)}×10⁸ m/s（n = ${n.toFixed(2)}）</tspan>`,
   wave(s){
     /* 惠更斯波前：同一道波前，先進入介質 2 的那一端改用 v2 前進，還在介質 1 的那一端仍用 v1 */
     const[n1Name,n1,c1]=MEDIA[s.m1],[n2Name,n2,c2]=MEDIA[s.m2],cx=450,cy=250,a=rad(Math.min(s.a,75)),V=170,PER=0.55,W=220,t=s.wt,same=s.m1===s.m2;
     let h=`<rect x="10" y="10" width="880" height="240" fill="${c1}"/><rect x="10" y="250" width="880" height="232" fill="${c2}"/>`+L(10,cy,890,cy,same?{stroke:'#d7edff',w:1.5,dash:'4 8',op:.35}:{stroke:'#d7edff',w:2})+L(cx,30,cx,470,{stroke:D.muted,w:1.5,dash:true,op:.7});
-    h+=T(30,52,this.mLabel(n1Name,n1),{size:19,fill:D.ink,weight:600})+T(30,462,this.mLabel(n2Name,n2),{size:19,fill:D.ink,weight:600});
+    h+=T(870,52,this.mLabel(n1Name,n1),{size:19,fill:D.ink,weight:600,anchor:'end'})+T(870,462,this.mLabel(n2Name,n2),{size:19,fill:D.ink,weight:600,anchor:'end'});
     const rv=s.col==='rv',sets=rv?[['r','#ff5a4f','紅光'],['v','#c77dff','紫光']]:[['r',D.ray,'']];
     const u1=[Math.sin(a),Math.cos(a)],p1=[Math.cos(a),-Math.sin(a)],sa=Math.sin(a),ca=Math.cos(a);
     /* 每種色光在上、下兩種介質各有自己的光速 */
@@ -765,11 +765,11 @@ refraction:{group:2,n:'4-3',name:'光的折射與全反射',subtitle:'單束光�
           const ends=[A,B].map(e=>({p:e.p,m:e.m,v:e.m===1?I.v1:I.v2,u:e.m===1?u1:u2})),fast=ends[0].v>=ends[1].v?0:1;
           if(s.cart)h+=L(ends[0].p[0],ends[0].p[1],ends[1].p[0],ends[1].p[1],{stroke:'#c9d3df',w:5})+ends.map(e=>`<circle cx="${e.p[0]}" cy="${e.p[1]}" r="11" fill="#2b3442" stroke="#c9d3df" stroke-width="3"/>`).join('');
           ends.forEach((e,i)=>{const q=[e.p[0]+e.u[0]*e.v*dt,e.p[1]+e.u[1]*e.v*dt],isF=i===fast,c=isF||same?'#ffcc6a':'#9be38b';
-            h+=L(e.p[0],e.p[1],q[0],q[1],{stroke:c,w:4,arrow:true})+`<circle cx="${e.p[0]}" cy="${e.p[1]}" r="6" fill="${c}"/>`+T(q[0]+(i===0?14:-14),q[1]+(e.m===1?-10:22),same?'兩端一樣快':isF?'外圈：走得多':'內圈：走得少',{size:16,fill:c,anchor:i===0?'start':'end',weight:700});});}}
-      if(tirs.length)h+=T(cx+60,cy+110,tirs.length===info.length?'全反射：沒有折射波':`${nm(tirs)}全反射，只剩${nm(info.filter(J=>!J.tir))}折射出去`,{size:22,fill:D.object,weight:700});
-      if(sa<=0.02&&!same)h+=T(cx,cy+150,`垂直入射：整道波前同時${n2>n1?'變慢':'變快'}，不轉彎`,{size:18,fill:D.ink,anchor:'middle',weight:600});
+            h+=L(e.p[0],e.p[1],q[0],q[1],{stroke:c,w:4,arrow:true})+`<circle cx="${e.p[0]}" cy="${e.p[1]}" r="6" fill="${c}"/>`+T(i===0?Math.min(788,q[0]+14):Math.max(112,q[0]-14),Math.min(486,q[1]+(e.m===1?-10:22)),same?'兩端一樣快':isF?'外圈：走得多':'內圈：走得少',{size:16,fill:c,anchor:i===0?'start':'end',weight:700});});}}
+      if(tirs.length)h+=T(cx+60,tirs.length===info.length?cy+110:cy+170,tirs.length===info.length?'全反射：沒有折射波':`${nm(tirs)}全反射，只剩${nm(info.filter(J=>!J.tir))}折射出去`,{size:22,fill:D.object,weight:700});
+      if(s.a===0&&!same)h+=T(cx,cy+150,`垂直入射：整道波前同時${n2>n1?'變慢':'變快'}，不轉彎`,{size:18,fill:D.ink,anchor:'middle',weight:600});
     }else h+=T(450,140,'按「開燈」',{size:20,fill:D.muted,anchor:'middle'});
-    if(s.a>75)h+=T(870,52,`波前圖最大畫到 75°（滑桿是 ${s.a}°）`,{size:17,fill:D.object,anchor:'end',weight:600});
+    if(s.a>75)h+=T(30,52,`波前圖最大畫到 75°（滑桿是 ${s.a}°）`,{size:17,fill:D.object,weight:600});
     const I=info[0],ang=x=>x===null?'全反射':`${deg(x).toFixed(1)}°`,inc=s.a>75?'75°（波前圖最大）':`${s.a}°`;
     /* 結論看紅、紫光實際偏折了多少：|θ₂ − θ₁| */
     const dev=info.map(J=>J.tir?0:Math.abs(J.b-a)),concl=same?'同一種介質，不偏折也不色散':tirs.length?(tirs.length===info.length?'兩種色光都全反射':`${nm(tirs)}先全反射`):s.a===0?'垂直入射，不偏折也不色散':dev[1]>dev[0]?'紫光偏折較多':'紅光偏折較多';
@@ -777,8 +777,9 @@ refraction:{group:2,n:'4-3',name:'光的折射與全反射',subtitle:'單束光�
       :[['入射角',inc],['光速',`${(3/n1).toFixed(2)} → ${(3/n2).toFixed(2)} ×10⁸ m/s`],['波長',`λ₂ = λ₁ × ${(n1/n2).toFixed(2)}`],['折射角',ang(I.b)]];
     const note=same?`兩邊是同一種介質 → 光速一樣，波前不轉彎（不偏折${rv?'，也不色散':''}）。`
       :s.a===0?`垂直入射：整道波前同時${n2>n1?'變慢':'變快'}，方向不變 → 不偏折${rv?'，紅光、紫光也不會分開':''}。`
+      :tirs.length===info.length?'光從光速慢的介質射向光速快的介質，入射角超過<b>臨界角</b> → 波前進不去，全部反射回來（<b>全反射</b>）。'
+      :tirs.length?'光從光速慢的介質射向光速快的介質：紫光的<b>臨界角</b>比紅光小 → <b>紫光先全反射</b>，只剩紅光折射出去。（差異已放大）'
       :rv?'紫光在水、玻璃、鑽石中都比紅光<b>更慢</b>（在空氣中一樣快）→ 跨過界面時紫光的光速變化較大、<b>轉得更多</b> → 不同顏色分開，這就是<b>色散</b>。（差異已放大）'
-      :I.tir?'光從光速慢的介質射向光速快的介質，入射角超過<b>臨界角</b> → 波前進不去，全部反射回來（<b>全反射</b>）。'
       :n2>n1?'同一道波前：<b>外圈</b>還在快的介質、走得多；<b>內圈</b>先進入慢的介質、走得少 → 波前轉彎，光線（垂直波前）偏向法線。波前也變密（波長變短）。'
       :'反過來進入快的介質：先進去的一端變快、走得多 → 波前往另一邊轉，光線偏離法線。';
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,note};},
@@ -787,7 +788,7 @@ refraction:{group:2,n:'4-3',name:'光的折射與全反射',subtitle:'單束光�
     beginLight(s);
     const[n1Name,n1,c1]=MEDIA[s.m1],[n2Name,n2,c2]=MEDIA[s.m2],cx=450,cy=250,Ln=210,crit=n1>n2?deg(Math.asin(n2/n1)):null,same=s.m1===s.m2;
     let h=`<rect x="10" y="10" width="880" height="240" fill="${c1}"/><rect x="10" y="250" width="880" height="232" fill="${c2}"/>`+L(10,cy,890,cy,same?{stroke:'#d7edff',w:1.5,dash:'4 8',op:.35}:{stroke:'#d7edff',w:2});
-    h+=T(30,52,this.mLabel(n1Name,n1),{size:19,fill:D.ink,weight:600})+T(30,462,this.mLabel(n2Name,n2),{size:19,fill:D.ink,weight:600});
+    h+=T(870,52,this.mLabel(n1Name,n1),{size:19,fill:D.ink,weight:600,anchor:'end'})+T(870,462,this.mLabel(n2Name,n2),{size:19,fill:D.ink,weight:600,anchor:'end'});
     const bend=inc=>{const q=n1*Math.sin(inc)/n2;return q>1+1e-12?null:Math.asin(Math.min(1,q));};
     if(s.beam==='single'){
       const a=rad(s.a),b=bend(a),tir=b===null,sx=cx-Ln*Math.sin(a),sy=cy-Ln*Math.cos(a);
