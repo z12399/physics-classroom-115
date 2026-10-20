@@ -1525,7 +1525,7 @@ const PHOTOS={
   cellophane:['img/cellophane.webp','白光穿過<b>紅色玻璃紙</b>：只有紅光透過，其他色光被吸收，所以牆上是紅色的光。'],
   lightning:['img/lightning.webp','閃電和雷聲是同時發生的，但光速比聲速快很多，所以先看到閃電、後聽到雷聲。'],
   roadmirror:['img/roadmirror.webp','道路轉角的<b>凸面鏡</b>：成正立、縮小的虛像，能看到比平面鏡更大的範圍。'],
-  straw:['img/straw.webp','吸管在水面處好像折斷了：水中吸管射出的光在水面<b>折射</b>，看起來位置變淺、變彎。'],
+  pencil:['img/pencil.webp','鉛筆在水面處好像折斷了：水中那一段射出的光在水面（和杯壁）<b>折射</b>，看起來位置偏移了。'],
   sunfocus:['img/sunfocus.webp','用凸透鏡把太陽光<b>會聚</b>成又小又亮的光點，紙會被燒焦——光點最小的地方就是<b>焦點</b>。千萬不要用透鏡看太陽！'],
   bench:['img/bench.webp','實驗室的<b>光具座</b>：蠟燭、凸透鏡、紙屏排在一直線上，移動紙屏找到最清楚的燭焰像（倒立的實像）。'],
   camera:['img/camera.webp','照相機的鏡頭是<b>凸透鏡</b>：遠處的樹在 2F 以外，在感光元件上形成倒立、縮小的實像。'],
@@ -1540,7 +1540,7 @@ const PHOTO_OF={
   shadow:s=>s.mode==='speed'?(s.sv==='thunder'?'lightning':null):s.mode==='pinhole'?'pinhole':null,
   mirror:s=>s.mode==='diffuse'?'lake':null,
   curved:s=>s.type===-1?'roadmirror':'makeupmirror',
-  refraction:()=>'straw',
+  refraction:()=>'pencil',
   lens:s=>({focus:'sunfocus',bench:'bench'})[s.mode]||null,
   life:s=>({camera:'camera',proj:'projector',mag:'magnifier',scope:'microscope',myopia:'glasses',hyper:'glasses'})[s.dev]||null,
   color:s=>({prism:'prism',rainbow:'rainbow',clear:'cellophane',mix:'stagelights'})[s.mode]||null};
