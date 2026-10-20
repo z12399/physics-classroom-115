@@ -1387,7 +1387,7 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
     let h=`<rect x="20" y="20" width="860" height="460" rx="20" fill="#05080d"/><rect x="34" y="226" width="40" height="48" rx="8" fill="${s.on?'#c9d3df':'#5a6573'}"/>`+T(54,300,'光源',{size:14,fill:D.muted,anchor:'middle'});
     if(s.tv==='rgb'){
       /* 白光 → 紅綠藍濾色片 → 三道色光疊在屏幕上；拿掉濾色片，光就直接通過 */
-      const F=[['紅',[1,0,0],s.fR,130,[690,190]],['綠',[0,1,0],s.fG,250,[790,190]],['藍',[0,0,1],s.fB,370,[740,280]]],outs=F.map(([,f,on])=>on?cmul(c0,f):c0),vis=[];
+      const F=[['紅',[1,0,0],s.fR,130,[680,190]],['綠',[0,1,0],s.fG,250,[780,190]],['藍',[0,0,1],s.fB,370,[730,280]]],outs=F.map(([,f,on])=>on?cmul(c0,f):c0),vis=[];
       h+=`<rect x="560" y="70" width="300" height="340" rx="10" fill="#0b0f16" stroke="#3a4554" stroke-width="2"/>`+T(710,58,'白色屏幕',{size:15,fill:D.muted,anchor:'middle'});
       F.forEach(([n,f,on,fy,[tx,ty]],i)=>{const d1=Math.hypot(300-74,fy-250),c=outs[i];
         if(s.on&&any)h+=ray([[74,250],[300,fy]],rgbOf(c0),{w:9,arrow:false,op:.8});
@@ -1398,7 +1398,7 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
       const sum=outs.reduce((a,c)=>a.map((v,i)=>Math.min(255,v+c[i])),[0,0,0]),done=vis.every(v=>v>=1);
       h+=T(710,450,done?`中央重疊：${ln(sum)}`:'',{size:21,fill:D.ink,anchor:'middle',weight:700});
       return {svg:h,reads:[['照射的光',ln(c0)],...F.map(([n,,on],i)=>[`${n}色濾色片`,!any?'—':!on?`拿掉了，${ln(c0)}直接通過`:!done?'—':has(outs[i])?`透過 ${ln(outs[i])}`:'全部被吸收']),['三道光疊在一起',done?ln(sum):'—']],
-        note:(white?'白光含有各種色光。三片濾色片分別只讓紅、綠、藍光<b>透過</b>，三道色光在屏幕上疊回去 → 看起來又是<b>白色</b>；兩兩重疊是黃、青、洋紅。':'三片濾色片分別只讓紅、綠、藍光<b>透過</b>；照射的光裡沒有的色光，濾色片也變不出來。')+'拿掉濾色片，光就直接通過。'};
+        note:(white&&s.fR&&s.fG&&s.fB?'白光含有各種色光。三片濾色片分別只讓紅、綠、藍光<b>透過</b>，三道色光在屏幕上疊回去 → 看起來又是<b>白色</b>；兩兩重疊是黃、青、洋紅。':white?'拿掉濾色片的那一道是<b>白光</b>，直接通過；它和其他色光疊在一起，看起來還是偏白。':'三片濾色片分別只讓紅、綠、藍光<b>透過</b>；照射的光裡沒有的色光，濾色片也變不出來。')+'拿掉濾色片，光就直接通過。'};
     }
     /* 一張或兩張玻璃紙排在一起 */
     const ks=s.tv==='two'?[s.f1,s.f2]:[s.f1],xs=s.tv==='two'?[300,520]:[400],steps=[];let c=c0,x=74,dl=0;
@@ -1415,7 +1415,7 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
     const pass=o=>!any?'—':!done?'—':has(o)?ln(o):'幾乎沒有光',[n1]=FILTERS[s.f1],[n2]=FILTERS[s.f2],o1=steps[0][1];
     const reads=s.tv==='two'?[['照射的光',ln(c0)],[`第一張（${n1}）透過`,pass(o1)],[`第二張（${n2}）透過`,pass(c)],['屏幕上',done?res:'—']]:[['照射的光',ln(c0)],[`${n1}色玻璃紙透過`,pass(c)],['屏幕上',done?res:'—']];
     let note='透明物體的顏色＝它讓哪些色光<b>透過</b>，其餘被吸收。';
-    if(s.tv==='two')note+='兩張疊在一起：光要<b>兩張都能透過</b>才到得了屏幕，越疊越暗'+(any&&has(o1)&&!has(c)?`。${n1}色玻璃紙透過的${ln(o1)}，到了${n2}色玻璃紙被吸收 → <b>幾乎沒有光</b>（不是色光相加，不會變成${ln(FILTERS[s.f1][1].map((v,i)=>255*Math.max(v,FILTERS[s.f2][1][i])))}）。`:'。');
+    if(s.tv==='two')note+='兩張疊在一起：光要<b>兩張都能透過</b>才到得了屏幕，越疊越暗'+(any&&has(o1)&&!has(c)?`。${n1}色玻璃紙透過的${ln(o1)}，到了${n2}色玻璃紙被吸收 → <b>幾乎沒有光</b>${FILTERS[s.f1][1].every((v,i)=>!(v&&FILTERS[s.f2][1][i]))?`（不是色光相加，不會變成${ln(FILTERS[s.f1][1].map((v,i)=>255*Math.max(v,FILTERS[s.f2][1][i])))}）`:''}。`:'。');
     else if(any&&white)note+=`白光含有各種色光，${n1}色玻璃紙${FILTERS[s.f1][2]} → 屏幕上是<b>${n1}色</b>。`;
     else if(any)note+='照射的光裡，只有玻璃紙能讓它透過的部分才過得去。';
     return {svg:h,reads,note};},
@@ -1437,7 +1437,7 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
         if(fl&&any)h+=T(735,230,`透過${fl[0]}色玻璃紙`,{size:16,fill:D.ink,anchor:'middle',weight:700})+T(735,262,`紙：${pb}　字：${tb}`,{size:16,fill:D.ink,anchor:'middle'});
         h+=T(735,340,verdict,{size:18,fill:D.object,anchor:'middle',weight:700});}
       let note='不透明物體的顏色＝它<b>反射</b>哪些色光，其餘被吸收。透過玻璃紙看時，只有玻璃紙讓它透過的色光才到得了眼睛。';
-      if(fl&&done&&any){if(has(tD)&&!has(tF))note+=`<br>${iname}字反射的${ln(tD)}過不了${fl[0]}色玻璃紙 → 字變成<b>黑色</b>；紙看起來是${pb}。`;else if(pb===tb)note+=`<br>紙和字透過來的都是${ln(pF)} → 字和紙同色，<b>看不出來</b>。`;}
+      if(fl&&done&&any){if(has(tD)&&!has(tF)&&has(pF))note+=`<br>${iname}字反射的${ln(tD)}過不了${fl[0]}色玻璃紙 → 字變成<b>黑色</b>；紙看起來是${pb}。`;else if(pb===tb)note+=`<br>紙和字透過來的都是${ln(pF)} → 字和紙同色，<b>看不出來</b>。`;}
       return {svg:h,reads:[['照射的光',ln(c0)],['直接看',done&&any?`紙${pa}・字${ta}`:'—'],[fl?`透過${fl[0]}色玻璃紙`:'玻璃紙',fl?(done&&any?`紙${pb}・字${tb}`:'—'):'沒有蓋'],['結果',done?verdict:'—']],note};
     }
     const[oname,ref]=REFLECT[s.obj],lit=clamp((reach-250)/150,0,1),out=cmul(c0,ref).map(v=>v*lit),done=!s.on||lit>=1,look=any?cn(out):'看不見';
@@ -1543,7 +1543,7 @@ const PHOTO_OF={
   refraction:()=>'straw',
   lens:s=>({focus:'sunfocus',bench:'bench'})[s.mode]||null,
   life:s=>({camera:'camera',proj:'projector',mag:'magnifier',scope:'microscope',myopia:'glasses',hyper:'glasses'})[s.dev]||null,
-  color:s=>({prism:'prism',rainbow:'rainbow',filter:'cellophane',mix:'stagelights'})[s.mode]||null};
+  color:s=>({prism:'prism',rainbow:'rainbow',clear:'cellophane',mix:'stagelights'})[s.mode]||null};
 let lastPhoto;
 function setPhoto(){const f=PHOTO_OF[current],k=f?f(state):null,fig=labEl.querySelector('.photo');if(k===lastPhoto||!fig)return;lastPhoto=k;fig.hidden=!k;if(k){fig.querySelector('img').src=PHOTOS[k][0];fig.querySelector('figcaption').innerHTML=PHOTOS[k][1];}}
 function openPhoto(k){document.getElementById('info-content').innerHTML=`<img class="photo-big" src="${PHOTOS[k][0]}" alt=""><p>${PHOTOS[k][1]}</p><p class="small">插圖由 AI 生成，僅供示意。</p>`;dialog.showModal();}
@@ -1571,5 +1571,5 @@ window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>「透鏡成像 → 為什麼會偏折」在透鏡兩個球面各算一次折射，最外側的光會略偏離焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>RGB 是螢幕色彩值，不是光功率。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>「透鏡成像 → 為什麼會偏折」在透鏡兩個球面各算一次折射，最外側的光會略偏離焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');
