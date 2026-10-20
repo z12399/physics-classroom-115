@@ -435,7 +435,7 @@ echo:{group:1,n:'3-4',name:'聲音的傳播與應用',subtitle:'聲音在不同�
 /* ===== 07 影子 ===== */
 shadow:{group:2,n:'4-1',name:'光的傳播：影子、針孔、光速',subtitle:'光沿直線前進：用影子和針孔成像來證明；再比比看光在不同物質中跑多快。',dark:true,
   q(s){if(s.mode==='speed')return this.speedQ[s.sv];if(s.mode!=='pinhole')return ['物體靠近點光源，屏幕上的影子會變大還是變小？','會變大。屏幕位置不變時，光源到物體的距離 a 減少，影子的放大倍數 D/a 增加。'];
-    return s.view==='3d'?pinholeExample(s):s.view==='sim'?simExample(s):['針孔變大，紙屏上的像會怎樣？','<b>更亮，但更模糊</b>。孔變大，物體上每一點的光穿過針孔後，在紙屏上變成較大的光點，光點互相重疊，像就模糊了；進來的光變多，所以更亮。<br>像的<b>大小</b>只由物距、像距決定（像高 ÷ 物高 = 像距 ÷ 物距），不會因為孔變大而改變。孔很小時，像的形狀也和孔的形狀無關。'];},
+    return s.view==='3d'?pinholeExample(s):s.view==='sim'?simExample(s):['針孔變大，紙屏上的像會怎樣？','<b>更亮，但更模糊</b>。孔變大，物體上每一點的光穿過針孔後，在紙屏上變成較大的光點，光點互相重疊，像就模糊了；進來的光變多，所以更亮。<br>像的<b>大小</b>由物高、物距、像距決定（像高 ÷ 物高 = 像距 ÷ 物距），不會因為孔變大而改變。孔很小時，像的形狀也和孔的形狀無關。'];},
   speedQ:{race:['光在哪一種物質中跑得最快？光速和什麼有關？','在<b>真空</b>中最快，約 3 × 10⁸ m/s；進入空氣、水、玻璃、鑽石會越來越慢。所以光速和光經過的<b>物質（介質）</b>有關。<br>聲音剛好相反：聲音不能在真空中傳播，在固體中反而最快（3-4）。'],
     thunder:['看到閃電後 3 秒才聽到雷聲，打雷的地方大約多遠？','約 1 公里。閃電和雷聲同時發生，光幾乎立刻到達，所以 3 秒是聲音走的時間：340 m/s × 3 s ≈ 1020 m。'],
     sun:['如果太陽突然熄滅，地球上的人多久後才會發現？','約 <b>8 分 20 秒</b>後。太陽光要走 1.5 × 10¹¹ m ÷ 3 × 10⁸ m/s = 500 秒才到地球；在這之前看到的，都是早已在路上的光。']},
@@ -673,7 +673,7 @@ shadow:{group:2,n:'4-1',name:'光的傳播：影子、針孔、光速',subtitle:
 /* ===== 08 平面鏡 ===== */
 mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = 光進入眼睛。觀察反射定律、光的可逆、單向反射與漫射。',dark:true,
   q:s=>s.mode==='diffuse'?['為什麼教室各個位置的同學都看得到黑板上的字，有些位置卻會看到黑板「反光」？','黑板和粉筆字的表面粗糙，光照到後發生<b>漫射</b>，反射光射向各方向，所以每個位置都有光進入眼睛。<br>「反光」是黑板較光滑的地方發生<b>單向反射</b>，反射光集中射向某個方向，坐在那裡的同學眼睛收到很強的光，就看不清楚字。兩種情形的每一小塊表面都遵守反射定律。']
-    :s.mode==='rotate'?['入射光不動，把平面鏡轉 10°，反射光會轉幾度？','<b>20°</b>。鏡面轉 10°，法線也跟著轉 10°；入射角、反射角各改變 10°，所以反射光一共轉 <b>2 × 10° = 20°</b>。可以按「▶ 播放轉動」驗證。']
+    :s.mode==='rotate'?['入射光不動，把平面鏡轉 10°，反射光會轉幾度？','<b>20°</b>。鏡面轉 10°，法線也跟著轉 10°；入射角、反射角各改變 10°，所以反射光一共轉 <b>2 × 10° = 20°</b>。把「鏡面轉動 θ」調到 10°，再按「▶ 播放轉動」驗證。']
     :['物體向鏡面靠近 10 cm，物與像的距離改變多少？','像也向鏡面靠近 10 cm，所以物與像的距離減少 20 cm。'],
   state:{on:true,beam:'full',prog:0,mode:'plane',d:55,h:60,ex:80,ey:110,eye:true,ext:true,hit:170,rev:false,surf:'rough',normals:true,zoom:0,zoomT:0,pick:4,mag:true,i0:40,rot:15,ghost:true,anim:null},
   controls:[LAMP,{...BEAM,show:s=>s.mode!=='rotate'},
@@ -832,9 +832,9 @@ curved:{group:2,n:'4-2',name:'凹面鏡與凸面鏡',subtitle:'從每一條光�
       for(const[yh,c]of hits)h+=ray([P([u,oh]),P([0,yh]),P(outEnd(yh))],c,{w:s.beam==='main'?3:1.8,arrow:s.beam==='main',op:s.beam==='main'?1:.8});}
     const fade=fadeIn(),onStage=!inf&&X(v)>20&&X(v)<880,tipY=inf?cy:Y(m*oh);
     if(fade>0&&!inf&&v<0)for(const[yh,c]of hits)h+=L(X(0),Y(yh),X(v),Y(m*oh),{stroke:c,w:1.6,dash:'7 6',op:.85*fade});
-    /* 凸面鏡：平行光的延長線通過鏡後 F；射向 F、C 的光，虛線畫到鏡後 */
-    if(fade>0&&!cc&&s.beam==='main')for(const[yh,c,d]of hits)h+=d?L(X(0),Y(yh),X(d),cy,{stroke:c,w:1.4,dash:'3 5',op:.7*fade}):L(X(v),Y(m*oh),X(f),cy,{stroke:c,w:1.6,dash:'7 6',op:.85*fade});
-    if(fade>0&&onStage)h+=`<g opacity="${fade}">${vArrow(X(v),cy,Y(m*oh),D.image,{dash:v<0?'7 6':false})}${T(X(v),Y(m*oh)+(m<0?30:-16),v>0?'實像':'虛像',{size:20,fill:D.image,anchor:'middle',weight:600})}</g>`;
+    /* 凸面鏡：平行光的延長線通過鏡後 F；射向 F、C 的光，虛線畫到鏡後（C 線從像接著畫，不和延長線重疊） */
+    if(fade>0&&!cc&&s.beam==='main')for(const[yh,c,d]of hits)h+=d===f?L(X(0),Y(yh),X(f),cy,{stroke:c,w:1.4,dash:'3 5',op:.7*fade}):d?L(X(v),Y(m*oh),X(d),cy,{stroke:c,w:1.4,dash:'3 5',op:.7*fade}):L(X(v),Y(m*oh),X(f),cy,{stroke:c,w:1.6,dash:'7 6',op:.85*fade});
+    if(fade>0&&onStage)h+=`<g opacity="${fade}">${vArrow(X(v),cy,Y(m*oh),D.image,{dash:v<0?'7 6':false})}${T(X(v),m<0?Math.max(Y(m*oh)+30,cy+52):Y(m*oh)-16,v>0?'實像':'虛像',{size:20,fill:D.image,anchor:'middle',weight:600})}</g>`;
     h+=`<g opacity="${s.on?1:.35}">${vArrow(X(u),cy,Y(oh),D.object)}</g>`+T(X(u),Y(oh)-18,'物',{size:20,fill:D.object,anchor:'middle'})+handle('obj',X(u),cy,D.object)+handle('top',X(u),Y(oh),D.object,10);
     if(fade>0&&inf)h+=T(450,480,'物體在焦點上：反射光平行，不成像',{size:19,fill:D.object,anchor:'middle'});else if(fade>0&&!onStage)h+=T(450,480,'像在畫面外，請看右側「像的位置」',{size:18,fill:D.image,anchor:'middle'});
     else if(fade>0&&(tipY<20||tipY>480))h+=T(450,tipY>480?36:480,'像太大，超出畫面（看右側數值）',{size:18,fill:D.image,anchor:'middle'});
