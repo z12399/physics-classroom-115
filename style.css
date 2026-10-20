@@ -228,3 +228,11 @@ dialog .small{font-size:13px;color:var(--muted)}
 .projection .ex-table{font-size:17px}
 .projection .ex-table th{font-size:15px}
 .projection .question .ex-hint{font-size:15px}
+
+/* ---------- 實物圖 ---------- */
+.photo{margin:14px 0 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface-2);cursor:zoom-in}
+.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;object-fit:cover;background:#0f1b2d}
+.photo figcaption{font-size:13px;line-height:1.6;color:var(--ink-2);padding:8px 12px}
+.photo figcaption b{color:var(--accent-ink)}
+.photo-big{display:block;width:100%;height:auto;border-radius:12px;margin-top:8px}
+.projection .photo figcaption{font-size:15px}

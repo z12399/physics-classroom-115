@@ -5,4 +5,6 @@
 
 入口為 index.html；offline.html 可下載後離線開啟。
 
-修改 index.html、style.css、或 app.js 後，執行 `node build-offline.js` 重新產生 offline.html。
+img/ 放各實驗右側的實物示意圖（WebP，AI 生成）；離線版會把它們內嵌進同一個 HTML。
+
+修改 index.html、style.css、app.js 或 img/ 後，執行 `node build-offline.js` 重新產生 offline.html。
