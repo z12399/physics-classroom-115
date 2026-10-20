@@ -115,8 +115,27 @@ const LIFE_Q={
   myopia:['近視的人為什麼要戴凹透鏡？','近視眼看遠處時，光會聚在視網膜<b>前方</b>。凹透鏡先讓光稍微發散，會聚點往後移，剛好落在視網膜上。'],
   hyper:['遠視的人為什麼要戴凸透鏡？','遠視眼看近處時，光會聚在視網膜<b>後方</b>。凸透鏡先幫忙會聚一些，會聚點往前移，剛好落在視網膜上。']};
 
+/* 「想一想」問答區塊（和例題卡放在同一張卡片時使用） */
+const qBlockHTML=([q,a])=>`<h3>想一想</h3><div class="ex-q"><b>${q}</b></div><details><summary>看解釋</summary><div class="answer">${a}</div></details><hr class="ex-sep">`;
+const camSharp=s=>{const v=100*s.cu/(s.cu-100);return Math.abs(s.focus-v)*90/v<3;};
+const LIFE_QUIZ=[
+  {q:'照相機原本拍遠處的風景，改拍近處的花，鏡頭要怎麼調才會清楚？',opts:['往前伸（離感光元件遠一點）','往後縮（離感光元件近一點）','不用調','換成凹透鏡'],ans:0,
+    sol:'物體變近 → 像距變大（物近像遠）。感光元件不能動，所以鏡頭要<b>往前伸</b>，讓鏡頭到感光元件的距離變大。',go:s=>{s.dev='camera';s.cu=400;s.focus=118;},goLabel:'用照相機試試（花在近處）'},
+  {q:'投影機的投影片要怎麼放，螢幕上的字才會是正的？',opts:['正著放','只要上下顛倒','只要左右相反','上下顛倒、左右相反（轉 180°）'],ans:3,
+    sol:'投影片在鏡頭的 F 與 2F 之間，成<b>倒立、放大的實像</b>：上下、左右都相反。所以投影片要先轉 180° 放進去。',go:s=>{s.dev='proj';s.flip=false;},goLabel:'用投影機試試'},
+  {q:'想讓螢幕上的像<b>更大</b>又清楚，投影機要怎麼調？',opts:['投影機離螢幕遠一點，投影片稍微靠近鏡頭','投影機靠近螢幕，投影片離鏡頭遠一點','只把投影機往後移','換一個焦距更長的鏡頭並靠近螢幕'],ans:0,
+    sol:'像要更大 → 像距要更大（螢幕更遠），物距就要更小（投影片更靠近焦點，但仍在焦點外）。',go:s=>{s.dev='proj';s.flip=true;s.pu=122;},goLabel:'投影片靠近焦點看看'},
+  {q:'用放大鏡看小字時，看到的像是：',opts:['倒立、放大的實像','正立、放大的虛像','正立、縮小的虛像','倒立、縮小的實像'],ans:1,
+    sol:'字在放大鏡的<b>焦點以內</b> → 正立、放大的<b>虛像</b>，而且像和字在同一側。',go:s=>{s.dev='mag';s.mu=100;}},
+  {q:'近視的人看遠處的物體，光會聚在哪裡？要戴哪一種眼鏡？',opts:['視網膜前方，戴凹透鏡','視網膜後方，戴凹透鏡','視網膜前方，戴凸透鏡','視網膜後方，戴凸透鏡'],ans:0,
+    sol:'近視：光會聚在視網膜<b>前方</b> → 戴<b>凹透鏡</b>讓光先發散一點。遠視（或老花）相反，戴凸透鏡。',go:s=>{s.dev='myopia';s.glasses=false;},goLabel:'看看近視眼'},
+  {q:'拿一副眼鏡放在書上，看到的字<b>變小</b>了。這是：',opts:['遠視眼鏡（凸透鏡）','近視眼鏡（凹透鏡）','老花眼鏡（凸透鏡）','平光眼鏡'],ans:1,
+    sol:'凹透鏡不管物體放哪裡，都成<b>正立、縮小</b>的虛像 → 看字變小的是凹透鏡，也就是<b>近視</b>眼鏡。看字變大的是凸透鏡（遠視或老花眼鏡）。',go:s=>{s.dev='myopia';s.glasses=true;},goLabel:'看近視眼鏡'},
+  {q:'眼睛從看遠處改成看近處的書，眼睛怎麼調整？',opts:['水晶體變厚','水晶體變薄','視網膜往後移','眼球變長'],ans:0,
+    sol:'視網膜的位置不能動（像距固定），所以看近處時<b>水晶體變厚</b>、焦距變短，像才會剛好落在視網膜上。',go:s=>{s.dev='eye';s.u=400;},goLabel:'讓物體靠近眼睛'}];
+
 /* ---------- 4-4 凸透鏡成像規律與例題 ---------- */
-const LENS_ROWS=[['2F 以外（u ＞ 2f）','另一側 F 與 2F 之間','倒立・縮小・實像','照相機、眼睛'],['2F 上（u ＝ 2f）','另一側 2F 上','倒立・等大・實像','用來求焦距'],['F 與 2F 之間','另一側 2F 以外','倒立・放大・實像','投影機'],['F 上（u ＝ f）','不成像','折射光平行射出','—'],['F 以內（u ＜ f）','與物體同側','正立・放大・虛像','放大鏡']];
+const LENS_ROWS=[['2F 以外','另一側 F 與 2F 之間','倒立・縮小・實像','照相機、眼睛'],['2F 上','另一側 2F 上','倒立・等大・實像','用來求焦距'],['F 與 2F 之間','另一側 2F 以外','倒立・放大・實像','投影機'],['F 上','不成像','折射光平行射出','—'],['F 以內','與物體同側','正立・放大・虛像','放大鏡']];
 const lensRow=(u,f)=>{const r=u/f;return Math.abs(r-1)<1e-6?3:r<1?4:Math.abs(r-2)<1e-6?1:r>2?0:2;};
 function lensTableHTML(s){
   const btn=`<div class="ex-tools tab-tools"><button type="button" class="btn${s.tab?'':' primary'}" data-qa="tab">${s.tab?'收起成像規律表':'📋 顯示成像規律表'}</button></div>`;
@@ -130,7 +149,7 @@ const LENS_Q={
 };
 const LENS_QUIZ=[
   {q:'焦距 10 cm 的凸透鏡，把蠟燭放在透鏡前 <b>15 cm</b> 處，移動紙屏可以接到清楚的像。這個像是：',opts:['倒立、縮小的實像','倒立、放大的實像','正立、放大的虛像','倒立、等大的實像'],ans:1,
-    sol:'15 cm 在 f（10 cm）和 2f（20 cm）之間 → 像在另一側 2F 以外，是<b>倒立、放大的實像</b>（投影機的原理）。',go:s=>{s.mode='image';s.type=1;s.beam='main';s.block=false;s.f=80;s.u=120;s.sweep=null;},goLabel:'用模擬驗證（同比例：f = 80、u = 120）'},
+    sol:'15 cm 在 f（10 cm）和 2f（20 cm）之間 → 像在另一側 2F 以外，是<b>倒立、放大的實像</b>（投影機的原理）。',go:s=>{s.mode='image';s.type=1;s.beam='main';s.block=false;s.f=80;s.u=120;s.sweep=null;},goLabel:'用模擬驗證（同比例：焦距 80、物距 120）'},
   {q:'凸透鏡在紙屏上形成清楚的像。用黑紙把透鏡的<b>上半部</b>遮住，紙屏上的像會：',opts:['只剩下半部','只剩上半部','仍然完整，但變暗','完全消失'],ans:2,
     sol:'物體上<b>每一點</b>發出的光，都有一部分會穿過沒被遮住的下半部，仍然會聚到同一個像點 → 像仍然完整；穿過透鏡的光變少，所以<b>變暗</b>。',go:s=>{s.mode='image';s.type=1;s.beam='full';s.block=true;s.f=80;s.u=200;s.sweep=null;},goLabel:'用模擬驗證（全光＋遮住上半部）'},
   {q:'蠟燭和紙屏都距離凸透鏡 <b>30 cm</b> 時，紙屏上出現倒立、等大的清楚像。這個透鏡的焦距是：',opts:['10 cm','15 cm','30 cm','60 cm'],ans:1,
@@ -880,9 +899,9 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
     {type:'toggle',key:'paper',label:'拿一張紙，找最亮的點',show:s=>s.mode==='focus'},
     {type:'range',key:'pd',label:'紙 → 透鏡',min:10,max:170,step:1,unit:' cm',show:s=>s.mode==='focus'&&s.paper},
     {type:'seg',key:'beam',label:'光線',options:[['single','單束光'],['main','主要光線'],['full','全光']],onChange:replay,show:s=>s.mode==='image'},
-    {type:'range',key:'u',label:'物距 u',min:20,max:360,step:1,unit:' cm',show:s=>s.mode==='image'},
+    {type:'range',key:'u',label:'物距',min:20,max:360,step:1,unit:' cm',show:s=>s.mode==='image'},
     {type:'range',key:'oh',label:'物高',min:10,max:50,step:1,unit:' cm',show:s=>s.mode==='image'},
-    {type:'buttons',label:'跳到關鍵位置',items:[['u > 2f',s=>{s.u=snap('u',s.f*2.6);s.sweep=null;}],['u = 2f',s=>{s.u=snap('u',s.f*2);s.sweep=null;}],['f < u < 2f',s=>{s.u=snap('u',s.f*1.5);s.sweep=null;}],['u = f',s=>{s.u=snap('u',s.f);s.sweep=null;}],['u < f',s=>{s.u=snap('u',s.f*0.55);s.sweep=null;}]],show:s=>s.mode==='image'&&s.type===1},
+    {type:'buttons',label:'把物體放到',items:[['2F 以外',s=>{s.u=snap('u',s.f*2.6);s.sweep=null;}],['2F 上',s=>{s.u=snap('u',s.f*2);s.sweep=null;}],['F 與 2F 之間',s=>{s.u=snap('u',s.f*1.5);s.sweep=null;}],['F 上',s=>{s.u=snap('u',s.f);s.sweep=null;}],['F 以內',s=>{s.u=snap('u',s.f*0.55);s.sweep=null;}]],show:s=>s.mode==='image'&&s.type===1},
     {type:'buttons',label:'',items:[['▶ 物體從遠處慢慢靠近',s=>{s.sweep=0;}]],show:s=>s.mode==='image',primary:true},
     {type:'toggle',key:'block',label:'用黑紙遮住透鏡上半部',onChange:replay,show:s=>s.mode==='image'&&s.beam!=='single'},
     {type:'seg',key:'bf',label:'凸透鏡的焦距',options:[[10,'10 cm'],[15,'15 cm']],onChange:s=>{s.log=[];},show:s=>s.mode==='bench'},
@@ -948,7 +967,7 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
       if(fade>0)h+=`<g opacity="${fade}">${hot?`<circle cx="${pX}" cy="${cy}" r="26" fill="#ffd27a" opacity=".45"/>`:''}<ellipse cx="${pX}" cy="${cy}" rx="5" ry="${Math.max(3,Math.min(w,210))}" fill="#fff7c2" opacity="${clamp(16/Math.max(w,3),.18,1)}"/></g>`;
       h+=handle('paper',pX,452,D.object,11);
       if(fade>=1)h+=T(pX+dir*16,cy-36,hot?'最小最亮 → 焦點！':cc?'光點還不是最小':'光點越來越大',{size:16,fill:hot?D.object:D.muted,anchor:dir>0?'start':'end',weight:700});}
-    if(s.terms){h+=T(dir>0?880:20,cy-10,'主軸',{size:15,fill:D.muted,anchor:dir>0?'end':'start'})+`<circle cx="${cx}" cy="${cy}" r="4" fill="${D.ink}"/>`+T(cx+10,cy+22,'光心',{size:15,fill:D.ink});
+    if(s.terms){h+=T(dir>0?880:20,cy-10,'主軸',{size:15,fill:D.muted,anchor:dir>0?'end':'start'})+`<circle cx="${cx}" cy="${cy}" r="4" fill="${D.ink}"/>`+T(cx+10,cy+22,'光心（鏡心）',{size:15,fill:D.ink});
       const Fk=cc?Fo:Fi;h+=L(cx,470,Fk,470,{stroke:D.object,w:1.5})+L(cx,462,cx,478,{stroke:D.object,w:1.5})+L(Fk,462,Fk,478,{stroke:D.object,w:1.5})+T((cx+Fk)/2,462,`焦距 f = ${s.f} cm`,{size:15,fill:D.object,anchor:'middle',weight:700});
       if(fade>0)h+=T(Fk,cy-18,cc?'焦點':'焦點（虛）',{size:15,fill:D.object,anchor:'middle',weight:700});}
     if(!s.on)h+=T(450,40,'按「開燈」',{size:20,fill:D.muted,anchor:'middle'});
@@ -969,26 +988,28 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
     const hits=[];
     if(s.on){
       if(s.beam==='single')hits.push([oh,s.aim,D.object,3.5,true,1]);
-      else if(s.beam==='main'){hits.push([oh,oh,D.ray,3,true,1],[oh,0,D.second,3,true,1]);const y3=inf?null:f*oh/(f-u);if(!inf&&Math.abs(y3)<400)hits.push([oh,y3,D.third,3,true,1]);}
+      else if(s.beam==='main'){h+=L(cx,18,cx,482,{stroke:D.ray,w:1.2,dash:'3 6',op:.35});hits.push([oh,oh,D.ray,3,true,1],[oh,0,D.second,3,true,1]);const y3=inf?null:f*oh/(f-u);if(!inf&&Math.abs(y3)<400)hits.push([oh,y3,D.third,3,true,1]);}
       else for(const[y0,c,op]of[[oh,'#ffe8a5',.8],[oh/2,D.second,.6]])for(let i=0;i<11;i++)hits.push([y0,-72+i*14.4,c,1.6,false,op]);
       for(const[y0,yh,c,w,arrow,op]of hits){const stop=blk&&yh>0.01;h+=ray(stop?[P([-u,y0]),P([0,yh])]:[P([-u,y0]),P([0,yh]),P(out(y0,yh))],c,{w,arrow:arrow&&!stop,op});}
     }
-    const fade=fadeIn(),onStage=!inf&&X(v)>20&&X(v)<880,dim=blk?.5:1;
+    const fade=fadeIn(),onStage=!inf&&X(v)>20&&X(v)<880&&Y(m*oh)>20&&Y(m*oh)<480,dim=blk?.5:1;
     if(fade>0&&!inf&&v<0)for(const[y0,yh,c]of hits)if(!(blk&&yh>0.01))h+=L(X(0),Y(yh),X(v),Y(m*y0),{stroke:c,w:1.4,dash:'7 6',op:.75*fade});
+    /* 凹透鏡的主要光線：①的延長線通過同側焦點、③原本射向另一側焦點 */
+    if(fade>0&&s.type===-1&&s.beam==='main'&&!inf){h+=L(X(0),Y(oh),X(-s.f),cy,{stroke:D.ray,w:1.4,dash:'3 5',op:.7*fade});const y3=f*oh/(f-u);if(Math.abs(y3)<400)h+=L(X(0),Y(y3),X(s.f),cy,{stroke:D.third,w:1.4,dash:'3 5',op:.7*fade});}
     if(blk)h+=`<rect x="436" y="56" width="28" height="${cy-56}" rx="4" fill="#05080d" stroke="#56606e" stroke-width="2"/>`+T(470,80,'黑紙',{size:15,fill:D.muted});
     if(fade>0&&onStage)h+=`<g opacity="${fade*dim}">${vArrow(X(v),cy,Y(m*oh),D.image,{dash:v<0?'7 6':false})}</g>`+`<g opacity="${fade}">${T(X(v),Y(m*oh)+(m<0?30:-16),(v>0?'實像':'虛像')+(blk?'（完整、變暗）':''),{size:20,fill:D.image,anchor:'middle',weight:600})}</g>`;
     h+=`<g opacity="${s.on?1:.35}">${vArrow(X(-u),cy,Y(oh),D.object)}</g>`+T(X(-u),Y(oh)-18,'物',{size:20,fill:D.object,anchor:'middle'})+handle('obj',X(-u),cy,D.object)+handle('top',X(-u),Y(oh),D.object,10);
     if(s.on&&s.beam==='single')h+=handle('aim',X(0),Y(s.aim),D.object,11);
     if(!s.on)h+=T(450,480,'按「開燈」讓物體發出光線',{size:18,fill:D.muted,anchor:'middle'});
-    else if(fade>0&&inf)h+=T(450,480,'物體在焦點上：折射光平行，不成像',{size:19,fill:D.object,anchor:'middle'});else if(fade>0&&!onStage)h+=T(450,480,'像在畫面外，請看右側像距',{size:18,fill:D.image,anchor:'middle'});
+    else if(fade>0&&inf)h+=T(450,480,'物體在焦點上：折射光平行，不成像',{size:19,fill:D.object,anchor:'middle'});else if(fade>0&&!onStage)h+=T(450,480,'像太大或太遠，超出畫面（看右側數值）',{size:18,fill:D.image,anchor:'middle'});
     const prop=inf?'不成像':`${v>0?'實像・倒立':'虛像・正立'}・${Math.abs(Math.abs(m)-1)<1e-6?'等大':Math.abs(m)>1?'放大':'縮小'}`;
     const where=s.type===1?['2F 以外','2F 上','F 與 2F 之間','F 上','F 以內'][lensRow(u,s.f)]:'任何位置';
-    const reads=[['物體位置',where],['像距 v',inf?'無窮遠':v>0?`${num(v)} cm（另一側）`:`${num(-v)} cm（同側）`],['放大率',inf?'—':`${num(Math.abs(m),2)} 倍`],['成像',prop]];
-    if(blk)reads.push(['亮度','變暗（光少了一半）']);
+    const reads=!s.on?[['物體位置',where],['成像','（開燈後觀察）']]:[['物體位置',where],['像的位置',inf?'不成像':v>0?`透鏡另一側 ${num(v)} cm`:`和物體同側 ${num(-v)} cm`],['像高 ÷ 物高',inf?'—':`${num(Math.abs(m),2)} 倍`],['成像',prop]];
+    if(blk&&s.on)reads.push(['亮度','變暗（光少了一半）']);
     const rules=s.type===1?'①平行主軸 → 折射後通過<b>焦點</b><br>②通過<b>光心</b> → 直線前進<br>③通過焦點 → 折射後<b>平行主軸</b>':'①平行主軸 → 折射後發散，<b>延長線</b>通過同側焦點<br>②通過<b>光心</b> → 直線前進<br>③射向另一側焦點 → 折射後<b>平行主軸</b>';
-    const note=s.beam==='single'?'物體上同一點發出的光，穿過透鏡後都會經過（或延長經過）<b>同一個像點</b>。拖動透鏡上的圓圈試試。'
+    const note=inf?'物體在<b>焦點上</b>：同一點發出的光折射後互相平行，不會交在一點 → <b>不成像</b>。':s.beam==='single'?'物體上同一點發出的光，穿過透鏡後都會經過（或延長經過）<b>同一個像點</b>。拖動透鏡上的圓圈試試。'
       :s.beam==='full'?(blk?'遮住上半部後，物體<b>每一點</b>的光仍有一部分穿過下半部，還是會聚到同一個像點 → 像<b>仍然完整</b>，只是光變少、<b>變暗</b>。':'物體上每一點發出的光（黃：頂端、粉紅：中間），都會聚（或延長會聚）到像上<b>對應的一點</b> → 整個像。')
-      :inf?'物體在焦點上：三條光線折射後互相平行，<b>不成像</b>。':rules+(blk?'<br>上半部被遮住，還有其他光線通過 → 像還在。':'');
+      :rules+(blk?'<br>上半部被遮住，還有其他光線通過 → 像還在。':'');
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,note};},
   /* 光具座實驗：移動紙屏找清楚的像 */
   bench(s){
@@ -1030,8 +1051,9 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
 
 /* ===== 4-4 生活中的透鏡 ===== */
 life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機、放大鏡和眼睛：物體放在哪裡，就形成什麼樣的像。',dark:true,
-  q:s=>LIFE_Q[s.dev],
-  state:{on:true,prog:0,beam:'full',dev:'camera',u:900,glasses:false,focus:118,cu:900,pu:150,flip:false,mu:100},
+  q:s=>({html:qBlockHTML(LIFE_Q[s.dev])+quizHTML(s,LIFE_QUIZ)}),
+  qAction(s,v){quizAction(s,v,LIFE_QUIZ);},
+  state:{on:true,prog:0,beam:'full',dev:'camera',u:900,glasses:false,focus:118,cu:900,pu:150,flip:false,mu:100,qi:0,qp:null,qc:false,qs:false},
   controls:[LAMP,{...BEAM,show:s=>s.dev!=='proj'&&s.dev!=='mag'},
     {type:'seg',key:'dev',label:'裝置',options:[['camera','照相機'],['proj','投影機'],['mag','放大鏡'],['eye','眼睛'],['myopia','近視'],['hyper','遠視']],onChange:replay},
     {type:'range',key:'pu',label:'投影片 → 鏡頭（焦距 10 cm）',min:120,max:190,step:1,fmt:s=>`${(s.pu/10).toFixed(1)} cm`,show:s=>s.dev==='proj'},
@@ -1040,7 +1062,7 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機�
     {type:'range',key:'u',label:'物體距離',min:300,max:3000,step:10,fmt:s=>s.u>=2400?'很遠':s.u>=900?'中等':'近',show:s=>s.dev==='eye'},
     {type:'toggle',key:'glasses',label:'戴上眼鏡',show:s=>s.dev==='myopia'||s.dev==='hyper'},
     {type:'range',key:'cu',label:'物體距離',min:300,max:3000,step:10,fmt:s=>s.cu>=2400?'很遠':s.cu>=900?'中等':'近',show:s=>s.dev==='camera'},
-    {type:'range',key:'focus',label:'對焦：鏡頭到感光元件',min:100,max:170,step:1,fmt:s=>{const v=100*s.cu/(s.cu-100);return Math.abs(s.focus-v)<3?'清楚':'模糊';},show:s=>s.dev==='camera'}],
+    {type:'range',key:'focus',label:'對焦：鏡頭到感光元件',min:100,max:170,step:1,fmt:s=>camSharp(s)?'清楚':'模糊',show:s=>s.dev==='camera'}],
   tick:LIGHT_TICK,
   drag:{eobj:(p,s)=>{s.u=snap('u',560-p.x);},cobj:(p,s)=>{s.cu=snap('cu',(780-s.focus)-p.x);},slide:(p,s)=>{s.pu=snap('pu',260-p.x);},mobj:(p,s)=>{s.mu=snap('mu',560-p.x);}},
   /* 投影機：投影片在 F 與 2F 之間 → 倒立放大實像，所以投影片要倒著放 */
@@ -1086,7 +1108,7 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機�
     const trace=paraxTrace,lensShape=lensPath;
     const toPx=pts=>pts.map(([x,y])=>[x,Y(y)]);
     if(s.dev==='camera'){
-      const fl=100,xs=780,xl=xs-s.focus,u=s.cu,v=fl*u/(u-fl),blur=Math.abs(s.focus-v)*90/v,sharp=blur<3,ox=xl-u,oh=40;
+      const fl=100,xs=780,xl=xs-s.focus,u=s.cu,v=fl*u/(u-fl),blur=Math.abs(s.focus-v)*90/v,sharp=camSharp(s),ox=xl-u,oh=40;
       h+=`<rect x="${xl-14}" y="150" width="${xs-xl+30}" height="200" rx="14" fill="#1b2738" stroke="#5d7088" stroke-width="2"/><rect x="${xl-40}" y="180" width="30" height="140" rx="6" fill="#26354a" stroke="#5d7088"/>`+L(xs,165,xs,335,{stroke:'#8aa0b8',w:6})+T(xs,148,'感光元件',{size:14,fill:D.muted,anchor:'middle'});
       h+=lensShape(xl,fl,58);
       const ys=s.beam==='single'?[30]:[-45,-30,-15,0,15,30,45];
@@ -1101,8 +1123,8 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機�
     const X0=560,L0={eye:200,myopia:240,hyper:170}[s.dev],xr=X0+L0;
     let u,oh,fEye,lenses;
     if(s.dev==='eye'){u=s.u;oh=40;fEye=1/(1/u+1/L0);lenses=[{x:X0,f:fEye}];}
-    else if(s.dev==='myopia'){u=3000;oh=0;fEye=200;lenses=[{x:X0,f:fEye}];if(s.glasses){const Dv=1/(1/200-1/L0);lenses.unshift({x:X0-40,f:1/(1/(u-40)+1/-(Dv-40))});}}
-    else{u=520;oh=0;fEye=160;lenses=[{x:X0,f:fEye}];if(s.glasses){const Dv=1/(1/160-1/L0);lenses.unshift({x:X0-40,f:1/(1/(u-40)+1/-(Dv-40))});}}
+    else if(s.dev==='myopia'){u=3000;oh=0;fEye=200;lenses=[{x:X0,f:fEye}];if(s.glasses){const Dv=1/(1/200-1/L0);lenses.unshift({x:X0-70,f:1/(1/(u-70)+1/-(Dv-70))});}}
+    else{u=520;oh=0;fEye=160;lenses=[{x:X0,f:fEye}];if(s.glasses){const Dv=1/(1/160-1/L0);lenses.unshift({x:X0-70,f:1/(1/(u-70)+1/-(Dv-70))});}}
     const ox=X0-u,first=lenses[0].x;
     h+=`<ellipse cx="${(X0-24+xr)/2}" cy="${cy}" rx="${(xr-X0+24)/2+12}" ry="115" fill="#1a2536" stroke="#c9d6e6" stroke-width="2.5"/>`+`<path d="M${xr-4} ${cy-90}Q${xr+14} ${cy} ${xr-4} ${cy+90}" fill="none" stroke="#ff92bc" stroke-width="5"/>`+T(xr+18,cy-80,'視網膜',{size:14,fill:D.second});
     h+=lensShape(X0,fEye,58)+T(X0,cy-74,'水晶體',{size:14,fill:D.ray,anchor:'middle'});
@@ -1115,10 +1137,10 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機�
     if(oh===0&&conv!==null&&fade>0&&conv<xr-2)h+=`<circle cx="${conv}" cy="${cy}" r="5" fill="${D.object}" opacity="${fade}"/>`;
     if(s.dev==='eye'){if(fade>0)h+=`<g opacity="${fade}">${vArrow(xr-8,cy,Y(-oh*L0/u),D.image)}</g>`;if(ox>30)h+=`<g opacity="${s.on?1:.35}">${vArrow(ox,cy,Y(oh),D.object)}</g>`+handle('eobj',ox,cy,D.object);else h+=T(40,Y(oh)-10,`← ${u>=2400?'很遠':'較遠'}的物體`,{size:15,fill:D.object});}
     else if(ox>30)h+=`<circle cx="${ox}" cy="${cy}" r="7" fill="${s.on?D.object:'#56606e'}"/>`+T(ox,cy-16,'近處物體',{size:15,fill:D.object,anchor:'middle'});else h+=T(40,cy-14,'← 遠方物體',{size:15,fill:D.object});
-    if(s.dev==='eye')return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['水晶體',u<1200?'變厚（看近）':'較薄（看遠）'],['視網膜上的像','倒立・縮小・實像'],['畫面','清楚（自動調焦）']],
+    if(s.dev==='eye')return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['水晶體',u<900?'變厚（看近）':u<2400?'稍厚':'較薄（看遠）'],['視網膜上的像','倒立・縮小・實像'],['畫面','清楚（自動調焦）']],
       note:'眼睛像相機：<b>水晶體</b>是凸透鏡，在<b>視網膜</b>上形成倒立縮小的實像；看近時水晶體變厚。'};
     const where=conv===null?'—':Math.abs(conv-xr)<3?'視網膜上':conv<xr?'視網膜前方':'視網膜後方',ok=where==='視網膜上';
-    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:s.dev==='myopia'?[['眼球','太長（或水晶體太凸）'],['光會聚在',where],['看遠處',ok?'清楚':'模糊'],['矯正','凹透鏡（發散）']]:[['眼球','太短（或水晶體太扁）'],['光會聚在',where],['看近處',ok?'清楚':'模糊'],['矯正','凸透鏡（會聚）']],
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:s.dev==='myopia'?[['眼球','前後太長（也可能是水晶體太厚）'],['光會聚在',where],['看遠處',ok?'清楚':'模糊'],['矯正','凹透鏡（發散）']]:[['眼球','前後太短（也可能是水晶體太薄）'],['光會聚在',where],['看近處',ok?'清楚':'模糊'],['矯正','凸透鏡（會聚）']],
       note:s.dev==='myopia'?'近視：光會聚在視網膜<b>前方</b> → 戴<b>凹透鏡</b>讓光先發散一點。':'遠視：光會聚在視網膜<b>後方</b> → 戴<b>凸透鏡</b>幫忙會聚。'};}},
 /* ===== 11 顏色 ===== */
 color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光可以分開、也可以疊回來；物體的顏色看它透射或反射哪些色光。',dark:true,
@@ -1278,5 +1300,5 @@ window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與公式，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的眼睛與相機尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>RGB 是螢幕色彩值，不是光功率。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與公式，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>「透鏡成像 → 為什麼會偏折」在透鏡兩個球面各算一次折射，最外側的光會略偏離焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>RGB 是螢幕色彩值，不是光功率。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');

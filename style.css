@@ -222,3 +222,5 @@ dialog .small{font-size:13px;color:var(--muted)}
 .tab-tools{margin:0 0 8px}
 .question .ex-q+.ex-row .qopt{text-align:left}
 @media(max-width:760px){.ex-table{font-size:12.5px}.ex-table th,.ex-table td{padding:6px}}
+.ex-sep{border:0;border-top:1px dashed var(--amber-line);margin:16px 0 12px}
+.question:has(.ex-q) details{margin:6px 0 4px}
