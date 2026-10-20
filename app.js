@@ -433,20 +433,30 @@ echo:{group:1,n:'3-4',name:'聲音的傳播與應用',subtitle:'聲音在不同�
       note:`<b>距離 = 聲速 × 時間 ÷ 2</b><br>${num(v,0)} × ${t.toFixed(3)} ÷ 2 = ${s.d} m　（聲速：固體 ＞ 液體 ＞ 氣體）`};}},
 
 /* ===== 07 影子 ===== */
-shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿直線前進：用影子和針孔成像來證明。',dark:true,
-  q:s=>s.mode==='pinhole'&&s.view==='3d'?pinholeExample(s):s.mode==='pinhole'&&s.view==='sim'?simExample(s):['物體靠近點光源，屏幕上的影子會變大還是變小？','會變大。屏幕位置不變時，光源到物體的距離 a 減少，影子的放大倍數 D/a 增加。'],
+shadow:{group:2,n:'4-1',name:'光的傳播：影子、針孔、光速',subtitle:'光沿直線前進：用影子和針孔成像來證明；再比比看光在不同物質中跑多快。',dark:true,
+  q(s){if(s.mode==='speed')return this.speedQ[s.sv];if(s.mode!=='pinhole')return ['物體靠近點光源，屏幕上的影子會變大還是變小？','會變大。屏幕位置不變時，光源到物體的距離 a 減少，影子的放大倍數 D/a 增加。'];
+    return s.view==='3d'?pinholeExample(s):s.view==='sim'?simExample(s):['針孔變大，紙屏上的像會怎樣？','<b>更亮，但更模糊</b>。孔變大，物體上每一點的光穿過針孔後，在紙屏上變成較大的光點，光點互相重疊，像就模糊了；進來的光變多，所以更亮。<br>像的<b>大小</b>只由物距、像距決定（像高 ÷ 物高 = 像距 ÷ 物距），不會因為孔變大而改變。孔很小時，像的形狀也和孔的形狀無關。'];},
+  speedQ:{race:['光在哪一種物質中跑得最快？光速和什麼有關？','在<b>真空</b>中最快，約 3 × 10⁸ m/s；進入空氣、水、玻璃、鑽石會越來越慢。所以光速和光經過的<b>物質（介質）</b>有關。<br>聲音剛好相反：聲音不能在真空中傳播，在固體中反而最快（3-4）。'],
+    thunder:['看到閃電後 3 秒才聽到雷聲，打雷的地方大約多遠？','約 1 公里。閃電和雷聲同時發生，光幾乎立刻到達，所以 3 秒是聲音走的時間：340 m/s × 3 s ≈ 1020 m。'],
+    sun:['如果太陽突然熄滅，地球上的人多久後才會發現？','約 <b>8 分 20 秒</b>後。太陽光要走 1.5 × 10¹¹ m ÷ 3 × 10⁸ m/s = 500 秒才到地球；在這之前看到的，都是早已在路上的光。']},
   qAction(s,v){const[k,x]=v.split(':');if(k==='exS1'||k==='exS2'){s[k]=x;s.exSChk=false;return;}if(k==='scheck'){s.exSChk=true;return;}if(k==='ssol'){s.exSSol=!s.exSSol;return;}if(k==='sview'){s.tri3='pinhole';s.pd=10;s.ph3=6;s.pD=15;s.turnT=0;return;}if(k==='a'||k==='b'){s[k==='a'?'exA':'exB']=x;s.exChk=false;}else if(k==='check')s.exChk=true;else if(k==='sol')s.exSol=!s.exSol;
     else if(k==='view'){s.obj3='F';s.spin=false;s.insets=true;if(x==='A'){s.yaw=0;s.pitch=6;}else{s.yaw=180;s.pitch=6;}}},
-  state:{on:true,beam:'full',prog:0,mode:'shadow',src:'point',a:60,D:200,h:40,R:15,ang:-16,edges:true,pa:80,pb:60,ph:40,hole:1,tri:true,view:'2d',tri3:'define',k:2,overlap:false,stretch:'all',animK:null,pd:4,ph3:3,pD:8,turn:0,turnT:0,exS1:null,exS2:null,exSChk:false,exSSol:false,yaw:50,pitch:18,spin:false,rays3:true,insets:true,obj3:'man',exA:null,exB:null,exChk:false,exSol:false},
-  controls:[LAMP,BEAM,
-    {type:'seg',key:'mode',label:'實驗',options:[['shadow','影子'],['pinhole','針孔成像']],onChange:replay},
+  state:{on:true,beam:'full',prog:0,mode:'shadow',src:'point',a:60,D:200,h:40,R:15,ang:-16,edges:true,pa:80,pb:60,ph:40,hole:1,tri:true,view:'2d',tri3:'define',k:2,overlap:false,stretch:'all',animK:null,pd:4,ph3:3,pD:8,turn:0,turnT:0,exS1:null,exS2:null,exSChk:false,exSSol:false,yaw:50,pitch:18,spin:false,rays3:true,insets:true,obj3:'man',exA:null,exB:null,exChk:false,exSol:false,sv:'race',st:null,km:1.7},
+  controls:[
+    {type:'seg',key:'mode',label:'實驗',options:[['shadow','影子'],['pinhole','針孔成像'],['speed','光速']],onChange:s=>{replay(s);s.st=null;}},
+    {type:'seg',key:'view',label:'視角',options:[['2d','剖面圖'],['3d','立體 360°'],['sim','相似三角形']],show:s=>s.mode==='pinhole'},
+    {...LAMP,show:s=>s.mode==='shadow'||s.mode==='pinhole'&&s.view!=='sim'},
+    {...BEAM,show:s=>s.mode==='shadow'||s.mode==='pinhole'&&s.view==='2d'},
+    {type:'seg',key:'sv',label:'比一比',options:[['race','不同物質中的光速'],['thunder','閃電與雷聲'],['sun','太陽光到地球']],show:s=>s.mode==='speed',onChange:s=>{s.st=null;}},
+    {type:'range',key:'km',label:'打雷的地方離你',min:0.3,max:5,step:0.1,unit:' km',show:s=>s.mode==='speed'&&s.sv==='thunder'},
+    {type:'buttons',label:'',items:[['▶ 出發',s=>{s.st=0;}]],show:s=>s.mode==='speed'&&s.sv!=='thunder',primary:true},
+    {type:'buttons',label:'',items:[['⚡ 打雷',s=>{s.st=0;}]],show:s=>s.mode==='speed'&&s.sv==='thunder',primary:true},
     {type:'seg',key:'src',label:'光源',options:[['point','點光源'],['area','有大小的光源']],onChange:replay,show:s=>s.mode==='shadow'},
     {type:'range',key:'R',label:'光源大小',min:4,max:30,step:1,unit:' cm',show:s=>s.mode==='shadow'&&s.src==='area'},
     {type:'range',key:'a',label:'光源 → 物體 a',min:20,max:150,step:1,unit:' cm',show:s=>s.mode==='shadow'},
-    {type:'range',key:'D',label:'光源 → 屏幕 D',min:160,max:300,step:1,unit:' cm',show:s=>s.mode==='shadow'},
+    {type:'range',key:'D',label:'光源 → 屏幕 D',min:165,max:300,step:1,unit:' cm',show:s=>s.mode==='shadow'},
     {type:'range',key:'h',label:'物體高度 h',min:10,max:60,step:1,unit:' cm',show:s=>s.mode==='shadow'},
     {type:'toggle',key:'edges',label:'標出邊界光線',show:s=>s.mode==='shadow'&&s.beam==='full'},
-    {type:'seg',key:'view',label:'視角',options:[['2d','剖面圖'],['3d','立體 360°'],['sim','相似三角形']],show:s=>s.mode==='pinhole'},
     {type:'seg',key:'tri3',label:'相似三角形',options:[['define','什麼是相似'],['pinhole','用在針孔成像']],show:s=>s.mode==='pinhole'&&s.view==='sim'},
     {type:'seg',key:'stretch',label:'怎麼放大',options:[['all','每一邊都放大'],['one','只放大底邊']],show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='define'},
     {type:'range',key:'k',label:'放大倍數',min:0.5,max:2.5,step:0.5,unit:' 倍',show:s=>s.mode==='pinhole'&&s.view==='sim'&&s.tri3==='define'},
@@ -463,11 +473,11 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
     {type:'toggle',key:'rays3',label:'顯示光線',show:s=>s.mode==='pinhole'&&s.view==='3d'},
     {type:'toggle',key:'insets',label:'對照：直接看物體 vs 看紙屏上的像',show:s=>s.mode==='pinhole'&&s.view==='3d'},
     {type:'range',key:'pa',label:'物體 → 針孔（物距）',min:30,max:150,step:1,unit:' cm',show:s=>s.mode==='pinhole'&&s.view!=='sim'},
-    {type:'range',key:'pb',label:'針孔 → 屏幕（像距）',min:20,max:150,step:1,unit:' cm',show:s=>s.mode==='pinhole'&&s.view!=='sim'},
+    {type:'range',key:'pb',label:'針孔 → 紙屏（像距）',min:20,max:150,step:1,unit:' cm',show:s=>s.mode==='pinhole'&&s.view!=='sim'},
     {type:'range',key:'ph',label:'物高',min:10,max:50,step:1,unit:' cm',show:s=>s.mode==='pinhole'&&s.view==='2d'},
     {type:'range',key:'hole',label:'針孔大小',min:0.5,max:8,step:0.5,unit:' cm',show:s=>s.mode==='pinhole'&&s.view==='2d'},
     {type:'toggle',key:'tri',label:'顯示相似三角形',show:s=>s.mode==='pinhole'&&s.view==='2d'}],
-  tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.spin&&s.mode==='pinhole'&&s.view==='3d')s.yaw=(s.yaw+dt*25)%360;if(s.animK!==null){s.animK+=dt;if(s.animK>1.6)s.animK=null;}s.turn+=(s.turnT-s.turn)*Math.min(1,dt*2.5);},
+  tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.mode==='speed'&&s.st!==null&&s.st<(s.sv==='thunder'?s.km/0.34+1.2:6.5))s.st+=dt;if(s.spin&&s.mode==='pinhole'&&s.view==='3d')s.yaw=(s.yaw+dt*25)%360;if(s.animK!==null){s.animK+=dt;if(s.animK>1.6)s.animK=null;}s.turn+=(s.turnT-s.turn)*Math.min(1,dt*2.5);},
   drag:{obj:(p,s)=>{s.a=snap('a',(p.x-100)/(700/300));},top:(p,s)=>{s.h=snap('h',2*(250-p.y)/1.6);},screen:(p,s)=>{s.D=snap('D',(p.x-100)/(700/300));},aim:(p,s)=>{s.ang=clamp(deg(Math.atan2(p.y-250,p.x-100)),-40,40);},pobj:(p,s)=>{s.pa=snap('pa',(450-p.x)/2.5);},pscr:(p,s)=>{s.pb=snap('pb',(p.x-450)/2.5);},orbit:(p,s,c)=>{s.yaw=c.s0.yaw-(p.x-c.p0.x)*0.45;s.pitch=clamp(c.s0.pitch+(p.y-c.p0.y)*0.3,-60,75);s.spin=false;}},
   similar(s){
     /* 相似三角形：三種邊固定三種顏色（底藍、高綠、斜邊橘），同色＝互相對應 */
@@ -562,7 +572,7 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
     beginLight(s);
     const k=2.5,hx=450,cy=250,ox=hx-s.pa*k,sx=hx+s.pb*k,hp=s.ph*k,w=Math.max(1.5,s.hole*k/2),r=s.pb/s.pa;
     const top=[ox,cy-hp/2],bot=[ox,cy+hp/2],img=y=>cy-(y-cy)*r,atScr=(P,e)=>P[1]+(e-P[1])*(sx-P[0])/(hx-P[0]);
-    let h=`<rect x="${hx}" y="70" width="${sx-hx+8}" height="360" fill="#16202e" stroke="#5d7088" stroke-width="2"/>`+L(hx,70,hx,cy-w,{stroke:'#8aa0b8',w:7})+L(hx,cy+w,hx,430,{stroke:'#8aa0b8',w:7})+L(sx,80,sx,420,{stroke:'#d8cda4',w:6,op:.85})+T(hx,58,'針孔',{size:15,fill:D.muted,anchor:'middle'})+T(sx,58,'屏幕',{size:15,fill:D.muted,anchor:'middle'});
+    let h=`<rect x="${hx}" y="70" width="${sx-hx+8}" height="360" fill="#16202e" stroke="#5d7088" stroke-width="2"/>`+L(hx,70,hx,cy-w,{stroke:'#8aa0b8',w:7})+L(hx,cy+w,hx,430,{stroke:'#8aa0b8',w:7})+L(sx,80,sx,420,{stroke:'#d8cda4',w:6,op:.85})+T(hx,58,'針孔',{size:15,fill:D.muted,anchor:'middle'})+T(sx,58,'紙屏',{size:15,fill:D.muted,anchor:'middle'});
     let rs='';
     if(s.on){
       if(s.beam==='single')rs+=ray([top,[hx,cy],[sx,img(top[1])]],D.object,{w:3.5});
@@ -577,15 +587,60 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
     const H=s.ph*r,spotCm=s.hole*(s.pa+s.pb)/s.pa;
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['像高',`${num(H)} cm`],['像距 ÷ 物距',`${num(r,2)} 倍`],['像','倒立・'+(Math.abs(r-1)<1e-6?'等大':r>1?'放大':'縮小')],['清晰度',spotCm<1.6?'清楚':spotCm<4?'有點模糊':'模糊']],
       note:`像距是物距的 <b>${num(r,2)} 倍</b>，像高也是物高的 ${num(r,2)} 倍（兩個三角形形狀一樣）。針孔越大越亮，但越模糊。`};},
+  speed(s){
+    /* 光速：等長跑道比一比、閃電與雷聲、太陽光到地球（動畫時間是示意，畫面標出放慢或快轉幾倍） */
+    const t=s.st===null?0:s.st,go=s.st!==null,glow=(x,y,r=8)=>`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${2*r}" fill="#ffe8a5" opacity=".25"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#ffe8a5"/>`;let h='';
+    if(s.sv==='race'){
+      /* 跑道 3 m；真空中跑完畫成 2 秒（實際 1 億分之 1 秒 → 放慢 2 億倍）；速率單位 ×10⁸ m/s */
+      const x0=150,x1=690,half=t>=2,LANES=[['真空',3,'#05080d','3.00'],['空氣',2.999,MEDIA.air[2],'約 3.00'],['水',2.25,MEDIA.water[2],'2.25'],['玻璃',2,MEDIA.glass[2],'2.00'],['鑽石',1.24,MEDIA.diamond[2],'1.24']];
+      h+=T(450,44,half?'真空中的光到終點時，其他的光走到哪裡？':go?'跑道一樣長（3 m），哪一道的光先到終點？':'跑道一樣長（3 m）：先猜猜看，再按「▶ 出發」',{size:18,fill:D.ink,anchor:'middle',weight:700});
+      LANES.forEach(([name,v,c,txt],i)=>{const y=106+i*76,p=clamp(t*v/6,0,1),x=x0+(x1-x0)*p;
+        h+=`<rect x="${x0-14}" y="${y-24}" width="${x1-x0+28}" height="48" rx="10" fill="${c}" stroke="#3a4f6b" stroke-width="1.5"/>`+T(x0-28,y+6,name,{size:19,fill:D.ink,anchor:'end',weight:700})+T(x1+24,y+6,`${txt} × 10⁸ m/s`,{size:16,fill:D.ink});
+        if(i===0)for(let j=0;j<14;j++)h+=`<circle cx="${(x0+rnd(j)*(x1-x0)).toFixed(1)}" cy="${(y-18+rnd(j+40)*36).toFixed(1)}" r="1.2" fill="#ffffff" opacity=".6"/>`;
+        if(half&&v<2.99){const px=x0+(x1-x0)*v/3;h+=L(px,y-22,px,y+22,{stroke:'#ffe8a5',w:2,dash:'4 3',op:.8})+T(px,y-30,`${Math.round(v/3*100)}%`,{size:14,fill:'#ffe8a5',anchor:'middle',weight:700});}
+        h+=(go?L(Math.max(x0,x-70),y,x,y,{stroke:'#ffe8a5',w:6,op:.35}):'')+glow(x,y);});
+      h+=L(x1,70,x1,440,{stroke:'#ffffff',w:2,dash:'6 6',op:.6})+T(x1,462,'終點',{size:14,fill:D.muted,anchor:'middle'})+T(450,488,'動畫放慢了約 2 億倍：真空中跑 3 m，實際只要 1 億分之 1 秒',{size:14,fill:D.muted,anchor:'middle'});
+      return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['真空中的光速','約 3 × 10⁸ m/s'],['1 秒可以走','30 萬公里（繞地球約 7 圈半）'],['水中的光速','約真空的 3/4'],['影響光速的因素','介質（光經過的物質）']],
+        note:'光在<b>真空</b>中最快；進入空氣、水、玻璃、鑽石越來越慢 → <b>光速和介質有關</b>。<br>和聲音相反：聲音不能在真空中傳播（3-4）。'};
+    }
+    if(s.sv==='thunder'){
+      /* 真實時間：光幾乎立刻到，聲音每秒 340 m */
+      const d=s.km*1000,tS=d/340,bx=150,px=790,gy=400,heard=go&&t>=tS,rr=640*Math.min(t,tS)*340/d,fo=heard?clamp(1-(t-tS)/0.8,0,1):1;
+      if(go&&t<0.35)h+=`<rect x="0" y="0" width="900" height="500" fill="#dfe9ff" opacity="${((0.35-t)/0.35*0.35).toFixed(3)}"/>`;
+      if(go&&rr>0&&fo>0)for(let j=0;j<3;j++){const r=rr-j*28;if(r>0)h+=`<circle cx="${bx}" cy="${gy}" r="${r.toFixed(1)}" fill="none" stroke="${D.second}" stroke-width="3" opacity="${((0.9-j*0.28)*fo).toFixed(2)}"/>`;}
+      h+=`<rect x="0" y="${gy}" width="900" height="100" fill="#16202e"/>`+L(0,gy,900,gy,{stroke:'#5d7088',w:2});
+      h+=`<g fill="#56606e"><ellipse cx="${bx}" cy="86" rx="92" ry="34"/><ellipse cx="${bx-56}" cy="100" rx="52" ry="26"/><ellipse cx="${bx+60}" cy="102" rx="56" ry="24"/></g>`;
+      if(go&&t<0.6)h+=`<path d="M${bx+6} 116L${bx-22} 210L${bx+10} 222L${bx-18} 318L${bx+12} 330L${bx} ${gy}" fill="none" stroke="#fff6c8" stroke-width="5" stroke-linejoin="round" opacity="${(1-t/0.6).toFixed(2)}"/>`;
+      if(go&&t<1.5)h+=L(bx,250,px,326,{stroke:'#ffe8a5',w:2.5,dash:'8 6',op:1-t/1.5})+T((bx+px)/2,272,'光：幾乎立刻到達',{size:15,fill:'#ffe8a5',anchor:'middle',weight:700});
+      h+=`<circle cx="${px}" cy="326" r="14" fill="${D.ink}"/>`+L(px,340,px,372,{stroke:D.ink,w:5})+L(px,372,px-12,gy,{stroke:D.ink,w:5})+L(px,372,px+12,gy,{stroke:D.ink,w:5})+L(px-18,352,px+18,352,{stroke:D.ink,w:4})+T(px,300,'你',{size:15,fill:D.ink,anchor:'middle'});
+      if(heard)h+=T(px-20,262,'轟隆隆！',{size:22,fill:D.second,anchor:'end',weight:700});
+      h+=L(bx,440,px,440,{stroke:D.muted,w:1.5,dash:'5 5'})+L(bx,432,bx,448,{stroke:D.muted,w:2})+L(px,432,px,448,{stroke:D.muted,w:2})+T((bx+px)/2,468,`${num(s.km,1)} km = ${Math.round(d)} m`,{size:16,fill:D.muted,anchor:'middle'});
+      h+=T(870,60,!go?'按「⚡ 打雷」，看到閃電就開始數秒':heard?`${num(tS,1)} 秒後聽到雷聲`:`看到閃電後…… ${num(t,1)} 秒`,{size:20,fill:heard?D.second:D.ink,anchor:'end',weight:700})+T(870,86,'（真實速度，可以跟著一起數）',{size:14,fill:D.muted,anchor:'end'});
+      return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['光到達',`約 ${(d/3e8).toFixed(6)} 秒（幾乎立刻）`],['雷聲到達',`約 ${num(tS,1)} 秒後`],['秒數 × 340',`${num(tS,1)} × 340 ≈ ${Math.round(+tS.toFixed(1)*340)} m`]],
+        note:'閃電和雷聲<b>同時</b>發生，但光速（約 3 × 10⁸ m/s）比聲速（約 340 m/s）快了約 88 萬倍 → 先看到閃電，後聽到雷聲。<br><b>看到閃電後數幾秒 × 340 ≈ 打雷處的距離（公尺）</b>。'};
+    }
+    /* 太陽光到地球：500 秒畫成 5 秒（快轉 100 倍） */
+    const x0=150,x1=800,p=clamp(t/5,0,1),el=Math.round(p*500),done=go&&p>=1;
+    for(let j=0;j<40;j++)h+=`<circle cx="${(rnd(j)*900).toFixed(1)}" cy="${(rnd(j+70)*500).toFixed(1)}" r="1.1" fill="#ffffff" opacity=".45"/>`;
+    h+=`<circle cx="60" cy="250" r="120" fill="#ffb347" opacity=".18"/><circle cx="60" cy="250" r="86" fill="#ffcc6a"/>`+T(60,370,'太陽',{size:18,fill:D.object,anchor:'middle',weight:700});
+    h+=`<circle cx="${x1+22}" cy="250" r="20" fill="#4c85bb"/><path d="M${x1+10} 240q8 -6 14 2q-4 8 4 14q-10 6 -16 -2z" fill="#9be38b"/>`+T(x1+22,296,'地球',{size:18,fill:'#7fb3ff',anchor:'middle',weight:700});
+    if(go)h+=L(x0,250,x0+(x1-x0)*p,250,{stroke:'#ffe8a5',w:3,op:.5});h+=glow(x0+(x1-x0)*p,250,7);
+    h+=L(x0,400,x1+22,400,{stroke:D.muted,w:1.5,dash:'5 5'})+T((x0+x1)/2,426,'約 1.5 × 10¹¹ m（1.5 億公里）',{size:16,fill:D.muted,anchor:'middle'});
+    h+=T(450,80,!go?'太陽光要多久才到地球？先猜猜看，再按「▶ 出發」':done?'到了！共 500 秒 ≈ 8 分 20 秒':`已經過 ${el} 秒（${Math.floor(el/60)} 分 ${el%60} 秒）`,{size:20,fill:done?D.object:D.ink,anchor:'middle',weight:700})+T(450,476,'動畫快轉了 100 倍',{size:14,fill:D.muted,anchor:'middle'});
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['太陽到地球','約 1.5 × 10¹¹ m'],['光速','約 3 × 10⁸ m/s'],['時間 = 距離 ÷ 速率','1.5 × 10¹¹ ÷ (3 × 10⁸) = 500 秒'],['也就是','約 8 分 20 秒']],
+      note:'我們現在看到的太陽，是約 <b>8 分 20 秒前</b>發出的光。光速雖然很快，宇宙中的距離更遠。'};},
   render(s){
     if(s.mode==='pinhole')return this.pinhole(s);
+    if(s.mode==='speed')return this.speed(s);
     beginLight(s);
-    const k=700/300,vy=1.6,a=Math.min(s.a,s.D-15),Dd=s.D,R=s.src==='area'?s.R:0,PX=x=>100+x*k,PY=y=>250+y*vy;
+    /* D 最小 165、a 最大 150：物體一定在屏幕前 */
+    const k=700/300,vy=1.6,a=s.a,Dd=s.D,R=s.src==='area'?s.R:0,PX=x=>100+x*k,PY=y=>250+y*vy;
     const s1=-R,s2=R,ot=-s.h/2,ob=s.h/2,line=(y0,y1)=>x=>y0+(y1-y0)*x/a;
     const uU=line(s1,ot),uL=line(s2,ob),oU=line(s2,ot),oL=line(s1,ob),sx=PX(Dd),ox=PX(a);
-    const trace=(y0,ang)=>{const dx=Math.cos(ang),dy=Math.sin(ang),ty=y0+dy*(ox-100)/dx;if(ty>=PY(ot)&&ty<=PY(ob))return{pts:[[100,y0],[ox,ty]],hit:true};return{pts:[[100,y0],[sx,y0+dy*(sx-100)/dx]],hit:false};};
-    let rays='',blocked=false,spot=null;
-    if(s.on&&s.beam==='single'){const t=trace(250,rad(s.ang));blocked=t.hit;rays+=ray(t.pts,'#ffe8a5',{w:3.5});if(!t.hit)spot=t.pts[1];}
+    /* 屏幕只在 y 30～470：超出就從旁邊經過 */
+    const trace=(y0,ang)=>{const dx=Math.cos(ang),dy=Math.sin(ang),ty=y0+dy*(ox-100)/dx,sy=y0+dy*(sx-100)/dx;if(ty>=PY(ot)&&ty<=PY(ob))return{pts:[[100,y0],[ox,ty]],hit:true};if(sy<30||sy>470)return{pts:[[100,y0],[900,y0+dy*800/dx]],hit:false,miss:true};return{pts:[[100,y0],[sx,sy]],hit:false};};
+    let rays='',blocked=false,miss=false,spot=null;
+    if(s.on&&s.beam==='single'){const t=trace(250,rad(s.ang));blocked=t.hit;miss=!!t.miss;rays+=ray(t.pts,'#ffe8a5',{w:3.5});if(!t.hit&&!t.miss)spot=t.pts[1];}
     else if(s.on){const ys=R>0?[PY(s1),250,PY(s2)]:[250];for(const y0 of ys){const n=R>0?13:25,a0=Math.atan2(36-y0,sx-100),a1=Math.atan2(464-y0,sx-100);for(let i=0;i<n;i++)rays+=ray(trace(y0,a0+(a1-a0)*i/(n-1)).pts,'#ffe8a5',{w:1.6,op:R>0?.4:.55,arrow:false});}}
     const fade=s.beam==='full'?fadeIn():0,lit=fade>0;
     let h=`<rect x="${sx}" y="30" width="16" height="440" rx="4" fill="${lit?'#d8cda4':'#5d7088'}"/>`;
@@ -611,16 +666,18 @@ shadow:{group:2,n:'4-1',name:'光的直進：影子與針孔',subtitle:'光沿�
     h+=L(100,462,ox,462,{stroke:D.object,w:1.5,dash:'5 5'})+T((100+ox)/2,456,`a = ${a} cm`,{size:15,fill:D.object,anchor:'middle'})+L(100,488,sx,488,{stroke:D.muted,w:1.5,dash:'5 5'})+T((100+sx)/2+60,483,`D = ${Dd} cm`,{size:15,fill:D.muted,anchor:'middle'});
     if(!s.on)h+=T(450,250,'按「開燈」',{size:22,fill:D.muted,anchor:'middle'});
     let reads=R>0?[['本影高度',umbraH>0?num(umbraH)+' cm':'沒有本影'],['半影寬度（單側）',num((oL(Dd)-oU(Dd)-umbraH)/2)+' cm']]:[['影子高度 H',num(s.h*Dd/a)+' cm'],['放大倍數',num(Dd/a,2)+' 倍']];
-    if(s.beam==='single')reads=[['這束光',!s.on?'—':blocked?'被物體擋住':'照到屏幕'],...reads];
+    if(s.beam==='single')reads=[['這束光',!s.on?'—':blocked?'被物體擋住':miss?'沒照到屏幕（從旁邊經過）':'照到屏幕'],...reads];
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,
       note:s.beam==='single'?'光在同一介質中<b>沿直線</b>前進。拖動光束旁的圓圈改變方向。':R>0?'光源有大小 → 完全照不到的<b>本影</b>＋部分照到的<b>半影</b>':`被擋住的光到不了屏幕 → 影子。<b>H / h = D / a</b>`};}},
 
 /* ===== 08 平面鏡 ===== */
-mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = 光進入眼睛。觀察反射定律、光的可逆、鏡面反射與漫反射。',dark:true,
-  q:['物體向鏡面靠近 10 cm，物與像的距離改變多少？','像也向鏡面靠近 10 cm，所以物與像的距離減少 20 cm。'],
+mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = 光進入眼睛。觀察反射定律、光的可逆、單向反射與漫射。',dark:true,
+  q:s=>s.mode==='diffuse'?['為什麼教室各個位置的同學都看得到黑板上的字，有些位置卻會看到黑板「反光」？','黑板和粉筆字的表面粗糙，光照到後發生<b>漫射</b>，反射光射向各方向，所以每個位置都有光進入眼睛。<br>「反光」是黑板較光滑的地方發生<b>單向反射</b>，反射光集中射向某個方向，坐在那裡的同學眼睛收到很強的光，就看不清楚字。兩種情形的每一小塊表面都遵守反射定律。']
+    :s.mode==='rotate'?['入射光不動，把平面鏡轉 10°，反射光會轉幾度？','<b>20°</b>。鏡面轉 10°，法線也跟著轉 10°；入射角、反射角各改變 10°，所以反射光一共轉 <b>2 × 10° = 20°</b>。可以按「▶ 播放轉動」驗證。']
+    :['物體向鏡面靠近 10 cm，物與像的距離改變多少？','像也向鏡面靠近 10 cm，所以物與像的距離減少 20 cm。'],
   state:{on:true,beam:'full',prog:0,mode:'plane',d:55,h:60,ex:80,ey:110,eye:true,ext:true,hit:170,rev:false,surf:'rough',normals:true,zoom:0,zoomT:0,pick:4,mag:true,i0:40,rot:15,ghost:true,anim:null},
   controls:[LAMP,{...BEAM,show:s=>s.mode!=='rotate'},
-    {type:'seg',key:'mode',label:'實驗',options:[['plane','平面鏡成像'],['diffuse','鏡面 vs 漫反射'],['rotate','鏡面旋轉']],onChange:replay},
+    {type:'seg',key:'mode',label:'實驗',options:[['plane','平面鏡成像'],['diffuse','單向反射 vs 漫射'],['rotate','鏡面旋轉（延伸）']],onChange:replay},
     {type:'range',key:'i0',label:'原來的入射角',min:10,max:60,step:1,unit:'°',show:s=>s.mode==='rotate'},
     {type:'range',key:'rot',label:'鏡面轉動 θ',min:-30,max:30,step:1,unit:'°',show:s=>s.mode==='rotate'},
     {type:'buttons',label:'',items:[['▶ 播放轉動',s=>{s.anim=0;}]],show:s=>s.mode==='rotate',primary:true},
@@ -658,8 +715,10 @@ mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = �
     if(B.back)h+=T(450,470,'光照到鏡子背面了，轉小一點',{size:18,fill:D.second,anchor:'middle'});
     h+=`<circle cx="${S[0]}" cy="${S[1]}" r="9" fill="${s.on?'#ffe8a5':'#56606e'}"/>`+handle('turn',...at(B.m,200),D.ray,12)+`<circle cx="${P[0]}" cy="${P[1]}" r="5" fill="${D.ink}"/>`;
     if(!s.on)h+=T(450,80,'按「開燈」',{size:20,fill:D.muted,anchor:'middle'});
-    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['鏡面轉了',`${tr}°`],['法線也轉了',`${tr}°`],['入射角',`${s.i0}° → ${num(B.inc,0)}°`],['反射光轉了',`${2*tr}°`]],
-      note:'入射光不動，鏡面轉 θ → 法線也轉 θ → 入射角、反射角<b>各</b>改變 θ → 反射光一共轉 <b>2θ</b>。'};},
+    /* θ 為正時法線轉向入射光；θ 大於原入射角就轉過頭，入射光跑到法線另一側 */
+    const cross=!B.back&&s.i0-th<-0.5;
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['鏡面轉了',`${tr}°`],['法線也轉了',`${tr}°`],['入射角',`${s.i0}° → ${num(B.inc,0)}°${cross?'（在法線另一側）':''}`],['反射光轉了',`${2*tr}°`]],
+      note:'入射光不動，鏡面轉 θ → <b>法線轉 θ</b> → 反射光一共轉 <b>2θ</b>。'+(cross?`<br>這次法線轉過了入射光，入射光跑到法線的<b>另一側</b>：入射角 = ${tr}° − ${s.i0}° = ${num(B.inc,0)}°，反射光仍然轉 2θ。`:'<br>入射角、反射角各改變 θ，合起來就是 2θ。')};},
   diffuse(s){
     beginLight(s);
     /* 表面由很多小平面組成；粗糙表面每片傾斜不同。放大倍率只影響「畫出來的凹凸」，反射永遠用真實的小平面 */
@@ -695,8 +754,8 @@ mirror:{group:2,n:'4-2',name:'光的反射與平面鏡',subtitle:'看得見 = �
     }
     h+=T(450,446,smooth?'光滑表面（鏡子）':z<0.15?'粗糙表面：肉眼看起來平平的':'粗糙表面放大：其實凹凸不平',{size:17,fill:D.muted,anchor:'middle'});
     if(!s.on)h+=T(450,200,'按「開燈」',{size:20,fill:D.muted,anchor:'middle'});
-    const note=smooth?'光滑表面每一小塊的方向都一樣 → 反射光整齊平行（<b>鏡面反射</b>），所以鏡子能成像。':z<0.15?'看起來平平的，反射光卻射向各處……按「放大」看看表面！':'每一小塊都是一片<b>小平面鏡</b>，都遵守<b>入射角 = 反射角</b>；只是每塊方向不同 → 反射光射向各方向（<b>漫反射</b>）。';
-    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['表面',smooth?'光滑':'粗糙'],['反射光',smooth?'平行射出（鏡面反射）':'射向各方向（漫反射）'],['選中的這一點',g?`入射角 = 反射角 = ${g.th.toFixed(0)}°`:'—']],note};},
+    const note=smooth?'光滑表面每一小塊的方向都一樣 → 反射光整齊平行，叫做<b>單向反射（鏡面反射）</b>，所以鏡子能成像。':z<0.15?'看起來平平的，反射光卻射向各處……按「放大」看看表面！':'每一小塊都是一片<b>小平面鏡</b>，都遵守<b>入射角 = 反射角</b>；只是每塊方向不同 → 反射光射向各方向，叫做<b>漫射</b>（漫反射）。';
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['表面',smooth?'光滑':'粗糙'],['反射光',smooth?'平行射出（單向反射）':'射向各方向（漫射）'],['選中的這一點',g?`入射角 = 反射角 = ${g.th.toFixed(0)}°`:'—']],note};},
   render(s){
     if(s.mode==='diffuse')return this.diffuse(s);
     if(s.mode==='rotate')return this.rotate(s);
@@ -732,52 +791,57 @@ curved:{group:2,n:'4-2',name:'凹面鏡與凸面鏡',subtitle:'從每一條光�
     {type:'seg',key:'type',label:'面鏡',options:[[1,'凹面鏡'],[-1,'凸面鏡']],onChange:replay},
     {type:'seg',key:'beam',label:'光線',options:[['single','單束光'],['parallel','平行光'],['main','主要光線'],['full','全光']],onChange:replay},
     {type:'toggle',key:'normals',label:'顯示法線（都指向球心 C）',show:s=>s.beam==='single'||s.beam==='parallel'},
-    {type:'range',key:'u',label:'物距 u',min:20,max:360,step:1,unit:' cm',show:s=>s.beam==='main'||s.beam==='full'},
-    {type:'range',key:'f',label:'焦距 |f|',min:40,max:140,step:1,unit:' cm',show:s=>s.beam==='main'||s.beam==='full'},
+    {type:'range',key:'u',label:'物距',min:20,max:360,step:1,unit:' cm',show:s=>s.beam==='main'||s.beam==='full'},
+    {type:'range',key:'f',label:'焦距',min:40,max:140,step:1,unit:' cm',show:s=>s.beam==='main'||s.beam==='full'},
     {type:'range',key:'oh',label:'物高',min:10,max:50,step:1,unit:' cm',show:s=>s.beam==='main'||s.beam==='full'},
-    {type:'buttons',label:'跳到關鍵位置',items:[['u > 2f',s=>{s.u=snap('u',s.f*2.6);}],['u = 2f',s=>{s.u=snap('u',s.f*2);}],['f < u < 2f',s=>{s.u=snap('u',s.f*1.5);}],['u = f',s=>{s.u=snap('u',s.f);}],['u < f',s=>{s.u=snap('u',s.f*0.55);}]],show:s=>s.type===1&&(s.beam==='main'||s.beam==='full')}],
+    {type:'buttons',label:'物體放在',items:[['2F 以外',s=>{s.u=snap('u',s.f*2.6);}],['2F 上',s=>{s.u=snap('u',s.f*2);}],['F 與 2F 之間',s=>{s.u=snap('u',s.f*1.5);}],['F 上',s=>{s.u=snap('u',s.f);}],['F 以內',s=>{s.u=snap('u',s.f*0.55);}]],show:s=>s.type===1&&(s.beam==='main'||s.beam==='full')}],
   tick:LIGHT_TICK,
   drag:{hit:(p,s)=>{s.hy=clamp(250-p.y,-150,150);},obj:(p,s)=>{s.u=snap('u',(600-p.x)/1.15);},top:(p,s)=>{s.oh=snap('oh',(250-p.y)/2.4);}},
   render(s){
     beginLight(s);const cy=250,cc=s.type===1;let h=L(15,cy,885,cy,{stroke:D.muted,w:1.5,dash:true});
     if(s.beam==='single'||s.beam==='parallel'){
-      /* 真實球面：每一點的法線都通過球心 */
-      const R=520,V=760,Cx=cc?V-R:V+R,arcX=dy=>cc?Cx+Math.sqrt(R*R-dy*dy):Cx-Math.sqrt(R*R-dy*dy),Fx=cc?V-R/2:V+R/2;
+      /* 真實球面：每一點的法線都通過球心；凸面鏡往左放，讓鏡後的 F 留在畫面內 */
+      const R=520,V=cc?760:540,Cx=cc?V-R:V+R,arcX=dy=>cc?Cx+Math.sqrt(R*R-dy*dy):Cx-Math.sqrt(R*R-dy*dy),Fx=cc?V-R/2:V+R/2;
       let arc='';for(let dy=-175;dy<=175;dy+=5)arc+=(dy===-175?'M':'L')+arcX(dy).toFixed(1)+' '+(cy-dy);
       for(let dy=-170;dy<=170;dy+=17){const x=arcX(dy);h+=L(x+3,cy-dy,x+13,cy-dy-8,{stroke:'#6f8196',w:1.5});}
       h+=`<path d="${arc}" fill="none" stroke="${D.ray}" stroke-width="5"/>`;
-      h+=`<circle cx="${Fx}" cy="${cy}" r="5" fill="${D.object}"/>`+T(Fx,cy+28,'F',{size:17,fill:D.object,anchor:'middle',weight:700});
+      h+=`<circle cx="${Fx}" cy="${cy}" r="5" fill="${D.object}"/>`+T(Fx,cy+28,cc?'F':'F（虛焦點）',{size:17,fill:D.object,anchor:'middle',weight:700});
       h+=Cx<880?`<circle cx="${Cx}" cy="${cy}" r="5" fill="${D.muted}"/>`+T(Cx,cy+28,'C（球心）',{size:15,fill:D.muted,anchor:'middle'}):T(885,40,'C 在右方畫面外 →',{size:14,fill:D.muted,anchor:'end'});
-      const hs=s.beam==='single'?[s.hy]:[-150,-112.5,-75,-37.5,0,37.5,75,112.5,150];let rays='',exts='',norms='',ang=0;
+      /* 平行光只取主軸附近 ±100，反射後都經過 F */
+      const hs=s.beam==='single'?[s.hy]:[-100,-75,-50,-25,0,25,50,75,100];let rays='',exts='',norms='',ang=0;
       for(const dy of hs){const y=cy-dy,x=arcX(dy),n=cc?[(Cx-x)/R,(cy-y)/R]:[(x-Cx)/R,(y-cy)/R],dot=n[0],r=[1-2*dot*n[0],-2*dot*n[1]],t=(x-20)/-r[0],end=[x+r[0]*t,y+r[1]*t];
         rays+=ray([[20,y],[x,y],end],s.beam==='single'?D.object:'#ffe8a5',{w:s.beam==='single'?3.5:2,arrow:s.beam==='single',op:s.beam==='single'?1:.85});
-        if(!cc)exts+=L(x,y,x-r[0]*200,y-r[1]*200,{stroke:'#ffe8a5',w:1.4,dash:'6 6',op:.7});
+        if(!cc)exts+=L(x,y,Fx,y-r[1]*(Fx-x)/-r[0],{stroke:'#ffe8a5',w:1.4,dash:'6 6',op:.7});
         if(s.normals)norms+=cc?L(x,y,Cx,cy,{stroke:D.muted,w:1.2,dash:'3 5',op:.55}):L(x,y,x+(x-Cx)*-0.4,y+(y-cy)*-0.4,{stroke:D.muted,w:1.2,dash:'3 5',op:.55})+L(x,y,x+n[0]*60,y+n[1]*60,{stroke:D.muted,w:1.2,dash:'3 5',op:.55});
         if(s.beam==='single'){ang=deg(Math.acos(Math.abs(n[0])));const pp=[-n[1],n[0]],side=Math.sign(-pp[0])||1,at=(sg)=>[x+n[0]*85+pp[0]*sg*side*22,y+n[1]*85+pp[1]*sg*side*22+5];
           if(dy!==0&&arrived()){const[a1,a2]=at(1),[b1,b2]=at(-1);h+=T(a1,a2,`入 ${ang.toFixed(0)}°`,{size:14,fill:D.object,anchor:'middle'})+T(b1,b2,`反 ${ang.toFixed(0)}°`,{size:14,fill:D.ink,anchor:'middle'});}}}
       const fade=fadeIn();h+=norms+rays;if(!cc&&fade>0)h+=`<g opacity="${fade}">${exts}</g>`;
       if(s.beam==='single')h+=handle('hit',arcX(s.hy),cy-s.hy,D.object,11);
       if(!s.on)h+=T(300,120,'按「開燈」',{size:20,fill:D.muted,anchor:'middle'});
-      const reads=s.beam==='single'?[['入射角 = 反射角',`${ang.toFixed(1)}°`],['這點的法線','通過球心 C'],['焦點 F','鏡面到 C 的一半']]:[['平行光反射後',cc?'會聚於 F':'散開'],['焦點種類',cc?'實焦點':'虛焦點（鏡後）'],['F 的位置','鏡面與 C 的中點']];
+      const reads=s.beam==='single'?[['入射角 = 反射角',`${ang.toFixed(1)}°`],['這點的法線','通過球心 C'],['焦點 F','鏡面到 C 的一半']]:[['平行光反射後',!s.on?'（開燈後觀察）':cc?'會聚於 F':'散開'],['焦點種類',cc?'實焦點':'虛焦點（鏡後）'],['F 的位置','鏡面與 C 的中點']];
       return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,
-        note:s.beam==='single'?'拖動鏡面上的圓圈：每一點的法線方向不同，但都遵守<b>入射角 = 反射角</b>。':cc?'每條光都遵守反射定律；因為法線都指向 C，反射光剛好都經過 <b>F</b>。邊緣的光略偏離 F（球面像差）。':'反射光散開，它們的<b>反向延長線</b>交於鏡後的 F（虛焦點）。'};
+        note:s.beam==='single'?'拖動鏡面上的圓圈：每一點的法線方向不同，但都遵守<b>入射角 = 反射角</b>。':cc?'每條光都遵守反射定律；因為法線都指向 C，反射光都經過 <b>F</b>。<small>（延伸：離主軸很遠的光會稍微偏離 F，叫球面像差。）</small>':'反射光散開，它們的<b>反向延長線</b>交於鏡後的 F（虛焦點）。'};
     }
     /* 成像：近軸光線 */
     const V=600,f=s.type*s.f,u=s.u,oh=s.oh,inf=Math.abs(u-f)<1e-9,v=inf?null:f*u/(u-f),m=inf?null:-v/u,X=d=>V-d*1.15,Y=y=>cy-y*2.4,E=(V-20)/1.15,P=([d,y])=>[X(d),Y(y)],outEnd=yh=>[E,yh+(inf?-oh/u:(m*oh-yh)/v)*E];
-    for(const k of[1,2]){const d=k*f,x=X(d);h+=L(x,cy-7,x,cy+7,{stroke:D.muted,w:2})+T(x,cy+28,k===1?'F':'C',{size:15,fill:D.muted,anchor:'middle'});}
+    for(const k of[1,2]){const d=k*f,x=X(d);h+=L(x,cy-7,x,cy+7,{stroke:D.muted,w:2})+T(x,cy+28,k===1?'F':'C（2F）',{size:15,fill:D.muted,anchor:'middle'});}
     h+=`<path d="M${V+(cc?-12:12)} 60Q${V+(cc?12:-12)} 250 ${V+(cc?-12:12)} 440" fill="none" stroke="${D.ray}" stroke-width="5"/>`;for(let y=70;y<=430;y+=20)h+=L(V+8,y,V+18,y-8,{stroke:'#6f8196',w:1.5});
     const hits=[];
-    if(s.on){if(s.beam==='main'){hits.push([oh,D.ray]);const y2=inf?null:f*oh/(f-u);if(!inf&&Math.abs(y2)<400)hits.push([y2,D.third]);if(Math.abs(2*f-u)>1e-6){const yc=oh*2*f/(2*f-u);if(Math.abs(yc)<400)hits.push([yc,D.second]);}}
+    if(s.on){if(s.beam==='main'){hits.push([oh,D.ray,0]);const y2=inf?null:f*oh/(f-u);if(!inf&&Math.abs(y2)<400)hits.push([y2,D.third,f]);if(Math.abs(2*f-u)>1e-6){const yc=oh*2*f/(2*f-u);if(Math.abs(yc)<400)hits.push([yc,D.second,2*f]);}}
       else for(let i=0;i<11;i++)hits.push([-72+i*14.4,'#ffe8a5']);
       for(const[yh,c]of hits)h+=ray([P([u,oh]),P([0,yh]),P(outEnd(yh))],c,{w:s.beam==='main'?3:1.8,arrow:s.beam==='main',op:s.beam==='main'?1:.8});}
-    const fade=fadeIn(),onStage=!inf&&X(v)>20&&X(v)<880;
+    const fade=fadeIn(),onStage=!inf&&X(v)>20&&X(v)<880,tipY=inf?cy:Y(m*oh);
     if(fade>0&&!inf&&v<0)for(const[yh,c]of hits)h+=L(X(0),Y(yh),X(v),Y(m*oh),{stroke:c,w:1.6,dash:'7 6',op:.85*fade});
+    /* 凸面鏡：平行光的延長線通過鏡後 F；射向 F、C 的光，虛線畫到鏡後 */
+    if(fade>0&&!cc&&s.beam==='main')for(const[yh,c,d]of hits)h+=d?L(X(0),Y(yh),X(d),cy,{stroke:c,w:1.4,dash:'3 5',op:.7*fade}):L(X(v),Y(m*oh),X(f),cy,{stroke:c,w:1.6,dash:'7 6',op:.85*fade});
     if(fade>0&&onStage)h+=`<g opacity="${fade}">${vArrow(X(v),cy,Y(m*oh),D.image,{dash:v<0?'7 6':false})}${T(X(v),Y(m*oh)+(m<0?30:-16),v>0?'實像':'虛像',{size:20,fill:D.image,anchor:'middle',weight:600})}</g>`;
     h+=`<g opacity="${s.on?1:.35}">${vArrow(X(u),cy,Y(oh),D.object)}</g>`+T(X(u),Y(oh)-18,'物',{size:20,fill:D.object,anchor:'middle'})+handle('obj',X(u),cy,D.object)+handle('top',X(u),Y(oh),D.object,10);
-    if(fade>0&&inf)h+=T(450,480,'物體在焦點上：反射光平行，不成像',{size:19,fill:D.object,anchor:'middle'});else if(fade>0&&!onStage)h+=T(450,480,'像在畫面外，請看右側像距',{size:18,fill:D.image,anchor:'middle'});
-    const prop=inf?'不成像':`${v>0?'實像・倒立':'虛像・正立'}・${Math.abs(Math.abs(m)-1)<1e-6?'等大':Math.abs(m)>1?'放大':'縮小'}`;
-    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['像的位置',inf?'無窮遠':v>0?`鏡前 ${num(v)} cm`:`鏡後 ${num(-v)} cm`],['放大率',inf?'—':`${num(Math.abs(m),2)} 倍`],['成像',prop]],
-      note:s.beam==='main'?'平行主軸 → 經過 F；經過 F → 平行主軸；經過 C → 原路反射。':'物體同一點發出的光，反射後（或延長線）交在同一點 → 像。'};}},
+    if(fade>0&&inf)h+=T(450,480,'物體在焦點上：反射光平行，不成像',{size:19,fill:D.object,anchor:'middle'});else if(fade>0&&!onStage)h+=T(450,480,'像在畫面外，請看右側「像的位置」',{size:18,fill:D.image,anchor:'middle'});
+    else if(fade>0&&(tipY<20||tipY>480))h+=T(450,tipY>480?36:480,'像太大，超出畫面（看右側數值）',{size:18,fill:D.image,anchor:'middle'});
+    const prop=inf?'不成像':`${v>0?'實像・倒立':'虛像・正立'}・${Math.abs(Math.abs(m)-1)<1e-6?'等大':Math.abs(m)>1?'放大':'縮小'}`,off='（開燈後觀察）';
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['像的位置',!s.on?off:inf?'不成像':v>0?`鏡前 ${num(v)} cm`:`鏡後 ${num(-v)} cm`],['像高 ÷ 物高',!s.on||inf?'—':`${num(Math.abs(m),2)} 倍`],['成像',!s.on?'—':prop]],
+      note:s.beam==='main'?(cc?'平行主軸的光 → 反射後經過 F；經過 F 的光 → 反射後平行主軸；經過 C 的光 → 原路反射。':'平行主軸的光 → 反射光的<b>反向延長線</b>通過鏡後的 F；射向鏡後 F 的光 → 反射後平行主軸；射向 C 的光 → 原路反射。凸面鏡的像都是<b>正立、縮小的虛像</b>。')
+        :inf?'物體在焦點上：反射光互相平行，不會交在一點 → <b>不成像</b>。':'物體同一點發出的光，反射後（或延長線）交在同一點 → 像。'};}},
 /* ===== 09 折射 ===== */
 refraction:{group:2,n:'4-3',name:'光的折射與全反射',subtitle:'單束光看折射角；全光從一點發光，找出全反射從哪裡開始。',dark:true,
   q:['光由水射向空氣，一定會折射出去嗎？','不一定。由折射率大的介質射向折射率小的介質，入射角大於臨界角時，就發生全反射。'],
