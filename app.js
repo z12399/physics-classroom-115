@@ -916,7 +916,7 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
   tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.flashT>0)s.flashT-=dt;
     if(s.sweep!==null){s.sweep=Math.min(1,s.sweep+dt/7);const e=1-Math.pow(1-s.sweep,2),to=s.type===1?s.f*1.08:20;s.u=snap('u',360-(360-to)*e);if(s.sweep>=1)s.sweep=null;}},
   drag:{obj:(p,s)=>{s.u=snap('u',(450-p.x)/1.15);s.sweep=null;},top:(p,s)=>{s.oh=snap('oh',(250-p.y)/2.4);},aim:(p,s)=>{s.aim=clamp((250-p.y)/2.4,-76,76);},
-    wy:(p,s)=>{s.wy=clamp(250-p.y,-140,140);},paper:(p,s)=>{s.pd=snap('pd',(p.x-450)*(s.side==='left'?1:-1)/2.4);},
+    wy:(p,s)=>{s.wy=clamp(250-p.y,-118,118);},paper:(p,s)=>{s.pd=snap('pd',(p.x-450)*(s.side==='left'?1:-1)/2.4);},
     cand:(p,s)=>{s.bu=snap('bu',(450-p.x)/8);},scr:(p,s)=>{s.bv=snap('bv',(p.x-450)/8);}},
   /* 為什麼會偏折：真實的球面（或切成一疊三稜鏡），在兩個表面各用一次折射定律 */
   why(s){
