@@ -43,7 +43,7 @@ const COLOR_Q={
   prism:['白光經過三稜鏡，哪一種色光偏折最多？如果改用紅光照射三稜鏡，還會再分出其他顏色嗎？','<b>紫光</b>偏折最多、紅光最少。紅光是單色光，通過三稜鏡只會偏折，<b>不會</b>再分散。可見顏色不是三稜鏡加上去的，白光本來就含有各種色光。（切到「單色光」，或打開「倒置的三稜鏡」試試看）'],
   rainbow:['早上出太陽時，要往哪個方向看才可能看到彩虹？彩虹最外圈是什麼顏色？','要<b>背對太陽</b>：早上太陽在東方，彩虹出現在<b>西方</b>（傍晚則在東方）。主虹<b>外圈紅、內圈紫</b>。背對太陽用水管噴出水霧，也能做出人造彩虹。'],
   clear:['白光穿過紅色玻璃紙後，再穿過綠色玻璃紙，屏幕上會看到什麼？','<b>幾乎沒有光</b>。紅色玻璃紙只讓紅光透過，紅光到了綠色玻璃紙又被吸收。玻璃紙疊在一起是越疊越暗，不會變成黃色。（切到「兩張疊在一起」試試看）'],
-  opaque:['在暗室裡只用紅光照射，白襯衫、紅蘋果、綠葉各是什麼顏色？','白襯衫和紅蘋果都是<b>紅色</b>，綠葉是<b>黑色</b>。物體只能反射照到它的光裡、它會反射的那部分；綠葉只反射綠光，紅光照上去全部被吸收。'],
+  opaque:['在暗室裡只用紅光照射，白紙、紅蘋果、綠葉各是什麼顏色？','白紙和紅蘋果都是<b>紅色</b>，綠葉是<b>黑色</b>。物體只能反射照到它的光裡、它會反射的那部分；綠葉只反射綠光，紅光照上去全部被吸收。'],
   text:['白紙上寫著紅字。透過紅色玻璃紙看，和透過綠色玻璃紙看，各看到什麼？','透過<b>紅色</b>玻璃紙：紙和字都是紅色，字幾乎看不出來。透過<b>綠色</b>玻璃紙：紙是綠色，紅字變成<b>黑色</b>。'],
   mix:['紅光和綠光照在白牆上重疊，重疊的地方是什麼顏色？紅、綠、藍三種色光都重疊呢？','紅光＋綠光＝<b>黃光</b>；三種色光都重疊＝<b>白光</b>。色光是越加越亮。'],
   paint:['（延伸）青色和黃色的顏料混在一起，看起來是什麼顏色？','<b>綠色</b>。青色顏料吸收紅光、黃色顏料吸收藍光，混在一起只剩綠光被反射。顏料越混越暗（減色），和色光越加越亮相反。']};
@@ -1156,7 +1156,7 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
   qAction(s,v){quizAction(s,v,COLOR_QUIZ);},
   state:{on:true,prog:0,mode:'prism',beam:'full',hue:3,newton:false,rv:'drop',tv:'one',f1:'r',f2:'g',fR:true,fG:true,fB:true,ov:'obj',obj:'apple',ink:'r',gv:'g',r:1,g:1,b:1,pc:true,pm:true,py:true,compare:false,qi:0,qp:null,qc:false,qs:false},
   controls:[LAMP,
-    {type:'seg',key:'mode',label:'實驗',options:[['prism','色散（三稜鏡）'],['rainbow','彩虹'],['clear','透明物體'],['opaque','不透明物體'],['mix','色光三原色'],['paint','顏料混色（延伸）']],onChange:replay},
+    {type:'seg',key:'mode',label:'實驗',options:[['prism','色散（三稜鏡）'],['rainbow','彩虹'],['clear','透明物體'],['opaque','不透明物體'],['mix','色光三原色'],['paint','顏料混色（延伸）']],onChange:s=>{if(!s.r&&!s.g&&!s.b)[s.r,s.g,s.b]=[1,1,1];replay(s);}},
     {type:'seg',key:'beam',label:'光線',options:[['full','白光'],['single','單色光']],show:s=>s.mode==='prism',onChange:replay},
     {type:'seg',key:'hue',label:'色光',options:SPECTRUM.map(([n],i)=>[i,n]),show:s=>s.mode==='prism'&&s.beam==='single',onChange:replay},
     {type:'toggle',key:'newton',label:'再放一個倒置的三稜鏡',show:s=>s.mode==='prism',onChange:replay},
@@ -1200,9 +1200,9 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
     if(done&&nw&&full){const r0=spots[0],v0=spots[spots.length-1],p0=[r0[3],v0[3]].sort((a,b)=>(b[0]*d0[0]+b[1]*d0[1])-(a[0]*d0[0]+a[1]*d0[1]))[0],y0=Math.min(r0[0],v0[0]),y1=Math.max(r0[0],v0[0]);
       h+=`<defs><linearGradient id="nwt" gradientUnits="userSpaceOnUse" x1="${p0[0]}" y1="${p0[1]}" x2="${p0[0]+d0[0]*50}" y2="${p0[1]+d0[1]*50}"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".95"/></linearGradient></defs>`;
       h+=`<g opacity="${fade}"><polygon points="${r0[3]} 852,${r0[0]} 852,${v0[0]} ${v0[3]}" fill="url(#nwt)" stroke="url(#nwt)" stroke-width="3"/><rect x="852" y="${y0-3}" width="18" height="${y1-y0+6}" fill="#fff"/>${T(846,y0-16,'又變回白光',{size:16,fill:'#ffffff',anchor:'end',weight:700})}</g>`;}
-    else if(done)spots.forEach(([y,c,n],j)=>{h+=`<rect x="852" y="${y-6}" width="18" height="12" fill="${c}"/>`;if(!full||j===0||j===spots.length-1)h+=T(842,y+6,n,{size:15,fill:c,anchor:'end',weight:700});});
+    else if(done)spots.forEach(([y,c,n],j)=>{h+=`<rect x="852" y="${y-6}" width="18" height="12" fill="${c}"/>`;if(!full||j===0||j===spots.length-1)h+=T(875,y+5,n,{size:15,fill:c,weight:700});});
     h+=`<rect x="18" y="404" width="34" height="22" rx="5" transform="rotate(-29 35 415)" fill="${s.on?'#c9d3df':'#5a6573'}"/>`;
-    const reads=!full?[['入射光',nm+'光'],['射出',s.on?nm+'光（不再分散）':'—'],...(nw?[['倒置的三稜鏡','又把它偏折回來']]:[])]:nw?[['入射光','白光'],['第一個三稜鏡','分成各種色光'],['倒置的三稜鏡','把各色光偏折回來'],['紙屏上',done?'又變回白光':'—']]:[['入射光','白光'],['射出',s.on?'七種色光':'—'],['偏折最少','紅光'],['偏折最多','紫光']];
+    const inc=s.on?(full?'白光':nm+'光'):'沒有光（關燈）',reads=!full?[['入射光',inc],['射出',done?nm+'光（不再分散）':'—'],...(nw?[['倒置的三稜鏡',done?'又把它偏折回來':'—']]:[])]:nw?[['入射光',inc],['第一個三稜鏡',done?'分成各種色光':'—'],['倒置的三稜鏡',done?'把各色光偏折回來':'—'],['紙屏上',done?'又變回白光':'—']]:[['入射光',inc],['射出',done?'七種色光':'—'],['偏折最少',done?'紅光':'—'],['偏折最多',done?'紫光':'—']];
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,
       note:!full?'單色光通過三稜鏡只會<b>偏折</b>，不會再分出其他顏色。':nw?'倒置的三稜鏡把各色光<b>反方向偏折</b>回來，重疊在一起 → <b>又變回白光</b>（牛頓的實驗）。可見顏色不是三稜鏡「染」上去的，白光本來就含有各種色光。':'各色光在玻璃中的<b>光速不同</b>（4-3）→ 偏折程度不同：<b>紫光最多、紅光最少</b>，白光就分成各種色光，這叫<b>色散</b>。光都偏向三稜鏡<b>較厚的底部</b>，這也是凸透鏡能會聚光的原因（4-4）。<br><small>延伸：4-3「光的折射」的波前圖，可以比較紅光和紫光。</small>'};},
   rainbow(s){
@@ -1210,7 +1210,7 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
     const nOf=i=>1.331+0.008*i,drop=(c,R,n)=>{const b=0.86*R,E=[c[0]-Math.sqrt(R*R-b*b),c[1]-b],un=p=>[(p[0]-c[0])/R,(p[1]-c[1])/R],cut=(p,d)=>{const t=-2*((p[0]-c[0])*d[0]+(p[1]-c[1])*d[1]);return[p[0]+d[0]*t,p[1]+d[1]*t];};
       const d1=cRefr([1,0],un(E),1,n),P=cut(E,d1),u=un(P),k=2*(d1[0]*u[0]+d1[1]*u[1]),d2=[d1[0]-k*u[0],d1[1]-k*u[1]],Q=cut(P,d2),w=un(Q);return{E,P,Q,d:cRefr(d2,[-w[0],-w[1]],n,1)||d2};};
     const sun=(x,y)=>`<circle cx="${x}" cy="${y}" r="20" fill="${s.on?'#ffd60a':'#5a6573'}"/>`+[0,1,2,3,4,5,6,7].map(k=>{const a=k*Math.PI/4;return L(x+27*Math.cos(a),y+27*Math.sin(a),x+35*Math.cos(a),y+35*Math.sin(a),{stroke:s.on?'#ffd60a':'#5a6573',w:3});}).join('');
-    const off=!s.on?T(450,250,'沒有陽光，就沒有彩虹',{size:20,fill:D.muted,anchor:'middle'}):'',RED=SPECTRUM[0][1],VIO=SPECTRUM[6][1];
+    const off=!s.on?T(s.rv==='sky'?450:200,250,'沒有陽光，就沒有彩虹',{size:20,fill:D.muted,anchor:'middle'}):'',RED=SPECTRUM[0][1],VIO=SPECTRUM[6][1];
     const note='小水滴就像<b>小三稜鏡</b>：陽光進入水滴<b>折射</b>、在後面<b>反射</b>、出來時<b>再折射</b>，各色光偏折不同 → 色散。要<b>背對太陽</b>才看得到；主虹<b>外紅內紫</b>。';
     let h='';
     if(s.rv==='sky'){
@@ -1221,7 +1221,7 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
       h+=`<circle cx="${eye[0]-6}" cy="${eye[1]+2}" r="12" fill="#c9d3df"/><circle cx="${eye[0]}" cy="${eye[1]}" r="2.5" fill="#05080d"/>`+L(eye[0]-6,eye[1]+14,eye[0]-6,eye[1]+34,{stroke:'#c9d3df',w:4})+L(eye[0]-6,eye[1]+34,eye[0]-14,eye[1]+47,{stroke:'#c9d3df',w:4})+L(eye[0]-6,eye[1]+34,eye[0]+2,eye[1]+47,{stroke:'#c9d3df',w:4});
       for(const[i,D0]of drops){const sl=D0[0]-11-70;if(s.on)h+=ray([[70,D0[1]],[D0[0]-11,D0[1]]],'#ffffff',{w:2,op:.8});
         SPECTRUM.forEach(([,c],j)=>{const a=ang(j),dir=[-Math.cos(a),Math.sin(a)];if(!s.on)return;h+=j===i?ray([D0,eye],c,{w:3.5,delay:sl}):ray([D0,[D0[0]+dir[0]*70,D0[1]+dir[1]*70]],c,{w:1.6,op:.45,arrow:false,delay:sl});});
-        h+=`<circle cx="${D0[0]}" cy="${D0[1]}" r="11" fill="#9fd8ff33" stroke="#bfe6ff" stroke-width="2"/>`+T(D0[0]+20,D0[1]+5,i===0?'較高的水滴 → 紅光進入眼睛':i===6?'較低的水滴 → 紫光進入眼睛':'中間的水滴 → 綠光',{size:14,fill:SPECTRUM[i][1],weight:700});}
+        h+=`<circle cx="${D0[0]}" cy="${D0[1]}" r="11" fill="#9fd8ff33" stroke="#bfe6ff" stroke-width="2"/>`+T(D0[0]+20,D0[1]+5,!s.on?'小水滴':i===0?'較高的水滴 → 紅光進入眼睛':i===6?'較低的水滴 → 紫光進入眼睛':'中間的水滴 → 綠光進入眼睛',{size:14,fill:s.on?SPECTRUM[i][1]:D.muted,weight:700});}
       if(s.on)h+=T(80,58,'陽光（從背後照來）',{size:14,fill:D.ink});
       const fade=fadeIn(),aR=ang(0),aV=ang(6),arc=(r,a,c)=>`<path d="M${eye[0]+r} ${eye[1]}A${r} ${r} 0 0 0 ${eye[0]+r*Math.cos(a)} ${eye[1]-r*Math.sin(a)}" fill="none" stroke="${c}" stroke-width="2"/>`;
       if(s.on&&fade>0){h+=`<g opacity="${fade}">${arc(92,aR,RED)}${arc(74,aV,VIO)}${T(eye[0]+100*Math.cos(aR+0.12),eye[1]-100*Math.sin(aR+0.12),'42°',{size:14,fill:RED,anchor:'end',weight:700})}${T(eye[0]+86*Math.cos(aV-0.2),eye[1]-86*Math.sin(aV-0.2)+4,'40°',{size:14,fill:VIO,weight:700})}`;
@@ -1255,11 +1255,11 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
         if(s.on&&has(c))h+=ray([[318,fy],[tx,ty]],rgbOf(c),{w:9,arrow:false,op:.85,delay:d1+18});
         vis.push(s.on&&has(c)?clamp((REACH-d1-18-Math.hypot(tx-318,ty-fy))/200,0,1):1);
         h+=on?`<rect x="300" y="${fy-40}" width="18" height="80" rx="4" fill="${rgbOf(f.map(v=>v*255))}" opacity=".75" stroke="#ffffff55"/>`+T(309,fy-48,`${n}色濾色片`,{size:14,fill:D.ink,anchor:'middle'}):`<rect x="300" y="${fy-40}" width="18" height="80" rx="4" fill="none" stroke="#ffffff33" stroke-dasharray="4 4"/>`+T(309,fy-48,'（拿掉了）',{size:14,fill:D.muted,anchor:'middle'});});
-      h+=`<g style="isolation:isolate">${F.map(([,,,,[tx,ty]],i)=>`<circle cx="${tx}" cy="${ty}" r="78" fill="${rgbOf(outs[i].map(v=>v*vis[i]))}" style="mix-blend-mode:screen"/>`).join('')}</g>`;
+      h+=`<g style="isolation:isolate">${F.map(([,,,,[tx,ty]],i)=>s.on&&has(outs[i])&&vis[i]>0?`<circle cx="${tx}" cy="${ty}" r="78" fill="${rgbOf(outs[i])}" opacity="${vis[i]}" style="mix-blend-mode:screen"/>`:'').join('')}</g>`;
       const sum=outs.reduce((a,c)=>a.map((v,i)=>Math.min(255,v+c[i])),[0,0,0]),done=vis.every(v=>v>=1);
       h+=T(710,450,done?`中央重疊：${ln(sum)}`:'',{size:21,fill:D.ink,anchor:'middle',weight:700});
-      return {svg:h,reads:[['照射的光',ln(c0)],...F.map(([n,,on],i)=>[`${n}色濾色片`,!any?'—':!on?`拿掉了，${ln(c0)}直接通過`:done?`透過 ${ln(outs[i])}`:'—']),['三道光疊在一起',done?ln(sum):'—']],
-        note:'白光含有各種色光。三片濾色片分別只讓紅、綠、藍光<b>透過</b>，三道色光在屏幕上疊回去 → 看起來又是<b>白色</b>；兩兩重疊是黃、青、洋紅。拿掉濾色片，光就直接通過。'};
+      return {svg:h,reads:[['照射的光',ln(c0)],...F.map(([n,,on],i)=>[`${n}色濾色片`,!any?'—':!on?`拿掉了，${ln(c0)}直接通過`:!done?'—':has(outs[i])?`透過 ${ln(outs[i])}`:'全部被吸收']),['三道光疊在一起',done?ln(sum):'—']],
+        note:(white?'白光含有各種色光。三片濾色片分別只讓紅、綠、藍光<b>透過</b>，三道色光在屏幕上疊回去 → 看起來又是<b>白色</b>；兩兩重疊是黃、青、洋紅。':'三片濾色片分別只讓紅、綠、藍光<b>透過</b>；照射的光裡沒有的色光，濾色片也變不出來。')+'拿掉濾色片，光就直接通過。'};
     }
     /* 一張或兩張玻璃紙排在一起 */
     const ks=s.tv==='two'?[s.f1,s.f2]:[s.f1],xs=s.tv==='two'?[300,520]:[400],steps=[];let c=c0,x=74,dl=0;
@@ -1276,7 +1276,7 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
     const pass=o=>!any?'—':!done?'—':has(o)?ln(o):'幾乎沒有光',[n1]=FILTERS[s.f1],[n2]=FILTERS[s.f2],o1=steps[0][1];
     const reads=s.tv==='two'?[['照射的光',ln(c0)],[`第一張（${n1}）透過`,pass(o1)],[`第二張（${n2}）透過`,pass(c)],['屏幕上',done?res:'—']]:[['照射的光',ln(c0)],[`${n1}色玻璃紙透過`,pass(c)],['屏幕上',done?res:'—']];
     let note='透明物體的顏色＝它讓哪些色光<b>透過</b>，其餘被吸收。';
-    if(s.tv==='two')note+='兩張疊在一起：光要<b>兩張都能透過</b>才到得了屏幕，越疊越暗'+(any&&has(o1)&&!has(c)?`。${n1}色玻璃紙透過的${ln(o1)}，到了${n2}色玻璃紙被吸收 → <b>幾乎沒有光</b>（不是色光相加，不會變成黃色）。`:'。');
+    if(s.tv==='two')note+='兩張疊在一起：光要<b>兩張都能透過</b>才到得了屏幕，越疊越暗'+(any&&has(o1)&&!has(c)?`。${n1}色玻璃紙透過的${ln(o1)}，到了${n2}色玻璃紙被吸收 → <b>幾乎沒有光</b>（不是色光相加，不會變成${ln(FILTERS[s.f1][1].map((v,i)=>255*Math.max(v,FILTERS[s.f2][1][i])))}）。`:'。');
     else if(any&&white)note+=`白光含有各種色光，${n1}色玻璃紙${FILTERS[s.f1][2]} → 屏幕上是<b>${n1}色</b>。`;
     else if(any)note+='照射的光裡，只有玻璃紙能讓它透過的部分才過得去。';
     return {svg:h,reads,note};},
@@ -1292,16 +1292,16 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
       h+=`<rect x="262" y="24" width="76" height="22" rx="6" fill="${s.on?'#c9d3df':'#5a6573'}"/><rect x="60" y="100" width="240" height="350" fill="${rgbOf(pD)}"/><rect x="300" y="100" width="240" height="350" fill="${rgbOf(pF)}"/>`;
       h+=T(180,315,'理化',{size:92,fill:rgbOf(tD),anchor:'middle',weight:900})+T(420,315,'理化',{size:92,fill:rgbOf(tF),anchor:'middle',weight:900})+T(180,476,'直接看',{size:15,fill:D.muted,anchor:'middle'});
       h+=fl?`<rect x="296" y="90" width="254" height="370" rx="6" fill="none" stroke="${rgbOf(fl[1].map(v=>v*255))}" stroke-width="3" stroke-dasharray="9 5"/>`+T(423,476,`透過${fl[0]}色玻璃紙看`,{size:15,fill:D.ink,anchor:'middle',weight:700}):T(420,476,'（沒有蓋玻璃紙）',{size:15,fill:D.muted,anchor:'middle'});
-      const[pa,ta,pb,tb]=[pD,tD,pF,tF].map(cn),verdict=!has(pF)&&!has(tF)?'一片黑，什麼都看不到':pb===tb?'字和紙同色 → 看不出字':tb==='黑色'?'字是黑色 → 看得很清楚':'字和紙顏色不同 → 看得到字';
+      const[pa,ta,pb,tb]=[pD,tD,pF,tF].map(cn),verdict=!any?'沒有光，什麼都看不到':!has(pF)&&!has(tF)?'一片黑，什麼都看不到':pb===tb?'字和紙同色 → 看不出字':tb==='黑色'?'字是黑色 → 看得很清楚':'字和紙顏色不同 → 看得到字';
       h+=T(735,70,'看到的顏色',{size:17,fill:D.muted,anchor:'middle'});
-      if(done){h+=T(735,130,'直接看',{size:16,fill:D.ink,anchor:'middle',weight:700})+T(735,162,`紙：${pa}　字：${ta}`,{size:16,fill:D.ink,anchor:'middle'});
-        if(fl)h+=T(735,230,`透過${fl[0]}色玻璃紙`,{size:16,fill:D.ink,anchor:'middle',weight:700})+T(735,262,`紙：${pb}　字：${tb}`,{size:16,fill:D.ink,anchor:'middle'});
+      if(done){if(any)h+=T(735,130,'直接看',{size:16,fill:D.ink,anchor:'middle',weight:700})+T(735,162,`紙：${pa}　字：${ta}`,{size:16,fill:D.ink,anchor:'middle'});
+        if(fl&&any)h+=T(735,230,`透過${fl[0]}色玻璃紙`,{size:16,fill:D.ink,anchor:'middle',weight:700})+T(735,262,`紙：${pb}　字：${tb}`,{size:16,fill:D.ink,anchor:'middle'});
         h+=T(735,340,verdict,{size:18,fill:D.object,anchor:'middle',weight:700});}
       let note='不透明物體的顏色＝它<b>反射</b>哪些色光，其餘被吸收。透過玻璃紙看時，只有玻璃紙讓它透過的色光才到得了眼睛。';
       if(fl&&done&&any){if(has(tD)&&!has(tF))note+=`<br>${iname}字反射的${ln(tD)}過不了${fl[0]}色玻璃紙 → 字變成<b>黑色</b>；紙看起來是${pb}。`;else if(pb===tb)note+=`<br>紙和字透過來的都是${ln(pF)} → 字和紙同色，<b>看不出來</b>。`;}
-      return {svg:h,reads:[['照射的光',ln(c0)],['直接看',done?`紙${pa}・字${ta}`:'—'],[fl?`透過${fl[0]}色玻璃紙`:'玻璃紙',fl?(done?`紙${pb}・字${tb}`:'—'):'沒有蓋'],['結果',done?verdict:'—']],note};
+      return {svg:h,reads:[['照射的光',ln(c0)],['直接看',done&&any?`紙${pa}・字${ta}`:'—'],[fl?`透過${fl[0]}色玻璃紙`:'玻璃紙',fl?(done&&any?`紙${pb}・字${tb}`:'—'):'沒有蓋'],['結果',done?verdict:'—']],note};
     }
-    const[oname,ref]=REFLECT[s.obj],lit=clamp((reach-250)/150,0,1),out=cmul(c0,ref).map(v=>v*lit),done=!s.on||lit>=1,look=cn(out);
+    const[oname,ref]=REFLECT[s.obj],lit=clamp((reach-250)/150,0,1),out=cmul(c0,ref).map(v=>v*lit),done=!s.on||lit>=1,look=any?cn(out):'看不見';
     const shape=(c,stroke='#ffffff40')=>({apple:`<circle cx="0" cy="0" r="62" fill="${c}" stroke="${stroke}" stroke-width="2"/><path d="M0 -58Q4 -80 18 -88" stroke="#5b4026" stroke-width="7" fill="none" stroke-linecap="round"/>`,
       leaf:`<path d="M-90 25Q-20 -95 90 -25Q20 75 -90 25Z" fill="${c}" stroke="${stroke}" stroke-width="2"/><path d="M-80 22Q0 -10 80 -22" stroke="#00000040" stroke-width="3" fill="none"/>`,
       banana:`<path d="M-95 -30Q0 80 95 -35Q86 -12 74 -6Q0 42 -84 -40Z" fill="${c}" stroke="${stroke}" stroke-width="2"/>`,
@@ -1321,7 +1321,7 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
     const c0=lightRGB(s),[r,g,b]=c0,lamps=[[60,60,250,200,'255,60,60',r,'紅'],[570,60,380,200,'60,255,90',g,'綠'],[315,470,315,312,'80,140,255',b,'藍']];
     let h=`<rect x="35" y="30" width="550" height="440" rx="22" fill="#05080d"/>`;
     const vis=lamps.map(([x0,y0,x1,y1])=>clamp((REACH-Math.hypot(x1-x0,y1-y0))/200,0,1)),[vr,vg,vb]=vis;
-    h+=`<g style="isolation:isolate"><circle cx="250" cy="200" r="130" fill="rgb(${Math.round(r*vr)},0,0)"/><circle cx="380" cy="200" r="130" fill="rgb(0,${Math.round(g*vg)},0)" style="mix-blend-mode:screen"/><circle cx="315" cy="312" r="130" fill="rgb(0,0,${Math.round(b*vb)})" style="mix-blend-mode:screen"/></g>`;
+    h+=`<g style="isolation:isolate">${[[250,200,[r*vr,0,0]],[380,200,[0,g*vg,0]],[315,312,[0,0,b*vb]]].map(([x,y,c])=>Math.max(...c)>0?`<circle cx="${x}" cy="${y}" r="130" fill="${rgbOf(c)}" style="mix-blend-mode:screen"/>`:'').join('')}</g>`;
     lamps.forEach(([x0,y0,x1,y1,c,val,lab])=>{if(val>0)h+=ray([[x0,y0],[x1,y1]],`rgb(${c})`,{w:6,op:.85});h+=`<circle cx="${x0}" cy="${y0}" r="17" fill="${val>0?`rgb(${c})`:'#3a4250'}" stroke="#ffffff55" stroke-width="2"/>`+T(x0,y0+6,lab,{size:15,fill:'#05080d',anchor:'middle',weight:700});});
     const done=Math.min(...vis.map((v,i)=>c0[i]>0?v:1))>=1,res=colorName(r,g,b);
     h+=T(735,72,'重疊後的顏色',{size:18,fill:D.muted,anchor:'middle'})+`<rect x="635" y="95" width="200" height="170" rx="20" fill="${done?rgbOf(c0):'#05080d'}" stroke="#ffffff33"/>`+T(735,305,done?res:'',{size:30,fill:D.ink,anchor:'middle',weight:700});
@@ -1330,19 +1330,20 @@ color:{group:2,n:'4-5',name:'色散與顏色',subtitle:'白光經過三稜鏡會
       note:'色光三原色是<b>紅、綠、藍</b>。色光相加會<b>更亮</b>：紅＋綠＝黃、綠＋藍＝青、紅＋藍＝洋紅，三色一起＝白光。'};},
   paint(s){
     /* （延伸）顏料三原色：每種吸收一種色光（減色） */
-    const P3=[['青',[0,1,1],s.pc,[230,190]],['洋紅',[1,0,1],s.pm,[350,190]],['黃',[1,1,0],s.py,[290,295]]],sel=P3.filter(p=>p[2]),ref=sel.reduce((a,p)=>cmul(a,p[1]),[1,1,1]),look=ref.map(v=>s.on?v*255:0),seen=s.on?colorName(...look,'色'):'黑色（沒有光）';
+    const P3=[['青',[0,1,1],s.pc,[230,190]],['洋紅',[1,0,1],s.pm,[350,190]],['黃',[1,1,0],s.py,[290,295]]],sel=P3.filter(p=>p[2]),ref=sel.reduce((a,p)=>cmul(a,p[1]),[1,1,1]),look=ref.map(v=>s.on?v*255:0);let seen=s.on?colorName(...look,'色'):'看不見（沒有光）';
     let h=`<rect x="40" y="30" width="500" height="440" rx="20" fill="#fbfaf6"/><g style="isolation:isolate">${P3.map(([,c,on,[x,y]])=>on?`<circle cx="${x}" cy="${y}" r="105" fill="${rgbOf(c.map(v=>v*255))}" style="mix-blend-mode:multiply"/>`:'').join('')}</g>`;
     P3.forEach(([n,,on,[x,y]],i)=>{if(on)h+=T(x+[-60,60,0][i],y+[-70,-70,85][i],n,{size:18,fill:'#1b2a33',anchor:'middle',weight:700});});
     const pair=(a,b,x,y,t)=>P3[a][2]&&P3[b][2]?T(x,y,t,{size:15,fill:'#ffffff',anchor:'middle',weight:700}):'';
-    h+=pair(0,1,290,160,'藍')+pair(1,2,345,262,'紅')+pair(0,2,235,262,'綠')+(sel.length===3?T(290,228,'黑',{size:15,fill:'#ffffff',anchor:'middle',weight:700}):'');
+    if(s.on)h+=pair(0,1,290,160,'藍')+pair(1,2,345,262,'紅')+pair(0,2,235,262,'綠')+(sel.length===3?T(290,228,'黑',{size:15,fill:'#ffffff',anchor:'middle',weight:700}):'');
     if(!s.on)h+=`<rect x="40" y="30" width="500" height="440" rx="20" fill="#05080d" opacity=".88"/>`+T(290,250,'沒有光照，看不到顏色',{size:18,fill:D.muted,anchor:'middle'});
     if(s.compare){
       h+=T(730,60,'色光混合（加色）',{size:17,fill:D.ink,anchor:'middle',weight:700})+`<rect x="600" y="75" width="260" height="210" rx="16" fill="#05080d" stroke="#3a4554"/><g style="isolation:isolate"><circle cx="700" cy="150" r="58" fill="#ff0000"/><circle cx="760" cy="150" r="58" fill="#00ff00" style="mix-blend-mode:screen"/><circle cx="730" cy="205" r="58" fill="#0000ff" style="mix-blend-mode:screen"/></g>`;
       h+=T(730,320,'色光：越加越亮 → 白',{size:16,fill:D.ink,anchor:'middle'})+T(730,348,'顏料：越混越暗 → 黑',{size:16,fill:D.ink,anchor:'middle'})+T(730,392,'色光兩兩相加 ＝ 顏料三原色',{size:15,fill:D.muted,anchor:'middle'})+T(730,418,'顏料兩兩相混 ＝ 色光三原色',{size:15,fill:D.muted,anchor:'middle'});
     }else{
-      h+=T(730,60,s.on?'白光照到顏料上':'沒有光照到顏料',{size:17,fill:D.ink,anchor:'middle',weight:700})+(s.on?T(730,82,'（用紅、綠、藍光代表白光）',{size:13,fill:D.muted,anchor:'middle'}):'')+`<rect x="620" y="360" width="220" height="44" rx="8" fill="${rgbOf(look)}" stroke="#ffffff55"/>`+T(730,436,`看起來：${seen}`,{size:18,fill:D.ink,anchor:'middle',weight:700});
+      h+=T(730,60,s.on?'白光照到顏料上':'沒有光照到顏料',{size:17,fill:D.ink,anchor:'middle',weight:700})+(s.on?T(730,82,'（用紅、綠、藍光代表白光）',{size:13,fill:D.muted,anchor:'middle'}):'');
       [['#ff453a',0],['#32d74b',1],['#0a84ff',2]].forEach(([c,i],k)=>{const x0=600+k*28,x1=680+k*30,inLen=Math.hypot(x1-x0,358-90);if(s.on)h+=ray([[x0,90],[x1,358]],c,{w:4});
         if(ref[i]>0.5){if(s.on)h+=ray([[x1,358],[x1+110,100]],c,{w:4,delay:inLen});}else if(s.on&&REACH>inLen)h+=T(x1,390,'×',{size:22,fill:'#ffffff',anchor:'middle',weight:700});});
+      const pd=!s.on||arrived();if(!pd)seen='—';h+=`<rect x="620" y="360" width="220" height="44" rx="8" fill="${pd?rgbOf(look):'#05080d'}" stroke="#ffffff55"/>`+T(730,436,pd?`看起來：${seen}`:'',{size:18,fill:D.ink,anchor:'middle',weight:700});
     }
     const abs=['紅','綠','藍'].filter((_,i)=>ref[i]<0.5),refl=['紅','綠','藍'].filter((_,i)=>ref[i]>0.5);
     return {svg:h,reads:[['顏料',sel.length?sel.map(p=>p[0]).join(' ＋ '):'（白紙）'],['吸收',!s.on?'—':abs.length?abs.join('、')+'光':'沒有'],['反射',!s.on?'—':refl.length?refl.join('、')+'光':'沒有'],['看起來',seen]],
