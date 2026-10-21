@@ -7,4 +7,4 @@ const html=read('index.html')
   .replace('<script src="app.js"></script>',()=>`<script>${read('app.js').replace(/img\/([\w-]+)\.webp/g,(m,n)=>`data:image/webp;base64,${fs.readFileSync(path.join(__dirname,'img',n+'.webp')).toString('base64')}`)}</script>`);
 if(/src="app\.js"|href="style\.css"|href="offline\.html"/.test(html))throw new Error('offline build: a placeholder was not replaced');
 fs.writeFileSync(path.join(__dirname,'offline.html'),html);
-console.log('offline.html written',html.length,'bytes');
+console.log('offline.html written',Buffer.byteLength(html),'bytes');
