@@ -54,7 +54,7 @@ h1{font-size:32px;letter-spacing:-.5px;margin:0 0 2px;line-height:1.3}
 /* ---------- Simulation card ---------- */
 .sim-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden;min-height:500px}
 .viz-panel{position:relative;padding:18px 22px 22px;min-width:0;background-color:var(--stage);background-image:radial-gradient(var(--stage-dot) 1px,transparent 1.2px);background-size:24px 24px;display:flex;flex-direction:column}
-.viz-panel svg{display:block;width:100%;height:auto;min-width:0;overflow:visible;font-family:inherit;margin:auto 0}
+.viz-panel svg{display:block;width:100%;height:auto;min-width:0;overflow:visible;font-family:inherit;margin:0 0 auto;position:sticky;top:76px}
 .viz-panel.dark{background:var(--stage-dark);background-image:radial-gradient(#ffffff0d 1px,transparent 1.2px);background-size:24px 24px}
 .viz-panel.dark svg{overflow:hidden}
 
@@ -133,7 +133,8 @@ dialog a{color:var(--accent-ink);font-weight:600}
   .sim-layout{grid-template-columns:1fr}
   .controls{border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:0 24px;align-content:start}
   .controls>*{min-width:0}
-  .controls .note,.controls .readouts,.controls .control-buttons,.controls>.btn,.controls>div:not(.control){grid-column:1/-1}
+  .controls .note,.controls .readouts,.controls .control-buttons,.controls>.btn,.controls>div:not(.control),.controls>.photo{grid-column:1/-1}
+  .controls>.photo{max-width:520px}
   .readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
   .readout+.readout{border-top:0}
   .readout{border-bottom:1px solid var(--line);border-right:1px solid var(--line);margin:0 -1px -1px 0}
@@ -212,3 +213,29 @@ dialog .small{font-size:13px;color:var(--muted)}
 .ex-mark{font-size:14px;font-weight:700;color:var(--ink-2);margin-left:4px}
 .ex-tools{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
 .ex-tools .btn{font-size:13px;padding:6px 12px}
+
+/* ---------- Lens table & quiz (4-4) ---------- */
+.ex-table{width:100%;border-collapse:collapse;margin:6px 0 4px;font-size:14px;background:#fff;border-radius:12px;overflow:hidden}
+.ex-table th,.ex-table td{padding:7px 10px;border-bottom:1px solid var(--amber-line);text-align:left;line-height:1.5}
+.ex-table th{background:#fbeed8;color:var(--amber);font-size:13px}
+.ex-table tr.on td{background:#ffe9b3;font-weight:700;color:var(--ink)}
+.question .ex-hint{font-size:13px;font-weight:400;line-height:1.7;color:var(--ink-2);margin:4px 0 14px}
+.tab-tools{margin:0 0 8px}
+.question .ex-q+.ex-row .qopt{text-align:left}
+@media(max-width:760px){.ex-table{font-size:12.5px}.ex-table th,.ex-table td{padding:6px}}
+.ex-sep{border:0;border-top:1px dashed var(--amber-line);margin:16px 0 12px}
+.question:has(.ex-q) details{margin:6px 0 4px}
+.projection .ex-q,.projection .qopt,.projection .question .answer{font-size:18px}
+.projection .ex-table{font-size:17px}
+.projection .ex-table th{font-size:15px}
+.projection .question .ex-hint{font-size:15px}
+
+/* ---------- 實物圖 ---------- */
+.photo{margin:14px 0 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface-2);cursor:zoom-in}
+.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;object-fit:cover;background:#0f1b2d}
+.photo figcaption{font-size:13px;line-height:1.6;color:var(--ink-2);padding:8px 12px}
+.photo figcaption b{color:var(--accent-ink)}
+.photo-big{display:block;width:100%;height:auto;border-radius:12px;margin-top:8px}
+.projection .photo figcaption{font-size:15px}
+.projection .seg button,.projection .ex-tools .btn,.projection .ex-who{font-size:15px}
+@media(max-width:760px){.viz-panel svg{position:static}}
