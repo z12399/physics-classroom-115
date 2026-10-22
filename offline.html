@@ -427,6 +427,7 @@ function lensTableHTML(s){
 }
 const LENS_Q={
   why:['凸透鏡和凹透鏡，哪一種會讓平行光會聚？為什麼？','凸透鏡。光經過透鏡的兩個表面<b>各折射一次</b>，兩次都偏向<b>較厚的一邊</b>。凸透鏡中間厚 → 光往主軸偏 → 會聚；凹透鏡邊緣厚 → 光往外偏 → 發散。'],
+  blur:['紙屏不在成像的位置時，為什麼像會模糊，而不是完全消失？','把透鏡想成<b>很多個小孔</b>：每個小孔都像針孔一樣，在紙屏上形成一個倒立的像，大小都一樣。紙屏在成像位置時，透鏡讓這些像<b>剛好疊在同一個位置</b> → 清楚；紙屏往前或往後移，這些像就<b>錯開</b>疊在一起 → 模糊。就像把針孔挖大一樣：像還在，只是糊掉了。'],
   focus:['怎樣用太陽光量出凸透鏡的焦距？','太陽很遠，射來的光可以看成<b>平行光</b>。讓透鏡正對太陽，在另一側前後移動紙張，找到<b>最小、最亮</b>的光點，那就是焦點；量光點到透鏡中心（光心）的距離，就是焦距。（千萬不要用透鏡看太陽！）'],
 };
 const LENS_QUIZ=[
@@ -1250,10 +1251,10 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
   q:s=>s.mode==='image'?{html:lensTableHTML(s)+quizHTML(s,LENS_QUIZ)}:s.mode==='bench'?{html:quizHTML(s,LENS_QUIZ)}:LENS_Q[s.mode],
   qAction(s,v){if(v==='tab'){s.tab=!s.tab;return;}quizAction(s,v,LENS_QUIZ);},
   state:{on:true,prog:0,mode:'why',type:1,wbeam:'parallel',bulge:3,prisms:false,wnorm:false,wy:80,side:'left',terms:true,paper:false,pd:120,
-    beam:'main',f:80,u:200,oh:30,aim:20,block:false,sweep:null,tab:false,su:null,bf:10,bu:30,bv:10,log:[],flash:'',flashT:0,qi:0,qp:null,qc:false,qs:false},
+    beam:'main',f:80,u:200,oh:30,aim:20,block:false,sweep:null,tab:false,su:null,bf:10,bu:30,bv:10,log:[],bdev:'lens',bh:'5',bu2:20,bd:30,bcol:true,breal:false,flash:'',flashT:0,qi:0,qp:null,qc:false,qs:false},
   controls:[LAMP,
-    {type:'seg',key:'mode',label:'實驗',options:[['why','為什麼會偏折'],['focus','焦點與焦距'],['image','成像'],['bench','光具座實驗']],onChange:s=>{s.prog=0;s.sweep=null;}},
-    {type:'seg',key:'type',label:'透鏡',options:[[1,'凸透鏡'],[-1,'凹透鏡']],onChange:replay,show:s=>s.mode!=='bench'},
+    {type:'seg',key:'mode',label:'實驗',options:[['why','為什麼會偏折'],['focus','焦點與焦距'],['image','成像'],['bench','光具座實驗'],['blur','為什麼會模糊']],onChange:s=>{s.prog=0;s.sweep=null;}},
+    {type:'seg',key:'type',label:'透鏡',options:[[1,'凸透鏡'],[-1,'凹透鏡']],onChange:replay,show:s=>s.mode!=='bench'&&s.mode!=='blur'},
     {type:'seg',key:'wbeam',label:'光線',options:[['single','單束光'],['parallel','平行光']],onChange:replay,show:s=>s.mode==='why'},
     {type:'range',key:'bulge',label:'透鏡彎曲程度',min:1,max:5,step:1,fmt:s=>['很平','較平','中等','較彎','很彎'][s.bulge-1],show:s=>s.mode==='why'},
     {type:'toggle',key:'prisms',label:'看成一疊三稜鏡',onChange:replay,show:s=>s.mode==='why'},
@@ -1269,16 +1270,24 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
     {type:'buttons',label:'把物體放到',items:[['2F 以外',s=>{s.u=snap('u',s.f*2.6);s.sweep=null;}],['2F 上',s=>{s.u=snap('u',s.f*2);s.sweep=null;}],['F 與 2F 之間',s=>{s.u=snap('u',s.f*1.5);s.sweep=null;}],['F 上',s=>{s.u=snap('u',s.f);s.sweep=null;}],['F 以內',s=>{s.u=snap('u',s.f*0.55);s.sweep=null;}]],show:s=>s.mode==='image'&&s.type===1},
     {type:'buttons',label:'',items:[['▶ 物體從遠處慢慢靠近',s=>{s.sweep=0;s.su=null;}]],show:s=>s.mode==='image',primary:true},
     {type:'toggle',key:'block',label:'用黑紙遮住透鏡上半部',onChange:replay,show:s=>s.mode==='image'&&s.beam!=='single'},
+    {type:'seg',key:'bdev',label:'用什麼成像',options:[['lens','凸透鏡'],['pin','針孔板（沒有透鏡）']],onChange:replay,show:s=>s.mode==='blur'},
+    {type:'seg',key:'bh',label:'打開幾個小孔',options:[['1','1 個'],['2','2 個'],['5','5 個'],['all','全部（挖大）']],onChange:replay,show:s=>s.mode==='blur'},
+    {type:'range',key:'bu2',label:'物體 → 透鏡（物距）',min:13,max:40,step:1,unit:' cm',show:s=>s.mode==='blur'},
+    {type:'range',key:'bd',label:'透鏡 → 紙屏',min:5,max:50,step:0.5,unit:' cm',show:s=>s.mode==='blur'},
+    {type:'buttons',label:'',items:[['🔍 把紙屏移到成像位置',s=>{const v=10*s.bu2/(s.bu2-10);if(v<=50)s.bd=snap('bd',v);}]],show:s=>s.mode==='blur'&&s.bdev==='lens',primary:true},
+    {type:'toggle',key:'bcol',label:'依小孔位置上色',show:s=>s.mode==='blur'},
+    {type:'toggle',key:'breal',label:'看實際的樣子（像糊成一片）',show:s=>s.mode==='blur'&&s.bh==='all'},
     {type:'seg',key:'bf',label:'凸透鏡的焦距',options:[[10,'10 cm'],[15,'15 cm']],onChange:s=>{s.log=[];},show:s=>s.mode==='bench'},
     {type:'range',key:'bu',label:'蠟燭 → 透鏡（物距）',min:4,max:50,step:1,unit:' cm',show:s=>s.mode==='bench'},
     {type:'range',key:'bv',label:'透鏡 → 紙屏',min:4,max:50,step:0.5,unit:' cm',show:s=>s.mode==='bench'},
     {type:'buttons',label:'',items:[['📋 記錄這一次',s=>benchLog(s)]],show:s=>s.mode==='bench',primary:true},
-    {type:'buttons',label:'',items:[['🔍 幫我對焦',s=>{const v=s.bf*s.bu/(s.bu-s.bf);if(s.bu>s.bf&&v<=50)s.bv=snap('bv',v);else{s.flash=s.bu<=s.bf?'蠟燭在焦點上或焦點內，紙屏接不到像':'像太遠了，紙屏放不到';s.flashT=3;}}],['清除紀錄',s=>{s.log=[];}]],show:s=>s.mode==='bench'}],
+    {type:'buttons',label:'',items:[['🔍 幫我對焦',s=>{const v=s.bf*s.bu/(s.bu-s.bf);if(s.bu>s.bf&&v<=50)s.bv=snap('bv',v);else{s.flash=s.bu<=s.bf?'蠟燭在焦點上或焦點內，紙屏接不到像':'像太遠了，紙屏放不到';s.flashT=3;}}],['清除紀錄',s=>{s.log=[];}]],show:s=>s.mode==='bench'},
+    {type:'buttons',label:'',items:[['🤔 沒對準時為什麼會模糊？',s=>{s.mode='blur';s.bdev='lens';s.bh='5';s.prog=0;if(s.bf===10){s.bu2=snap('bu2',s.bu);s.bd=snap('bd',s.bv);}}]],show:s=>s.mode==='bench'}],
   tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.flashT>0)s.flashT-=dt;
     if(s.sweep!==null){if(s.su!==null&&s.u!==s.su){s.sweep=null;return;}s.sweep=Math.min(1,s.sweep+dt/7);const e=1-Math.pow(1-s.sweep,2),to=s.type===1?s.f*1.08:20;s.u=s.su=snap('u',360-(360-to)*e);if(s.sweep>=1)s.sweep=null;}},
   drag:{obj:(p,s)=>{s.u=snap('u',(450-p.x)/1.15);s.sweep=null;},top:(p,s)=>{s.oh=snap('oh',(250-p.y)/2.4);},aim:(p,s)=>{s.aim=clamp((250-p.y)/2.4,-76,76);},
     wy:(p,s)=>{const m=s.type===1?118:110;s.wy=clamp(250-p.y,-m,m);},paper:(p,s)=>{s.pd=snap('pd',(p.x-450)*(s.side==='left'?1:-1)/2.4);},
-    cand:(p,s)=>{s.bu=snap('bu',(450-p.x)/8);},scr:(p,s)=>{s.bv=snap('bv',(p.x-450)/8);}},
+    cand:(p,s)=>{s.bu=snap('bu',(450-p.x)/8);},bobj:(p,s)=>{s.bu2=snap('bu2',(330-p.x)/7);},bscr:(p,s)=>{s.bd=snap('bd',(p.x-330)/7);},scr:(p,s)=>{s.bv=snap('bv',(p.x-450)/8);}},
   /* 為什麼會偏折：真實的球面（或切成一疊三稜鏡），在兩個表面各用一次折射定律 */
   why(s){
     beginLight(s);
@@ -1414,6 +1423,54 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
     const flash=s.flashT>0&&s.flash?`<b>${s.flash}</b><br>`:'';
     const note=flash+(!s.on?'按「開燈」點燃蠟燭。':u<f?'蠟燭在<b>焦點以內</b>：紙屏怎麼移都接不到像。從紙屏這一側<b>透過透鏡看</b>，會看到正立、放大的<b>虛像</b>（放大鏡）。':inf?'蠟燭在<b>焦點上</b>：折射光平行，紙屏上只有一片亮光，<b>不成像</b>。'
       :far?`像距約 ${num(v)} cm，超出光具座，紙屏放不到。把蠟燭往遠離透鏡的方向移一點。`:sharp?'找到了！<b>實像</b>可以用紙屏接到。按「記錄這一次」，再換一個蠟燭位置。':'前後移動紙屏，找到<b>最清楚</b>的像（燭焰的像最清楚、邊緣最銳利）。');
+    return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,note};},
+  /* 為什麼會模糊：把透鏡看成很多個小孔，每個小孔各成一個針孔像；只有紙屏在會聚處時這些像才疊在一起 */
+  blur(s){
+    beginLight(s);
+    const f=10,A=5,u=s.bu2,Dd=s.bd,lens=s.bdev==='lens',v=f*u/(u-f),m=-v/u,oh=3,cx=330,cy=372,X=d=>cx+d*7,Y=y=>cy-y*11;
+    const holes=s.bh==='1'?[[0,0]]:s.bh==='2'?[[0,3.5],[0,-3.5]]:s.bh==='5'?[[0,0],[0,3.5],[0,-3.5],[3.5,0],[-3.5,0]]:(()=>{const o=[];for(let x=-4.5;x<=4.5;x+=1)for(let y=-4.5;y<=4.5;y+=1)if(x*x+y*y<=4.6*4.6)o.push([x,y]);return o;})();
+    const all=s.bh==='all',many=holes.length>1;
+    /* 依小孔位置上色：上紅、下青、右紫、左綠，中間白 */
+    const hcol=(hx,hy)=>{if(!s.bcol||all&&s.breal)return '#ffe8a5';const r=Math.min(1,Math.hypot(hx,hy)/4.5),a=(deg(Math.atan2(hy,hx))-90+720)%360;return `hsl(${a.toFixed(0)} ${(r*95).toFixed(0)}% ${(84-16*r).toFixed(0)}%)`;};
+    /* 穿過小孔 h 的光打在紙屏上的位置：每個像大小都是 物 × D/u，只差在錯開多少 */
+    const shift=lens?1-Dd/v:1+Dd/u,onScr=(h,p)=>h*shift-p*Dd/u,sharp=lens&&Math.abs(shift)*3.5<0.15;
+    let h=`<clipPath id="bside"><rect x="8" y="238" width="884" height="254"/></clipPath><g clip-path="url(#bside)">`+L(15,cy,885,cy,{stroke:D.muted,w:1.5,dash:true});
+    if(lens)for(const sg of[-1,1])for(const k of[1,2])h+=L(X(sg*k*f),cy-6,X(sg*k*f),cy+6,{stroke:D.muted,w:2})+T(X(sg*k*f),cy+24,`${k===2?'2':''}F`,{size:13,fill:D.muted,anchor:'middle'});
+    const ys=all?[-4.5,-3,-1.5,0,1.5,3,4.5]:[...new Set(holes.filter(p=>p[0]===0).map(p=>p[1]))];
+    const gaps=all&&!lens?[[-A,A]]:all?[]:ys.map(y=>[y-.35,y+.35]),bar=(x,w,y0,y1,c)=>{let g='',top=y1;for(const[a,b]of[...gaps].sort((p,q)=>q[1]-p[1])){if(b<top)g+=`<rect x="${x}" y="${Y(top)}" width="${w}" height="${(top-b)*11}" fill="${c}"/>`;top=Math.min(top,a);}if(top>y0)g+=`<rect x="${x}" y="${Y(top)}" width="${w}" height="${(top-y0)*11}" fill="${c}"/>`;return g;};
+    if(lens){h+=`<path d="M${cx} ${Y(A)-6}Q${cx+18} ${cy} ${cx} ${Y(-A)+6}Q${cx-18} ${cy} ${cx} ${Y(A)-6}" fill="#61ddeb33" stroke="${D.ray}" stroke-width="2.5"/>`;if(!all)h+=bar(cx-17,7,-A-1.2,A+1.2,'#05080d');}
+    else h+=bar(cx-4,8,-13,13,'#5d7088');
+    /* 光線：從物體頂端穿過每一個（側面看得到的）小孔，打到紙屏 */
+    const hits=[];
+    if(s.on)for(const hy of ys){const ysc=onScr(hy,oh),c=hcol(0,hy);hits.push(ysc);h+=ray([[X(-u),Y(oh)],[X(0),Y(hy)],[X(Dd),Y(ysc)]],c,{w:all?1.6:2.6,arrow:false,op:all?.75:.95});}
+    const fade=fadeIn();
+    if(lens&&fade>0&&many&&!sharp){const ix=X(v),iy=Y(m*oh);if(Dd<v)for(const hy of ys)h+=L(X(Dd),Y(onScr(hy,oh)),ix,iy,{stroke:hcol(0,hy),w:1.2,dash:'4 5',op:.45*fade});
+      if(ix<880)h+=`<circle cx="${ix}" cy="${iy}" r="4.5" fill="${D.image}" opacity="${fade}"/>`+T(ix,iy+(m<0?44:-12),Dd<v?'光在紙屏後面才會聚':'光在這裡會聚過了',{size:14,fill:D.image,anchor:'middle',weight:700,halo:true});}
+    if(fade>0&&many&&hits.length>1){const lo=Math.min(...hits),hi=Math.max(...hits),bx=X(Dd)+14;if(hi-lo>0.3)h+=L(bx,Y(hi),bx,Y(lo),{stroke:'#ff8a7a',w:2.5,op:fade})+L(bx-5,Y(hi),bx+5,Y(hi),{stroke:'#ff8a7a',w:2.5,op:fade})+L(bx-5,Y(lo),bx+5,Y(lo),{stroke:'#ff8a7a',w:2.5,op:fade})+T(bx+10,clamp((Y(hi)+Y(lo))/2+5,258,485),'錯開',{size:15,fill:'#ff8a7a',weight:700,halo:true});
+      else h+=T(X(Dd)+14,clamp(Y(hi)+5,258,485),'疊在一起！',{size:15,fill:D.third,weight:700,halo:true});}
+    h+=`<g opacity="${s.on?1:.35}">${vArrow(X(-u),cy,Y(oh),D.object)}</g>`+T(X(-u),Y(oh)-14,'物',{size:17,fill:D.object,anchor:'middle'})+handle('bobj',X(-u),cy+44,D.object,11);
+    const sx=X(Dd);h+=`<g data-drag="bscr" class="handle-body"><rect x="${sx-4}" y="248" width="8" height="230" rx="2" fill="#d8cda4"/></g>`+handle('bscr',sx,470,D.muted,11)+T(sx+10,264,'紙屏',{size:14,fill:D.muted})+'</g>';
+    /* 紙屏上看到的（從紙屏後面看）：每個小孔一個像 */
+    const px=20,py=12,pw=520,ph=215,ox=px+pw/2,oy=py+ph/2+6,k=Dd/u,ext=Math.max(...holes.map(([x,y])=>Math.hypot(x,y)))*Math.abs(shift)+1.6*k,g=Math.min(22,96/ext),op=all?0.1:0.6;
+    h+=`<clipPath id="bscrc"><rect x="${px}" y="${py}" width="${pw}" height="${ph}" rx="10"/></clipPath><rect x="${px}" y="${py}" width="${pw}" height="${ph}" rx="10" fill="#141a24" stroke="#3a4554"/>`;
+    if(s.on&&fade>0){const sd=all&&s.breal?Math.abs(shift)*A*g*0.4:0;h+=(sd>0.3?`<filter id="bblur2" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="${sd.toFixed(1)}"/></filter>`:'')+`<g clip-path="url(#bscrc)"><g opacity="${fade}"${sd>0.3?' filter="url(#bblur2)"':''}>`;for(const[hx,hy]of holes){const c=hcol(hx,hy);h+=`<g transform="translate(${(ox+hx*shift*g).toFixed(1)} ${(oy-hy*shift*g).toFixed(1)}) scale(${(k*g).toFixed(3)}) rotate(180)" opacity="${op}"><path d="M0 1.5V-1.5M-0.55 -0.85L0 -1.5L0.55 -0.85" fill="none" stroke="${c}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path d="M0 -1.5L1.3 -1L0 -0.5Z" fill="${c}"/></g>`;}h+='</g></g>';}
+    h+=T(px+12,py+22,'紙屏上看到的（從紙屏後面看）',{size:13,fill:D.muted,weight:700});
+    if(s.on&&fade>0)h+=T(px+pw-12,py+ph-12,!many?'只有一個像：清楚，但很暗':sharp?'所有的像疊在一起 → 清楚、明亮':all?'無數個像錯開疊在一起 → 模糊':`${holes.length} 個像錯開了 → 模糊`,{size:14,fill:sharp||!many?D.third:'#ff8a7a',anchor:'end',weight:700});
+    else if(!s.on)h+=T(ox,oy,'按「開燈」',{size:16,fill:D.muted,anchor:'middle'});
+    /* 透鏡（或針孔板）正面：小孔的位置與顏色 */
+    const fx=560,fw=200,fcx=fx+fw/2,fcy=py+ph/2+8,R=A*14;
+    h+=`<rect x="${fx}" y="${py}" width="${fw}" height="${ph}" rx="10" fill="#141a24" stroke="#3a4554"/>`+T(fx+12,py+22,lens?'透鏡正面':'針孔板正面',{size:13,fill:D.muted,weight:700});
+    if(lens)h+=`<circle cx="${fcx}" cy="${fcy}" r="${R}" fill="#61ddeb33" stroke="${D.ray}" stroke-width="2.5"/>`+(all?'':`<circle cx="${fcx}" cy="${fcy}" r="${R+6}" fill="#05080d"/>`);
+    else h+=`<rect x="${fcx-R-10}" y="${fcy-R-10}" width="${2*R+20}" height="${2*R+20}" rx="6" fill="#5d7088"/>`+(all?`<circle cx="${fcx}" cy="${fcy}" r="${R}" fill="#141a24"/>`:'');
+    for(const[hx,hy]of holes)h+=`<circle cx="${(fcx+hx*14).toFixed(1)}" cy="${(fcy-hy*14).toFixed(1)}" r="${all?3:5}" fill="${hcol(hx,hy)}"${all?' opacity=".8"':''}/>`;
+    if(!s.on)h+=T(450,300,'按「開燈」',{size:18,fill:D.muted,anchor:'middle'});
+    const spread=Math.abs(shift)*(all?2*A:7);
+    const reads=[[lens?'光會聚的位置（像距）':'光會聚的位置',lens?`透鏡後 ${num(v)} cm`:'沒有（針孔不會讓光偏折）'],['紙屏位置',`${Dd} cm`],['每個像的大小',`物體的 ${num(k,2)} 倍（每個小孔都一樣）`],
+      ['像錯開的距離',!many?'只有一個像':spread<0.15?'0 → 疊在一起，清楚':`約 ${num(spread)} cm → 模糊`]];
+    const note=!s.on?'按「開燈」。':!many?'只開<b>一個小孔</b>：就是針孔成像。紙屏放在哪裡都看得到清楚的像，只是光太少、<b>很暗</b>。'
+      :!lens?`沒有透鏡時，每個孔都各自形成一個倒立的像，大小一樣，但<b>位置錯開</b>；紙屏放在哪裡都疊不起來。孔越多（針孔挖越大）→ 越亮，但越模糊。`
+      :sharp?'紙屏剛好在光會聚的地方：每個小孔各自形成一個針孔像，大小一樣、<b>位置也一樣</b> → 全部疊在一起 → 又清楚又亮。這就是透鏡的功用：<b>把很多個針孔像拉到同一個位置</b>。'
+      :`透鏡可以看成<b>很多個小孔</b>，每個小孔都形成一個倒立的針孔像（大小都一樣）。紙屏${Dd<v?'太靠近透鏡，光還沒會聚':'離得太遠，光已經會聚又散開'}，這些像就<b>錯開</b>疊在一起 → 模糊。`+(all?'整個透鏡＝無數個小孔，無數個像疊成一片模糊。':'打開「全部」看看整個透鏡。');
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,note};},
   keep:['mode','type'],
   render(s){return this[s.mode](s);}},
