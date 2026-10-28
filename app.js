@@ -211,6 +211,87 @@ function benchLog(s){
   else{s.flash=v>50?`像距約 ${num(v)} cm，超出光具座，紙屏放不到`:'先移動紙屏，找到最清楚的像再記錄';s.flashT=3;return;}
   s.log=s.log.filter(r=>r.u!==u);s.log.push(row);if(s.log.length>5)s.log.shift();s.flash='已記錄！';s.flashT=1.5;}
 
+/* ---------- 第五章 溫度與熱：共用繪圖 ---------- */
+const WARM=t=>{const f=clamp(t/100,0,1);return `rgb(${Math.round(76+f*124)},${Math.round(133-f*48)},${Math.round(187-f*130)})`;};
+const HG='#9aa3ad',ALC='#d94b3d';
+/* 玻璃管溫度計：x 中心、yb 玻璃泡圓心、yt 管頂、yl 液面。o.c 液體顏色、o.br 泡半徑、o.w 管內徑、o.neck 縮口高度、o.gap 液柱在縮口斷開 */
+function glassTherm(x,yb,yt,yl,o={}){const{c=ALC,br=15,w=8,neck=0,gap=false}=o,ow=w+12;yl=clamp(yl,yt,yb);
+  let h=`<circle cx="${x}" cy="${yb}" r="${br+5}" fill="#fbfdff" stroke="#8fa3a8" stroke-width="2"/>`
+    +`<rect x="${x-ow/2}" y="${yt-10}" width="${ow}" height="${yb-yt+10-br}" rx="${ow/2}" fill="#fbfdff" stroke="#8fa3a8" stroke-width="2"/>`
+    +`<rect x="${x-ow/2+1.5}" y="${yb-br-14}" width="${ow-3}" height="${14+br}" fill="#fbfdff"/>`
+    +`<circle cx="${x}" cy="${yb}" r="${br}" fill="${c}"/>`;
+  if(gap&&neck){h+=`<rect x="${x-w/2}" y="${neck+7}" width="${w}" height="${yb-neck-7}" fill="${c}"/>`;if(yl<neck-3)h+=`<rect x="${x-w/2}" y="${yl}" width="${w}" height="${neck-3-yl}" fill="${c}"/>`;}
+  else h+=`<rect x="${x-w/2}" y="${yl}" width="${w}" height="${yb-yl}" fill="${c}"/>`;
+  if(neck)h+=`<path d="M${x-ow/2+1} ${neck-6}L${x-w/2+1} ${neck}L${x-ow/2+1} ${neck+6}M${x+ow/2-1} ${neck-6}L${x+w/2-1} ${neck}L${x+ow/2-1} ${neck+6}" fill="#dfe6e8" stroke="#8fa3a8" stroke-width="1.5"/>`;
+  return h;}
+/* 刻度：由 a 到 b，每 minor 一小格、每 major 標數字；y(v) 給位置；side=1 畫在右側 */
+function thermTicks(x,a,b,minor,major,y,o={}){const{side=1,size=15,fill=P.muted,fmt=v=>String(v).replace('-','−')}=o;let h='';
+  for(let v=Math.ceil(a/minor)*minor;v<=b+1e-9;v+=minor){const big=Math.abs(v/major-Math.round(v/major))<1e-6,yy=y(v);
+    h+=L(x,yy,x+side*(big?14:8),yy,{stroke:fill,w:big?1.6:1});if(big)h+=T(x+side*20,yy+5,fmt(+v.toFixed(4)),{size,fill,anchor:side>0?'start':'end'});}
+  return h;}
+const beakerPath=(x1,x2,y1,y2)=>`<path d="M${x1} ${y1}V${y2}H${x2}V${y1}" fill="none" stroke="#83999d" stroke-width="4" stroke-linejoin="round"/>`;
+const thermBubble=(x,y,text,c)=>`<rect x="${x-62}" y="${y-24}" width="124" height="40" rx="18" fill="#fffdf8" stroke="${c}" stroke-width="2"/>`+T(x,y+3,text,{size:20,fill:c,anchor:'middle',weight:700});
+/* 華氏、攝氏、自訂溫標 */
+const toF=c=>c*9/5+32,toX=(c,s)=>s.xa+c*(s.xb-s.xa)/100;
+const tnum=v=>{const r=Math.round(v*10)/10;return Number.isInteger(r)?String(r):r.toFixed(1);};
+/* 5-2 熱平衡：A 在內杯、B 在外杯，熱流 = K × 溫差；散熱時外杯對 25°C 的空氣散熱 */
+function mixCurve(s){const K=200,KL=s.loss?10:0,dt=.01,out=[];let a=s.ta,b=s.tb,lost=0;
+  for(let i=0;i<=1000;i++){if(i%5===0)out.push([i*dt,a,b,lost]);const p=K*(a-b)*dt,q=KL*(b-25)*dt;a-=p/s.ma;b+=(p-q)/s.mb;lost+=q;}
+  return out;}
+
+/* 5-1 想一想與例題 */
+const TEMP_Q={
+  touch:['左手先泡熱水、右手先泡冷水，再一起放進同一盆溫水，兩手的感覺一樣嗎？','<b>不一樣</b>：左手覺得溫水冷，右手覺得溫水熱。可是溫度計量到的都是同一個溫度。手的感覺會受原來狀態影響，<b>不可靠</b>，所以要用溫度計測量物體的<b>冷熱程度</b>，也就是溫度。'],
+  liquid:['要測量 −60°C 的極地氣溫，該用酒精溫度計還是水銀溫度計？量沸水呢？','水銀在 <b>−39°C 就凝固</b>，量不了 −60°C，要用<b>酒精</b>溫度計（酒精的凝固點在 −100°C 以下）。酒精在 <b>78°C 就沸騰</b>，量沸水要用<b>水銀</b>溫度計（水銀 357°C 才沸騰）。選溫度計要看<b>測量範圍</b>。'],
+  clinical:['體溫計為什麼使用前要甩一甩？沒甩就量會怎樣？','體溫計玻璃泡上方有一段很細的<b>縮口</b>。拿出來後液柱在縮口斷開，不會自己降回去，方便讀數。所以下次量之前要<b>甩一甩</b>，把液柱甩回玻璃泡。沒甩就量，若這次體溫比上次低，讀數會<b>停在上一次的較高值</b>。（按「放進腋下」比較看看）'],
+  bimetal:['雙金屬片受熱為什麼會彎曲？會往哪一邊彎？','兩種金屬（例如銅和鐵）貼在一起，受熱時<b>膨脹的程度不同</b>。銅膨脹得比鐵多，變得比較長，所以金屬片向<b>鐵的那一側</b>彎（銅在外側）。冷卻時則反過來彎。溫度越高彎得越多，就能帶動指針指出溫度。'],
+  digital:['電子溫度計裡面沒有液柱，怎麼知道溫度？','探頭裡的元件（熱敏電阻）<b>電阻會隨溫度改變</b>。電路量出電阻，再換算成溫度，用數字顯示出來。'],
+  ir:['耳溫槍、額溫槍為什麼不用等很久，也不必含在嘴裡？','物體都會放出<b>紅外線</b>，溫度越高放出越強。耳溫槍、額溫槍偵測紅外線的強弱，再換算成溫度，所以<b>不必接觸</b>、一兩秒就能讀數。'],
+  design:['兩支溫度計的玻璃泡一樣大，一支管子較細、一支較粗。哪一支比較靈敏？','<b>管子較細</b>的。溫度升高 1°C，玻璃泡裡的液體膨脹的體積一樣多，擠進較細的管子就上升得比較長，刻度間隔較大，比較容易看出細小的溫度變化。玻璃泡較大（液體較多）也有同樣效果。'],
+  scale:['定攝氏溫標時，為什麼選「冰水混合物」和「沸水」當作兩個定點？','在 1 大氣壓下，純水的<b>冰水混合物溫度固定</b>，<b>沸騰時溫度也固定</b>，在哪裡都能重複做出來，所以適合當定點。攝氏把兩點定為 0°C 和 100°C，中間<b>等分成 100 格</b>；華氏定為 32°F 和 212°F，中間等分成 180 格。'],
+  convert:['攝氏和華氏的讀數有可能一樣嗎？','可以：<b>−40°C ＝ −40°F</b>。由 C/100 ＝ (F − 32)/180，令 F ＝ C，得 C ＝ −40。（按「−40°C」驗證）']};
+const TEMP_QUIZ=[
+  {q:'一般實驗室用的酒精溫度計，是利用什麼原理測量溫度？',opts:['液體熱脹冷縮','金屬膨脹程度不同','電阻隨溫度改變','物體放出紅外線'],ans:0,
+    sol:'玻璃泡裡的液體受熱<b>膨脹</b>、遇冷<b>收縮</b>，體積的變化在細管中變成液柱長度的變化。',go:s=>{s.mode='types';s.kind='liquid';s.liq='alc';s.tt=60;},goLabel:'看液體溫度計'},
+  {q:'小美昨天發燒，體溫計量到 38.5°C，用完沒有甩。今天體溫已經恢復成 36.8°C，她直接用這支體溫計再量一次，讀數是：',opts:['36.8°C','37.6°C','38.5°C','低於 35°C'],ans:2,
+    sol:'體溫計有<b>縮口</b>，液柱不會自己降回去。今天體溫比較低，液柱不會下降，所以仍停在 <b>38.5°C</b>。使用前要先甩一甩。',go:s=>{s.mode='types';s.kind='clinical';s.cr=38.5;s.body=36.8;s.clin='in';},goLabel:'用體溫計驗證'},
+  {q:'要測量 −60°C 的南極氣溫，應該選用哪一種溫度計？',opts:['水銀溫度計','酒精溫度計','體溫計','哪一種都可以'],ans:1,
+    sol:'水銀在 <b>−39°C</b> 就凝固；酒精的凝固點在 −100°C 以下，所以用<b>酒精溫度計</b>。體溫計只能量 35～42°C 左右。',go:s=>{s.mode='types';s.kind='liquid';s.liq='hg';s.tt=-50;},goLabel:'把水銀溫度計放到 −50°C'},
+  {q:'兩支液體溫度計的玻璃泡大小相同、裝同一種液體，甲的管徑較細、乙較粗。下列何者正確？',opts:['甲每 1°C 的刻度間隔較大，較靈敏','乙每 1°C 的刻度間隔較大，較靈敏','兩支刻度間隔相同','管徑越粗，液柱上升越多'],ans:0,
+    sol:'升高 1°C 時，兩支膨脹的液體體積一樣。管子越<b>細</b>，液柱上升越<b>長</b>，刻度間隔越大，越靈敏。',go:s=>{s.mode='design';s.bulb='s';s.bore='thin';s.dt=20;},goLabel:'比較兩支溫度計'},
+  {q:'一支沒有刻度的溫度計，放入冰水混合物中液柱長 3 cm，放入沸水（1 atm）中長 23 cm。放入某杯水中液柱長 8 cm，這杯水的溫度是：',opts:['8°C','25°C','40°C','80°C'],ans:1,
+    sol:'0～100°C 對應 3～23 cm，共 20 cm，每 1 cm 代表 100 ÷ 20 ＝ 5°C。8 cm 比 3 cm 多 5 cm → 5 × 5 ＝ <b>25°C</b>。也可寫成 (8 − 3)/(23 − 3) ＝ T/100。',go:s=>{s.mode='scale';s.sys='C';s.mk='test';s.tc=25;},goLabel:'用定標驗證'},
+  {q:'25°C 等於多少 °F？',opts:['45°F','57°F','77°F','81°F'],ans:2,
+    sol:'F ＝ 9/5 × C ＋ 32 ＝ 9/5 × 25 ＋ 32 ＝ 45 ＋ 32 ＝ <b>77°F</b>。也可用比例：C/100 ＝ (F − 32)/180。',go:s=>{s.mode='convert';s.cc=25;},goLabel:'用換算尺驗證'},
+  {q:'自訂一種 X 溫標：冰水混合物為 −20°X、沸水（1 atm）為 180°X。40°C 等於多少 °X？',opts:['20°X','60°X','80°X','100°X'],ans:1,
+    sol:'0～100°C 對應 −20～180°X，共 200 格，所以 1°C ＝ 2°X。40°C → −20 ＋ 40 × 2 ＝ <b>60°X</b>。比例式：(X − (−20))/200 ＝ 40/100。',go:s=>{s.mode='convert';s.xa=-20;s.xb=180;s.cc=40;},goLabel:'用換算尺驗證'},
+  {q:'在什麼溫度時，攝氏溫度計和華氏溫度計的讀數相同？',opts:['0°','−32°','−40°','100°'],ans:2,
+    sol:'令 F ＝ C 代入 C/100 ＝ (F − 32)/180：180C ＝ 100C − 3200 → C ＝ <b>−40</b>。',go:s=>{s.mode='convert';s.cc=-40;},goLabel:'用換算尺驗證'}];
+
+/* 5-2 想一想與例題 */
+const HEAT_Q={
+  define:['用同一個熱源，把 100 g 和 200 g 的水各加熱 2 分鐘，哪一杯吸收的熱量多？哪一杯升溫多？','同一熱源、加熱時間相同 → 吸收的<b>熱量相同</b>。由 <b>H ＝ m × ΔT</b>，熱量相同時質量越大升溫越少：100 g 升溫是 200 g 的 <b>2 倍</b>。（打開「比較不同水量」看圖上的斜率）'],
+  mix:['熱水和冷水達到熱平衡時，兩杯的「熱量」相同，還是「溫度」相同？','<b>溫度相同</b>。熱由高溫傳到低溫，直到溫度相同就不再有淨熱傳。不計散熱時，<b>熱水放出的熱量 ＝ 冷水吸收的熱量</b>；兩杯水量不同時，升高與下降的溫度就不同。熱量是傳過去的能量，不能說兩杯「含有的熱量」相同。']};
+const HEAT_QUIZ=[
+  {q:'「1 卡」的定義是：',opts:['使 1 g 的水升高 1°C 所需的熱量','使 1 kg 的水升高 1°C 所需的熱量','使 1 g 的任何物質升高 1°C 所需的熱量','使 1 g 的水升高 100°C 所需的熱量'],ans:0,
+    sol:'<b>1 卡（cal）</b>：使 1 g 的水溫度升高 1°C 所需的熱量。1 千卡（kcal）＝ 1000 卡，可使 1 kg 的水升高 1°C。食品包裝上的「大卡」就是千卡。'},
+  {q:'把 200 g 的水由 20°C 加熱到 50°C，水吸收了多少熱量？（不計散熱）',opts:['30 cal','600 cal','6000 cal','10000 cal'],ans:2,
+    sol:'H ＝ m × ΔT ＝ 200 × (50 − 20) ＝ <b>6000 cal</b> ＝ 6 kcal。',go:s=>{s.mode='define';s.m=200;s.t=6;},goLabel:'用加熱實驗驗證'},
+  {q:'500 g 的水吸收 2 kcal 的熱量，溫度升高多少？（不計散熱）',opts:['0.4°C','4°C','40°C','250°C'],ans:1,
+    sol:'2 kcal ＝ 2000 cal。ΔT ＝ H ÷ m ＝ 2000 ÷ 500 ＝ <b>4°C</b>。',go:s=>{s.mode='define';s.m=500;s.t=2;},goLabel:'用加熱實驗驗證'},
+  {q:'用同一個穩定熱源分別加熱甲杯 100 g、乙杯 300 g 的水，加熱時間相同。不計散熱，甲杯升高的溫度是乙杯的幾倍？',opts:['1/3 倍','1 倍','3 倍','9 倍'],ans:2,
+    sol:'同熱源、同時間 → 吸收的熱量相同。H ＝ m × ΔT，H 相同時 ΔT 與 m 成反比：甲的質量是乙的 1/3，升溫是乙的 <b>3 倍</b>。',go:s=>{s.mode='define';s.m=100;s.t=3;s.cmp=true;},goLabel:'比較不同水量'},
+  {q:'80°C 的熱水 100 g 和 20°C 的冷水 300 g 混合，不計散熱，達到熱平衡時的溫度是：',opts:['35°C','45°C','50°C','65°C'],ans:0,
+    sol:'熱水放出的熱量 ＝ 冷水吸收的熱量：100 × (80 − T) ＝ 300 × (T − 20)，8000 − 100T ＝ 300T − 6000，T ＝ <b>35°C</b>。只有兩邊水量相同時，才是兩個溫度的平均。',go:s=>{s.mode='mix';s.ma=100;s.ta=80;s.mb=300;s.tb=20;s.loss=false;s.tm=10;},goLabel:'用熱平衡實驗驗證'},
+  {q:'60°C 的熱水 100 g 倒入一杯 20°C 的冷水中，混合後的溫度是 30°C。不計散熱，冷水有多少 g？',opts:['100 g','200 g','300 g','400 g'],ans:2,
+    sol:'熱水放出 100 × (60 − 30) ＝ 3000 cal；冷水吸收 m × (30 − 20) ＝ 10m。3000 ＝ 10m，m ＝ <b>300 g</b>。',go:s=>{s.mode='mix';s.ma=100;s.ta=60;s.mb=300;s.tb=20;s.loss=false;s.tm=10;},goLabel:'用熱平衡實驗驗證'},
+  {q:'兩物體接觸後達到熱平衡，下列敘述何者正確？',opts:['兩物體所含的熱量相同','兩物體的溫度相同','兩物體升高或降低的溫度相同','質量大的物體溫度較高'],ans:1,
+    sol:'熱由高溫物體傳到低溫物體，直到兩者<b>溫度相同</b>，就達到熱平衡，不再有淨熱傳。質量不同時，升降的溫度並不相同。'},
+  {q:'實際做冷熱水混合實驗，測得的混合溫度常比用「放熱 ＝ 吸熱」算出來的低，主要原因是：',opts:['溫度計不準','有一部分熱散失到空氣中或被容器吸收','冷水吸收的熱量比熱水放出的多','熱由低溫傳到高溫'],ans:1,
+    sol:'熱水放出的熱量，有一部分<b>散失到空氣中、被容器吸收</b>，冷水實際吸收的比較少，所以混合溫度較低。實驗時可用保麗龍杯、加蓋來減少散熱。',go:s=>{s.mode='mix';s.ma=100;s.ta=80;s.mb=300;s.tb=20;s.loss=true;s.tm=10;},goLabel:'打開散熱比較'},
+  {q:'用溫度計量一杯熱水，要等液柱不再移動才讀數，主要原因是：',opts:['要等溫度計和熱水的溫度相同（熱平衡）','要等熱水冷卻到室溫','液柱移動時刻度會改變','要讓熱水吸收溫度計的熱'],ans:0,
+    sol:'溫度計放進熱水後，熱由熱水傳給溫度計，直到兩者<b>溫度相同（熱平衡）</b>，液柱才停止移動，這時的讀數才是熱水的溫度。'}];
+
 const LABS={
 /* ===== 01 測量 ===== */
 measure:{group:1,n:'01',name:'測量與估讀',subtitle:'拖動物件或換一把尺，練習讀出完整的測量值。',
@@ -1543,7 +1624,222 @@ color:{group:2,n:'4-5',keep:['mode'],name:'色散與顏色',subtitle:'白光經�
     }
     const abs=['紅','綠','藍'].filter((_,i)=>ref[i]<0.5),refl=['紅','綠','藍'].filter((_,i)=>ref[i]>0.5);
     return {svg:h,reads:[['顏料',sel.length?sel.map(p=>p[0]).join(' ＋ '):'（白紙）'],['吸收',!s.on?'—':abs.length?abs.join('、')+'光':'沒有'],['反射',!s.on?'—':refl.length?refl.join('、')+'光':'沒有'],['看起來',seen]],
-      note:'（延伸）顏料三原色是<b>青、洋紅、黃</b>：青吸收紅光、洋紅吸收綠光、黃吸收藍光。混得越多吸收越多 → 越暗（<b>減色</b>）。'};}}
+      note:'（延伸）顏料三原色是<b>青、洋紅、黃</b>：青吸收紅光、洋紅吸收綠光、黃吸收藍光。混得越多吸收越多 → 越暗（<b>減色</b>）。'};}},
+/* ===== 5-1 溫度與溫度計 ===== */
+temp:{group:3,n:'5-1',keep:['mode'],name:'溫度與溫度計',subtitle:'溫度是物體的冷熱程度。溫度計利用物質隨溫度規律改變的性質來測量；溫標由兩個定點之間等分刻度而來。',
+  q:s=>({html:qBlockHTML(TEMP_Q[s.mode==='types'?s.kind:s.mode])+quizHTML(s,TEMP_QUIZ)}),
+  qAction(s,v){quizAction(s,v,TEMP_QUIZ);},
+  state:{mode:'touch',tstep:'soak',measure:false,kind:'liquid',liq:'alc',tt:25,body:37,clin:'out',cr:null,bulb:'b',bore:'thin',dt:20,sys:'C',mk:'ice',tc:40,xa:-20,xb:180,cc:37,kel:false,qi:0,qp:null,qc:false,qs:false},
+  controls:[
+    {type:'seg',key:'mode',label:'實驗',options:[['touch','用手感覺可靠嗎'],['types','溫度計的種類'],['design','液體溫度計的設計'],['scale','溫標的制定'],['convert','溫標的換算']]},
+    {type:'seg',key:'tstep',label:'步驟',options:[['soak','① 左手泡熱水、右手泡冷水'],['move','② 兩手一起放進溫水']],show:s=>s.mode==='touch'},
+    {type:'toggle',key:'measure',label:'用溫度計量量看',show:s=>s.mode==='touch'},
+    {type:'seg',key:'kind',label:'溫度計',options:[['liquid','液體溫度計'],['clinical','體溫計'],['bimetal','金屬溫度計'],['digital','電子溫度計'],['ir','紅外線溫度計']],show:s=>s.mode==='types'},
+    {type:'seg',key:'liq',label:'液體',options:[['alc','酒精（染紅）'],['hg','水銀']],show:s=>s.mode==='types'&&s.kind==='liquid'},
+    {type:'range',key:'tt',label:'待測物的溫度',min:-50,max:120,step:1,unit:' °C',show:s=>s.mode==='types'&&s.kind!=='clinical'},
+    {type:'range',key:'body',label:'現在的體溫',min:35,max:42,step:.1,unit:' °C',fmt:s=>s.body.toFixed(1)+' °C',show:s=>s.mode==='types'&&s.kind==='clinical'},
+    {type:'buttons',label:'操作',items:[['放進腋下',s=>{s.clin='in';}],['拿出來',s=>{s.clin='out';}],['甩一甩',s=>{s.clin='out';s.cr=null;}]],show:s=>s.mode==='types'&&s.kind==='clinical'},
+    {type:'seg',key:'bulb',label:'乙的玻璃泡',options:[['s','小'],['b','大']],show:s=>s.mode==='design'},
+    {type:'seg',key:'bore',label:'乙的管徑',options:[['thick','粗'],['thin','細']],show:s=>s.mode==='design'},
+    {type:'range',key:'dt',label:'水溫',min:0,max:40,step:1,unit:' °C',show:s=>s.mode==='design'},
+    {type:'seg',key:'sys',label:'要定的溫標',options:[['C','攝氏'],['F','華氏'],['X','自訂 X 溫標']],show:s=>s.mode==='scale'},
+    {type:'seg',key:'mk',label:'步驟',options:[['ice','① 放入冰水混合物'],['boil','② 放入沸水'],['test','③ 等分刻度、量一杯水']],show:s=>s.mode==='scale'},
+    {type:'range',key:'tc',label:'這杯水的溫度（攝氏）',min:0,max:100,step:1,unit:' °C',show:s=>s.mode==='scale'&&s.mk==='test'},
+    {type:'range',key:'cc',label:'攝氏溫度',min:-40,max:110,step:1,unit:' °C',show:s=>s.mode==='convert'},
+    {type:'buttons',label:'常見溫度',items:[['冰點 0°C',s=>{s.cc=0;}],['室溫 25°C',s=>{s.cc=25;}],['體溫 37°C',s=>{s.cc=37;}],['沸點 100°C',s=>{s.cc=100;}],['−40°C',s=>{s.cc=-40;}]],show:s=>s.mode==='convert'},
+    {type:'range',key:'xa',label:'X 溫標：冰點定為',min:-50,max:50,step:5,unit:' °X',show:s=>s.mode==='convert'||(s.mode==='scale'&&s.sys==='X')},
+    {type:'range',key:'xb',label:'X 溫標：沸點定為',min:60,max:250,step:10,unit:' °X',show:s=>s.mode==='convert'||(s.mode==='scale'&&s.sys==='X')},
+    {type:'toggle',key:'kel',label:'（補充）顯示克氏溫標 K',show:s=>s.mode==='convert'}],
+  render(s){const m=s.mode;return m==='types'?this[s.kind](s):m==='design'?this.design(s):m==='scale'?this.scale(s):m==='convert'?this.convert(s):this.touch(s);},
+  panel:(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="#fffdf8" stroke="#ddd7c9"/>`,
+  lines(x,y,arr,o={}){const{size=18,gap=30}=o;return arr.map((t,i)=>T(x,y+i*gap,t,{size,fill:P.ink})).join('');},
+  touch(s){const soak=s.tstep==='soak',B=[[200,45,'熱水',WARM(95)],[450,30,'溫水',WARM(50)],[700,10,'冷水',WARM(0)]];
+    let h=T(450,46,soak?'① 兩手各泡一分鐘':'② 兩手一起放進溫水',{size:24,anchor:'middle',weight:700});
+    B.forEach(([x,t,n,c])=>{h+=`<path d="M${x-106} 300L${x-88} 420H${x+88}L${x+106} 300Z" fill="${c}" fill-opacity=".35"/>`+L(x-106,300,x+106,300,{stroke:c,w:3})
+      +`<path d="M${x-114} 262L${x-90} 424H${x+90}L${x+114} 262" fill="none" stroke="#83999d" stroke-width="4" stroke-linejoin="round"/>`
+      +T(x,456,n,{size:21,anchor:'middle',weight:700,fill:c})+T(x,484,s.measure?`溫度計：${t}°C`:'溫度？',{size:17,anchor:'middle',fill:s.measure?P.ink:P.muted});
+      if(t===45)for(let i=0;i<3;i++)h+=`<path d="M${x-40+i*40} 290q-8 -12 0 -24q8 -12 0 -24" fill="none" stroke="${P.red}" stroke-width="2" opacity=".45"/>`;});
+    const hand=(x,y,name)=>`<rect x="${x-26}" y="88" width="52" height="${y-178}" rx="8" fill="#a9c1d1"/>`
+      +`<path d="M${x-22} ${y-92}V${y-22}Q${x-22} ${y} ${x} ${y}Q${x+22} ${y} ${x+22} ${y-22}V${y-92}Z" fill="#f2c9a5" stroke="#c99a76" stroke-width="2"/>`
+      +T(x,124,name,{size:17,anchor:'middle',weight:700,fill:'#2c4655'});
+    if(soak)h+=hand(200,370,'左手')+hand(700,370,'右手')+thermBubble(312,150,'熱熱的',P.red)+thermBubble(588,150,'冰冰的',P.blue);
+    else h+=hand(420,370,'左手')+hand(480,370,'右手')+thermBubble(300,150,'好冷！',P.blue)+thermBubble(600,150,'好熱！',P.red)
+      +T(450,236,'同一盆水',{size:17,anchor:'middle',fill:P.muted});
+    return {svg:h,reads:soak?[['左手','泡在 45°C 熱水'],['右手','泡在 10°C 冷水'],['接下來','一起放進溫水']]:[['左手覺得溫水','冷'],['右手覺得溫水','熱'],['溫度計',s.measure?'兩邊都是 30 °C':'（打開「用溫度計量量看」）']],
+      note:'<b>溫度</b>：表示物體的<b>冷熱程度</b>。同一盆溫水，兩手感覺卻相反：手的感覺會受原來的狀態影響，<b>不可靠</b>，所以要用溫度計測量。'};},
+  liquid(s){const hg=s.liq==='hg',x=300,yb=455,y=t=>420-(t+50)*2,frozen=hg&&s.tt<-39,boil=!hg&&s.tt>78,show=frozen?-39:boil?78:s.tt;
+    let h=`<rect x="226" y="372" width="148" height="114" fill="${WARM(s.tt)}" fill-opacity=".3"/>`+beakerPath(222,378,350,488)+T(370,395,'待測物',{size:15,anchor:'end',fill:P.muted});
+    h+=glassTherm(x,yb,70,y(show),{c:hg?(frozen?'#6f777f':HG):ALC,br:14,w:7})+thermTicks(x+12,-50,120,5,10,y,{size:14});
+    h+=L(x-30,y(s.tt),x-12,y(s.tt),{stroke:P.accent,w:3,arrow:true})+T(x-36,y(s.tt)+6,`實際 ${s.tt}°C`,{size:15,anchor:'end',fill:P.accent,weight:700});
+    h+=this.panel(470,70,400,330)+T(670,108,'液體溫度計：熱脹冷縮',{size:22,anchor:'middle',weight:700});
+    h+=this.lines(495,148,['玻璃泡裡的液體受熱膨脹、遇冷收縮，','體積變化在細管中變成液柱長度的變化。'],{size:17,gap:28});
+    const row=(yy,a,b,c,o={})=>T(530,yy,a,{size:17,anchor:'middle',...o})+T(660,yy,b,{size:17,anchor:'middle',...o})+T(790,yy,c,{size:17,anchor:'middle',...o});
+    h+=row(232,'液體','凝固點','沸點',{weight:700,fill:P.muted})+L(490,242,850,242,{stroke:P.faint})
+      +row(270,'酒精','−100°C 以下','78°C',{fill:hg?P.muted:ALC,weight:hg?400:700})+row(304,'水銀','−39°C','357°C',{fill:hg?'#5d6670':P.muted,weight:hg?700:400});
+    const msg=frozen?['水銀在 −39°C 就凝固','量不了這麼低的溫度 → 改用酒精溫度計']:boil?['超過酒精的沸點 78°C','量不了 → 改用水銀溫度計']:['在測量範圍內',`讀數 ${s.tt}°C`];
+    h+=T(670,352,msg[0],{size:19,anchor:'middle',weight:700,fill:frozen||boil?P.red:P.accent})+T(670,382,msg[1],{size:17,anchor:'middle',fill:frozen||boil?P.red:P.ink});
+    return {svg:h,reads:[['待測物',s.tt+' °C'],['讀數',frozen||boil?'無法測量':s.tt+' °C'],['原理','液體熱脹冷縮']],
+      note:'讀數時視線要與液面<b>等高</b>，並等液柱不再移動。選溫度計要看<b>測量範圍</b>：低溫用酒精、高溫用水銀。'};},
+  clinical(s){if(s.clin==='in')s.cr=Math.max(s.cr??0,s.body);
+    const x=300,yb=455,neck=420,y=t=>395-(t-35)*40,inn=s.clin==='in',stale=inn&&s.cr>s.body+1e-9,top=s.cr===null?neck+12:y(s.cr);
+    let h=inn?`<circle cx="${x}" cy="${yb}" r="44" fill="#f4b6a0" fill-opacity=".35"/>`+T(x-56,yb+6,`腋下 ${s.body.toFixed(1)}°C`,{size:16,anchor:'end',fill:P.red,weight:700})
+      :T(x-40,yb+6,'在空氣中',{size:16,anchor:'end',fill:P.muted});
+    h+=glassTherm(x,yb,100,top,{c:HG,br:14,w:6,neck,gap:!inn&&s.cr!==null})+thermTicks(x+11,35,42,.1,1,y,{size:15});
+    h+=L(x+11,y(37),x+30,y(37),{stroke:P.red,w:2})+T(x-20,neck+5,'縮口',{size:15,anchor:'end',fill:P.muted})+L(x-18,neck,x-9,neck,{stroke:P.muted,w:1.5});
+    h+=this.panel(470,70,400,330)+T(670,108,'體溫計的縮口',{size:22,anchor:'middle',weight:700});
+    const zx=560,zy=230,c=HG;
+    h+=`<path d="M${zx-30} 150V${zy-14}L${zx-10} ${zy}L${zx-30} ${zy+14}V310M${zx+30} 150V${zy-14}L${zx+10} ${zy}L${zx+30} ${zy+14}V310" fill="none" stroke="#8fa3a8" stroke-width="3"/>`;
+    h+=s.cr===null?`<rect x="${zx-26}" y="${zy+30}" width="52" height="${310-zy-30}" fill="${c}"/>`:inn?`<path d="M${zx-26} 160V${zy-12}L${zx-9} ${zy}L${zx-26} ${zy+12}V310H${zx+26}V${zy+12}L${zx+9} ${zy}L${zx+26} ${zy-12}V160Z" fill="${c}"/>`
+      :`<path d="M${zx-26} 160V${zy-24}H${zx+26}V160Z" fill="${c}"/><rect x="${zx-26}" y="${zy+22}" width="52" height="${310-zy-22}" fill="${c}"/>`;
+    h+=T(zx,330,'放大的縮口',{size:15,anchor:'middle',fill:P.muted});
+    h+=this.lines(612,160,stale?['體溫比讀數低：','上面那段液柱降不回來。']:inn?['體溫高：液體膨脹，','擠過縮口往上升。']:s.cr===null?['甩過了：','液體回到玻璃泡。']:['離開身體：液柱在縮口斷開，','上面那段不會降回去，','方便讀數。'],{size:16,gap:26});
+    h+=T(612,262,'下次用之前要甩一甩。',{size:16,fill:P.ink,weight:700});
+    if(stale)h+=T(670,365,`沒甩就量：讀數停在 ${s.cr.toFixed(1)}°C`,{size:18,anchor:'middle',weight:700,fill:P.red})+T(670,390,`不是現在的體溫 ${s.body.toFixed(1)}°C`,{size:16,anchor:'middle',fill:P.red});
+    else h+=T(670,375,s.cr===null?'讀數：低於 35°C（已甩下）':`讀數：${s.cr.toFixed(1)}°C`,{size:19,anchor:'middle',weight:700,fill:P.accent});
+    return {svg:h,reads:[['現在的體溫',s.body.toFixed(1)+' °C'],['體溫計讀數',s.cr===null?'低於 35 °C':s.cr.toFixed(1)+' °C'],['位置',inn?'腋下':'空氣中']],
+      note:'體溫計的刻度只有約 <b>35～42°C</b>，每小格 0.1°C，比一般溫度計精細。按「放進腋下」→「拿出來」，再把體溫調低、<b>不甩</b>直接量，看看讀數。'};},
+  bimetal(s){const th=(s.tt-20)*.0055,x0=150,y0=240,Ls=330,n=40,ds=Ls/n;
+    const pts=th=>{let x=x0,y=y0;const out=[[x,y,0]];for(let i=1;i<=n;i++){const f=th*(i-.5)/n;x+=Math.cos(f)*ds;y+=Math.sin(f)*ds;out.push([x,y,th*i/n]);}return out;};
+    const P0=pts(th),off=(d)=>P0.map(([x,y,f])=>`${(x-Math.sin(f)*d).toFixed(1)},${(y+Math.cos(f)*d).toFixed(1)}`).join(' ');
+    let h=`<rect x="70" y="90" width="460" height="320" rx="14" fill="${WARM(s.tt)}" fill-opacity=".14"/>`+T(300,118,`環境溫度 ${s.tt}°C`,{size:18,anchor:'middle',fill:P.muted});
+    for(let t=-40;t<=120;t+=20){const p=pts((t-20)*.0055)[n];h+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="${P.muted}"/>`+T(p[0]+16,p[1]+5,t+'°',{size:13,fill:P.muted});}
+    h+=`<polyline points="${off(-5)}" fill="none" stroke="#d98a4e" stroke-width="10" stroke-linecap="butt"/><polyline points="${off(5)}" fill="none" stroke="#8a949b" stroke-width="10" stroke-linecap="butt"/>`;
+    h+=`<rect x="112" y="205" width="40" height="70" rx="4" fill="#5b6870"/>`;
+    const tip=P0[n];h+=`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="7" fill="${P.red}"/>`;
+    h+=`<rect x="110" y="438" width="22" height="12" fill="#d98a4e"/>`+T(140,449,'銅（膨脹較多）',{size:15})+`<rect x="290" y="438" width="22" height="12" fill="#8a949b"/>`+T(320,449,'鐵（膨脹較少）',{size:15});
+    h+=this.panel(560,70,310,330)+T(715,108,'金屬溫度計',{size:22,anchor:'middle',weight:700});
+    h+=this.lines(582,150,['銅片和鐵片貼在一起（雙金屬片）。','受熱時銅膨脹得比鐵多，','→ 向鐵那一側（下方）彎曲；','冷卻時向銅那一側彎。','溫度變化越大，彎得越多。'],{size:16,gap:30});
+    h+=T(582,320,'實際常捲成螺旋狀，',{size:16,fill:P.muted})+T(582,346,'帶動指針（烤箱溫度計）。',{size:16,fill:P.muted});
+    const dir=Math.abs(s.tt-20)<1?'平直':s.tt>20?'向下（鐵那一側）':'向上（銅那一側）';
+    return {svg:h,reads:[['溫度',s.tt+' °C'],['彎曲方向',dir],['原理','兩種金屬膨脹程度不同']],
+      note:'假設雙金屬片在 <b>20°C</b> 時是平直的。彎曲程度有放大，方便觀察；灰點是不同溫度時尖端的位置，可以當作刻度。'};},
+  digital(s){const R=10*Math.exp(3950*(1/(s.tt+273.15)-1/298.15));
+    let h=`<rect x="134" y="300" width="192" height="168" fill="${WARM(s.tt)}" fill-opacity=".3"/>`+beakerPath(130,330,250,470)+T(230,492,'待測物',{size:15,anchor:'middle',fill:P.muted});
+    h+=`<rect x="226" y="150" width="8" height="270" rx="3" fill="#b8c2c7"/><rect x="224" y="410" width="12" height="22" rx="4" fill="#3c4a52"/>`+T(250,428,'熱敏電阻',{size:15,fill:P.ink});
+    h+=`<path d="M230 150C230 110 300 110 360 150" fill="none" stroke="#5b6870" stroke-width="3"/><rect x="340" y="120" width="170" height="120" rx="14" fill="#eef2f3" stroke="#8fa3a8" stroke-width="2"/><rect x="356" y="140" width="138" height="56" rx="6" fill="#cfdccf"/>`
+      +T(425,180,s.tt.toFixed(1)+'°C',{size:28,anchor:'middle',weight:700,fill:'#1c3326'});
+    h+=this.panel(560,70,310,360)+T(715,108,'電子溫度計',{size:22,anchor:'middle',weight:700});
+    h+=this.lines(582,148,['探頭裡的熱敏電阻，','電阻會隨溫度改變。','電路量出電阻 → 換算成溫度。'],{size:16,gap:28});
+    const X=t=>600+(t+50)/170*240,Y=r=>420-(Math.log10(r)-(-.5))/3.5*170;let d='';for(let t=-50;t<=120;t+=5)d+=(d?'L':'M')+X(t).toFixed(1)+' '+Y(10*Math.exp(3950*(1/(t+273.15)-1/298.15))).toFixed(1);
+    h+=L(600,250,600,420,{stroke:P.muted})+L(600,420,845,420,{stroke:P.muted})+`<path d="${d}" fill="none" stroke="${P.blue}" stroke-width="3"/>`+`<circle cx="${X(s.tt).toFixed(1)}" cy="${Y(R).toFixed(1)}" r="6" fill="${P.red}"/>`;
+    h+=T(600,242,'電阻',{size:14,anchor:'middle',fill:P.muted})+T(845,440,'溫度 →',{size:14,anchor:'end',fill:P.muted});
+    return {svg:h,reads:[['待測物',s.tt+' °C'],['電阻',(R>=10?num(R,0):num(R,2))+' kΩ'],['原理','電阻隨溫度改變']],
+      note:'這種熱敏電阻溫度越高、電阻越小（數值為示意）。電子體溫計就是這一類，量好會嗶一聲。'};},
+  ir(s){const k=clamp((s.tt+50)/170,0,1);
+    let h=`<rect x="100" y="170" width="170" height="170" rx="18" fill="${WARM(s.tt)}" fill-opacity=".75"/>`+T(185,262,s.tt+'°C',{size:26,anchor:'middle',weight:700,fill:'#fff'})+T(185,370,'待測物',{size:16,anchor:'middle',fill:P.muted});
+    for(let j=-1;j<=1;j++){let d=`M285 ${255+j*45}`;for(let x=285;x<=470;x+=6)d+=`L${x} ${(255+j*45+Math.sin((x-285)/11)*(5+7*k)).toFixed(1)}`;h+=`<path d="${d}" fill="none" stroke="${P.red}" stroke-width="${(1.2+4.5*k).toFixed(1)}" opacity="${(.35+.6*k).toFixed(2)}"/>`;}
+    h+=T(378,175,'紅外線（眼睛看不見）',{size:16,anchor:'middle',fill:P.red});
+    h+=`<path d="M480 215H600Q616 215 616 231V279Q616 295 600 295H560L548 385H516L524 295H480Z" fill="#eef2f3" stroke="#8fa3a8" stroke-width="2"/><rect x="530" y="230" width="72" height="34" rx="5" fill="#cfdccf"/>`+T(566,254,num(s.tt,0)+'°',{size:20,anchor:'middle',weight:700,fill:'#1c3326'});
+    h+=this.panel(640,70,230,330)+T(755,108,'紅外線溫度計',{size:21,anchor:'middle',weight:700});
+    h+=this.lines(660,150,['物體都會放出紅外線，','溫度越高放出越強。','偵測紅外線的強弱，','換算成溫度。','不必接觸，量得很快：','耳溫槍、額溫槍。'],{size:16,gap:30});
+    return {svg:h,reads:[['待測物',s.tt+' °C'],['紅外線',k<.35?'較弱':k<.7?'中等':'較強'],['原理','偵測紅外線強弱']],
+      note:'波線的粗細只表示強弱，不是真實的波長。紅外線溫度計<b>不必接觸</b>待測物，常用在耳溫槍、額溫槍。'};},
+  design(s){const V=s.bulb==='b'?2:1,A=s.bore==='thin'?1:2,p=4*V/A,y0=400,yb=452;
+    let h=`<rect x="160" y="420" width="450" height="64" fill="${WARM(s.dt)}" fill-opacity=".3"/>`+beakerPath(156,614,404,486)+T(385,476,`水溫 ${s.dt}°C`,{size:16,anchor:'middle',fill:P.muted});
+    [[250,2,13,10,'甲：小泡、粗管'],[520,p,V===2?19:13,A===1?5:10,`乙：${V===2?'大':'小'}泡、${A===1?'細':'粗'}管`]].forEach(([x,pp,br,w,name])=>{
+      h+=glassTherm(x,yb,70,y0-s.dt*pp,{c:ALC,br,w})+thermTicks(x+w/2+7,0,40,5,10,t=>y0-t*pp,{size:13});
+      h+=T(x,44,name,{size:18,anchor:'middle',weight:700})+T(x-w/2-10,y0-s.dt*pp+5,`${num(s.dt*pp/2,0)} mm`,{size:14,anchor:'end',fill:ALC});});
+    h+=this.panel(650,90,220,300)+T(760,128,'每升高 1°C',{size:20,anchor:'middle',weight:700});
+    h+=T(670,172,'甲：液柱上升 1 mm',{size:17})+T(670,206,`乙：液柱上升 ${num(p/2,0)} mm`,{size:17,fill:ALC,weight:700});
+    h+=this.lines(670,256,['玻璃泡越大（液體越多）、','管徑越細，','每 1°C 的刻度間隔越大，','越容易讀出小變化。'],{size:15,gap:27});
+    return {svg:h,reads:[['水溫',s.dt+' °C'],['甲的液柱上升',num(s.dt,0)+' mm'],['乙的液柱上升',num(s.dt*p/2,0)+' mm']],
+      note:'升溫相同時，玻璃泡裡液體膨脹的體積與液體的量成正比；擠進越細的管子，液柱上升越長。刻度間隔大，比較<b>靈敏</b>。另外，玻璃泡的壁做得薄，熱比較快傳進去，讀數也比較快穩定。'};},
+  scale(s){const sys=s.sys,lo=sys==='C'?0:sys==='F'?32:s.xa,hi=sys==='C'?100:sys==='F'?212:s.xb,u=sys==='C'?'°C':sys==='F'?'°F':'°X';
+    const Lc=s.mk==='ice'?4:s.mk==='boil'?24:4+s.tc/5,x=360,yb=455,y=Lc=>440-15*Lc,read=lo+(Lc-4)/20*(hi-lo);
+    let h=T(450,36,'自己做一支溫度計的刻度',{size:22,anchor:'middle',weight:700});
+    const fill=s.mk==='ice'?'#cfe3f2':s.mk==='boil'?WARM(100):WARM(s.tc);
+    h+=`<rect x="318" y="420" width="84" height="66" fill="${fill}" fill-opacity=".45"/>`+beakerPath(314,406,404,488);
+    if(s.mk==='ice')[[330,430],[372,446],[346,462],[380,470]].forEach(([a,b])=>{h+=`<rect x="${a}" y="${b}" width="15" height="13" rx="2" fill="#fff" stroke="#9cc0d9"/>`;});
+    if(s.mk==='boil')[[334,470],[384,462],[350,436],[392,440],[326,446]].forEach(([a,b],i)=>{h+=`<circle cx="${a}" cy="${b}" r="${3+i%3}" fill="none" stroke="#fff" stroke-width="2"/>`;});
+    h+=glassTherm(x,yb,62,y(Lc),{c:ALC,br:14,w:7});
+    h+=L(300,y(0),300,y(25),{stroke:P.muted,w:1.5});for(let c=0;c<=25;c++)h+=L(300,y(c),300-(c%5?6:12),y(c),{stroke:P.muted,w:1})+(c%5?'':T(282,y(c)+5,c,{size:13,anchor:'end',fill:P.muted}));
+    h+=T(290,y(25)-14,'cm',{size:13,anchor:'end',fill:P.muted});
+    const mark=(Lm,v,name,c,on)=>on?L(372,y(Lm),560,y(Lm),{stroke:c,w:2,dash:true})+T(568,y(Lm)+6,`${tnum(v)}${u}　${name}（液柱 ${Lm} cm）`,{size:17,fill:c,weight:700}):'';
+    h+=mark(4,lo,'冰水混合物',P.blue,true)+mark(24,hi,'沸水',P.red,s.mk!=='ice');
+    if(s.mk==='test'){const N=hi-lo,cand=[1,2,5,10,20,50],minor=cand.find(c=>300/N*c>=3)||50,major=cand.find(c=>c>=minor*5&&300/N*c>=34)||100;
+      for(let v=Math.ceil(lo/minor)*minor;v<=hi+1e-9;v+=minor){const yy=y(4+(v-lo)/N*20),big=Math.abs(v/major-Math.round(v/major))<1e-6;h+=L(372,yy,372+(big?14:7),yy,{stroke:P.ink,w:big?1.6:1});
+        if(big&&v-lo>N*.07&&hi-v>N*.07)h+=T(392,yy+5,v,{size:14,fill:P.ink});}
+      h+=L(372,y(Lc),470,y(Lc),{stroke:P.accent,w:3})+T(478,y(Lc)+6,`讀數 ${tnum(read)}${u}`,{size:19,fill:P.accent,weight:700});}
+    h+=this.panel(600,150,270,190);
+    const txt=s.mk==='ice'?['① 1 atm 下純水的冰水混合物，','溫度固定不變。','液柱停在 4 cm → 標上 '+tnum(lo)+u]:s.mk==='boil'?['② 1 atm 下的沸水，','溫度也固定不變。','液柱停在 24 cm → 標上 '+tnum(hi)+u]
+      :[`③ 兩點之間等分成 ${tnum(hi-lo)} 格。`,`液柱 ${tnum(Lc)} cm：`,`(${tnum(Lc)} − 4) ÷ (24 − 4) × ${tnum(hi-lo)}`,`＋ ${tnum(lo)} ＝ ${tnum(read)}${u}`];
+    h+=this.lines(620,190,txt,{size:16,gap:32});
+    return {svg:h,reads:[['液柱長度',tnum(Lc)+' cm'],['兩個定點',`${tnum(lo)}${u}、${tnum(hi)}${u}`],['讀數',s.mk==='test'?tnum(read)+u:'（還在定點）']],
+      note:'定溫標：先找兩個<b>溫度固定</b>的定點，再把中間<b>等分</b>。攝氏 0°C～100°C 分 100 格；華氏 32°F～212°F 分 180 格。溫度每升高 1 度，液柱增加的長度都一樣，所以可以用比例算讀數。'};},
+  convert(s){const cols=[['C','攝氏 °C',c=>c,v=>v,5,20],['F','華氏 °F',toF,v=>(v-32)*5/9,10,50]];
+    const k=(s.xb-s.xa)/100,cand=[5,10,20,25,50,100],majX=cand.find(c=>c/k*2.2>=40)||100;cols.push(['X','X 溫標 °X',c=>toX(c,s),v=>(v-s.xa)/k,majX/5,majX]);
+    if(s.kel)cols.push(['K','克氏 K（補充）',c=>c+273,v=>v-273,10,50]);
+    const y=c=>440-(c+40)*2.2,gap=s.kel?185:230,x0=s.kel?150:200;let h='';
+    h+=L(60,y(0),860,y(0),{stroke:P.blue,w:1,dash:'4 6',op:.6})+L(60,y(100),860,y(100),{stroke:P.red,w:1,dash:'4 6',op:.6})+T(40,y(0)+5,'冰點',{size:14,fill:P.blue})+T(40,y(100)+5,'沸點',{size:14,fill:P.red});
+    h+=L(60,y(s.cc),860,y(s.cc),{stroke:P.accent,w:2.5});
+    cols.forEach(([id,name,f,inv,mi,ma],i)=>{const x=x0+i*gap,a=f(-40),b=f(110);
+      h+=L(x,y(-40),x,y(110),{stroke:P.ink,w:2})+T(x,82,name,{size:17,anchor:'middle',weight:700})+thermTicks(x,Math.min(a,b),Math.max(a,b),mi,ma,v=>y(inv(v)),{side:-1,size:13});
+      const v=f(s.cc),txt=tnum(v)+(id==='K'?' K':'°');h+=`<rect x="${x+8}" y="${y(s.cc)-17}" width="86" height="32" rx="8" fill="#e5f3ef" stroke="${P.accent}"/>`+T(x+51,y(s.cc)+6,txt,{size:17,anchor:'middle',weight:700,fill:P.accent});});
+    h+=T(450,482,`C ÷ 100 ＝ (F − 32) ÷ 180 ＝ ${s.xa<0?'(X ＋ '+(-s.xa)+')':s.xa?'(X − '+s.xa+')':'X'} ÷ ${s.xb-s.xa}`,{size:19,anchor:'middle'});
+    const reads=[['攝氏',s.cc+' °C'],['華氏',tnum(toF(s.cc))+' °F'],['X 溫標',tnum(toX(s.cc,s))+' °X']];if(s.kel)reads.push(['克氏',s.cc+273+' K']);
+    return {svg:h,reads,note:`三種溫標都是在冰點與沸點之間等分，只是兩點的數字和格數不同。<b>F ＝ 9/5 × C ＋ 32</b>：${s.cc}°C → ${tnum(toF(s.cc))}°F。${s.kel?'（補充）克氏溫標 K ＝ °C ＋ 273，每 1 K 和 1°C 一樣大。':''}`};}},
+
+/* ===== 5-2 熱量與熱平衡 ===== */
+heat:{group:3,n:'5-2',keep:['mode'],name:'熱量與熱平衡',subtitle:'熱量是因為溫度不同而傳遞的能量，單位是卡（cal）。水吸收的熱量 H ＝ m × ΔT；冷熱物體接觸，熱由高溫傳到低溫，直到溫度相同。',
+  q:s=>({html:qBlockHTML(HEAT_Q[s.mode])+quizHTML(s,HEAT_QUIZ)}),
+  qAction(s,v){quizAction(s,v,HEAT_QUIZ);},
+  state:{mode:'define',m:200,t:0,cmp:false,ma:100,ta:80,mb:300,tb:20,tm:0,loss:false,qi:0,qp:null,qc:false,qs:false},
+  controls:[
+    {type:'seg',key:'mode',label:'實驗',options:[['define','熱量與卡'],['mix','熱平衡']]},
+    {type:'range',key:'m',label:'水的質量 m',min:100,max:500,step:50,unit:' g',show:s=>s.mode==='define'},
+    {type:'range',key:'t',label:'加熱時間',min:0,max:10,step:.5,unit:' 分鐘',show:s=>s.mode==='define'},
+    {type:'toggle',key:'cmp',label:'比較不同水量',show:s=>s.mode==='define'},
+    {type:'range',key:'ma',label:'A（內杯）水量',min:50,max:500,step:50,unit:' g',show:s=>s.mode==='mix'},
+    {type:'range',key:'ta',label:'A 的初溫',min:0,max:100,step:1,unit:' °C',show:s=>s.mode==='mix'},
+    {type:'range',key:'mb',label:'B（外杯）水量',min:50,max:500,step:50,unit:' g',show:s=>s.mode==='mix'},
+    {type:'range',key:'tb',label:'B 的初溫',min:0,max:100,step:1,unit:' °C',show:s=>s.mode==='mix'},
+    {type:'range',key:'tm',label:'經過時間',min:0,max:10,step:.1,unit:' 分鐘',fmt:s=>s.tm.toFixed(1)+' 分鐘',show:s=>s.mode==='mix'},
+    {type:'buttons',label:'例子',items:[['等量混合',s=>{s.ma=100;s.ta=80;s.mb=100;s.tb=20;s.tm=0;}],['100 g＋300 g',s=>{s.ma=100;s.ta=80;s.mb=300;s.tb=20;s.tm=0;}],['直接到熱平衡',s=>{s.tm=10;}]],show:s=>s.mode==='mix'},
+    {type:'toggle',key:'loss',label:'考慮散熱（外杯對 25°C 的空氣散熱）',show:s=>s.mode==='mix'}],
+  render(s){return s.mode==='mix'?this.mix(s):this.define(s);},
+  graph(xl,yl){const X=t=>500+t*36,Y=T=>440-T*3.3;let h='';
+    for(let v=20;v<=100;v+=20)h+=L(500,Y(v),860,Y(v),{stroke:P.faint,w:1,dash:'3 5'})+T(490,Y(v)+5,v,{size:13,anchor:'end',fill:P.muted});
+    for(let t=0;t<=10;t+=2)h+=L(X(t),440,X(t),446,{stroke:P.muted})+T(X(t),464,t,{size:13,anchor:'middle',fill:P.muted});
+    h+=L(500,440,866,440,{stroke:P.muted,w:1.5})+L(500,440,500,96,{stroke:P.muted,w:1.5})+T(506,94,yl,{size:14,fill:P.muted})+T(860,488,xl,{size:14,anchor:'end',fill:P.muted});
+    return {h,X,Y};},
+  define(s){const R=1000,H=R*s.t,rise=H/s.m,Tw=Math.min(100,20+rise),boil=20+rise>100,dT=Tw-20,wh=50+s.m*.32,bt=400;
+    let h=`<rect x="125" y="${bt-wh}" width="230" height="${wh}" fill="${WARM(Tw)}" fill-opacity=".35"/>`+L(125,bt-wh,355,bt-wh,{stroke:WARM(Tw),w:3})+beakerPath(120,360,165,bt+2);
+    h+=T(205,bt-wh-14,`${s.m} g 的水`,{size:18,anchor:'middle',weight:700})+T(205,bt-wh/2+12,`${tnum(Tw)}°C`,{size:28,anchor:'middle',weight:700,fill:P.red});
+    h+=glassTherm(320,bt-26,140,bt-46-Tw*2.2,{c:ALC,br:10,w:5});
+    h+=`<rect x="130" y="408" width="220" height="30" rx="6" fill="#4a5860"/>`;for(let i=0;i<5;i++)h+=`<path d="M${150+i*40} 418q10 10 20 0" fill="none" stroke="${s.t>0?'#ff7b4a':'#7c8a92'}" stroke-width="3"/>`;
+    h+=T(240,468,'穩定熱源：每分鐘供熱 1000 cal',{size:16,anchor:'middle',fill:P.muted});
+    const g=this.graph('加熱時間（分鐘）','水溫（°C）');h+=g.h;
+    const line=(m,w,c,op)=>{const tEnd=Math.min(10,80*m/R);let d=`M${g.X(0)} ${g.Y(20)}L${g.X(tEnd).toFixed(1)} ${g.Y(20+R*tEnd/m).toFixed(1)}`;return `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" opacity="${op}"/>`;};
+    if(s.cmp)[100,200,300,400,500].forEach(m=>{if(m===s.m)return;h+=line(m,2,P.muted,.55);const tEnd=Math.min(10,80*m/R);h+=T(g.X(tEnd)-4,g.Y(20+R*tEnd/m)-7,m+' g',{size:13,anchor:'end',fill:P.muted});});
+    h+=line(s.m,4,P.red,1)+`<circle cx="${g.X(s.t)}" cy="${g.Y(Tw).toFixed(1)}" r="7" fill="${P.red}" stroke="#fff" stroke-width="2"/>`;
+    if(boil)h+=T(680,g.Y(100)-12,'到 100°C 開始沸騰，本節先不討論',{size:15,anchor:'middle',fill:P.red});
+    const kc=v=>Number.isInteger(v/1000)?v/1000:(v/1000).toFixed(1);
+    return {svg:h,reads:[['供給熱量 H',`${H} cal ＝ ${kc(H)} kcal`],['升高溫度 ΔT',tnum(dT)+' °C'],['水溫',tnum(Tw)+' °C']],
+      note:boil?'水溫到 100°C 就會沸騰，之後吸收的熱不再使溫度上升，所以 H ＝ m × ΔT 只用在溫度改變、沒有沸騰的時候。'
+        :`<b>1 卡（cal）</b>：使 1 g 的水升高 1°C 所需的熱量；1 千卡（kcal）＝ 1000 卡。<br><b>H ＝ m × ΔT</b> ＝ ${s.m} × ${tnum(dT)} ＝ ${H} cal（不計散熱與容器吸熱）`};},
+  mix(s){const C=mixCurve(s),i=clamp(Math.round(s.tm/.05),0,C.length-1),[,a,b,lost]=C[i],tf=(s.ma*s.ta+s.mb*s.tb)/(s.ma+s.mb),eq=Math.abs(a-b)<.2;
+    const qa=s.ma*(a-s.ta),qb=s.mb*(b-s.tb);
+    let h=`<rect x="94" y="250" width="292" height="176" fill="${WARM(b)}" fill-opacity=".35"/>`+L(94,250,386,250,{stroke:WARM(b),w:3})+beakerPath(90,390,180,430);
+    h+=`<rect x="170" y="225" width="140" height="185" fill="#fbfdff" fill-opacity=".6"/><rect x="172" y="262" width="136" height="146" fill="${WARM(a)}" fill-opacity=".45"/>`+L(172,262,308,262,{stroke:WARM(a),w:3})
+      +`<path d="M170 222V410H310V222" fill="none" stroke="#7e8b92" stroke-width="5"/>`;
+    h+=glassTherm(285,385,150,365-a*2.1,{c:ALC,br:9,w:4})+glassTherm(365,402,150,382-b*2.1,{c:ALC,br:9,w:4});
+    {const ca=Math.abs(a-b)<.2?P.accent:a>b?P.red:P.blue,cb=Math.abs(a-b)<.2?P.accent:a>b?P.blue:P.red;h+=T(222,330,tnum(a)+'°C',{size:22,anchor:'middle',weight:700,fill:ca})+T(130,350,tnum(b)+'°C',{size:20,anchor:'middle',weight:700,fill:cb});}
+    h+=T(240,212,`A（內杯）${s.ma} g`,{size:16,anchor:'middle',weight:700})+T(240,456,`B（外杯）${s.mb} g`,{size:16,anchor:'middle',weight:700});
+    if(!eq){const out=a>b;h+=out?L(176,300,108,300,{stroke:P.red,w:4,arrow:true})+L(304,300,338,300,{stroke:P.red,w:4,arrow:true}):L(108,300,176,300,{stroke:P.red,w:4,arrow:true})+L(338,300,304,300,{stroke:P.red,w:4,arrow:true});
+      h+=T(140,292,'熱',{size:15,anchor:'middle',fill:P.red,weight:700});}
+    if(s.loss&&Math.abs(b-25)>.5){const o=b>25;[[86,340,50,340],[394,340,430,340]].forEach(([x1,y1,x2,y2])=>{h+=o?L(x1,y1,x2,y2,{stroke:P.muted,w:2.5,arrow:true}):L(x2,y2,x1,y1,{stroke:P.muted,w:2.5,arrow:true});});h+=T(40,322,o?'散熱':'吸熱',{size:14,fill:P.muted});}
+    const g=this.graph('經過時間（分鐘）','溫度（°C）');h+=g.h;
+    const path=(j,upto)=>C.slice(0,upto+1).map(([t,...v],k)=>(k?'L':'M')+g.X(t).toFixed(1)+' '+g.Y(v[j]).toFixed(1)).join('');
+    h+=L(500,g.Y(tf),860,g.Y(tf),{stroke:P.accent,w:1.5,dash:true})+T(856,g.Y(tf)+(tf>s.tb&&tf<s.ta&&s.ta-tf<12?18:-8),`${s.loss?'不計散熱的':''}計算值 ${tnum(tf)}°C`,{size:13,anchor:'end',fill:P.accent});
+    h+=`<path d="${path(0,C.length-1)}" fill="none" stroke="${P.red}" stroke-width="2" opacity=".25"/><path d="${path(1,C.length-1)}" fill="none" stroke="${P.blue}" stroke-width="2" opacity=".25"/>`;
+    h+=`<path d="${path(0,i)}" fill="none" stroke="${P.red}" stroke-width="4"/><path d="${path(1,i)}" fill="none" stroke="${P.blue}" stroke-width="4"/>`;
+    h+=`<circle cx="${g.X(C[i][0])}" cy="${g.Y(a).toFixed(1)}" r="6" fill="${P.red}"/><circle cx="${g.X(C[i][0])}" cy="${g.Y(b).toFixed(1)}" r="6" fill="${P.blue}"/>`;
+    h+=T(520,120,'— A（內杯）',{size:14,fill:P.red})+T(620,120,'— B（外杯）',{size:14,fill:P.blue});
+    h+=T(240,60,eq?'溫度相同：達到熱平衡':'熱由高溫傳到低溫',{size:22,anchor:'middle',weight:700,fill:eq?P.accent:P.red});
+    const hot=s.ta>=s.tb?['A',s.ma,s.ta,'B',s.mb,s.tb]:['B',s.mb,s.tb,'A',s.ma,s.ta];
+    return {svg:h,reads:[['A 溫度',tnum(a)+' °C'],['B 溫度',tnum(b)+' °C'],[qa<=0?'A 放出熱量':'A 吸收熱量',num(Math.abs(qa),0)+' cal'],[qb>=0?'B 吸收熱量':'B 放出熱量',num(Math.abs(qb),0)+' cal']],
+      note:`熱由高溫傳到低溫，直到<b>溫度相同（熱平衡）</b>。不計散熱：<b>放出的熱量 ＝ 吸收的熱量</b><br>${hot[1]} × (${hot[2]} − T) ＝ ${hot[4]} × (T − ${hot[5]})　→　T ＝ ${tnum(tf)}°C`
+        +(s.loss?`<br>考慮散熱：已有 ${num(Math.abs(lost),0)} cal ${lost>=0?'散到空氣中，所以溫度比計算值低':'從空氣傳進來，所以溫度比計算值高'}，之後會慢慢趨近室溫 25°C。`:'')};}}
 };
 function setCounts(s,c){for(const k of Object.keys(SPECIES))s.counts[k]=c[k]||0;}
 function lamMark(x1,x2,y,lam,c,label){return L(x1,y,x2,y,{stroke:c,w:2})+L(x1,y-8,x1,y+8,{stroke:c,w:2})+L(x2,y-8,x2,y+8,{stroke:c,w:2})+T((x1+x2)/2,y-10,label||`λ = ${lam.toFixed(2)} m`,{size:15,fill:c,anchor:'middle',weight:700});}
@@ -1592,6 +1888,10 @@ const PHOTOS={
   glasses:['img/glasses.webp','眼鏡：近視用<b>凹透鏡</b>（拿來看字會變小），遠視、老花用<b>凸透鏡</b>（看字變大）。'],
   prism:['img/prism.webp','白光經過三稜鏡分成各種色光：<b>紅光偏折最少，紫光偏折最多</b>。'],
   rainbow:['img/rainbow.webp','彩虹：要<b>背對太陽</b>才看得到（影子朝向彩虹）。主虹外紅內紫，較淡的副虹顏色順序相反。'],
+  thermometers:['img/thermometers.webp','各種溫度計：由左到右是液體溫度計、體溫計、電子溫度計、紅外線耳溫槍、指針式（雙金屬片）溫度計。'],
+  earthermo:['img/earthermo.webp','額溫槍偵測額頭放出的<b>紅外線</b>，不必接觸皮膚就能量體溫。'],
+  icebath:['img/icebath.webp','定攝氏溫標的兩個定點：<b>冰水混合物</b>（0°C）和 1 大氣壓下的<b>沸水</b>（100°C），溫度都固定不變。'],
+  mixwater:['img/mixwater.webp','冷熱水混合實驗：用保麗龍杯可以減少散熱，攪拌後等溫度計讀數穩定，就是熱平衡時的溫度。'],
   stagelights:['img/stagelights.webp','舞台燈：紅、綠、藍光照在白牆上，兩兩重疊成黃、青、洋紅，三色重疊成<b>白光</b>。']};
 const PHOTO_OF={
   shadow:s=>s.mode==='speed'?(s.sv==='thunder'?'lightning':null):s.mode==='pinhole'?'pinhole':null,
@@ -1600,6 +1900,8 @@ const PHOTO_OF={
   refraction:()=>'pencil',
   lens:s=>s.mode==='focus'&&s.type===1?'sunfocus':s.mode==='bench'?'bench':null,
   life:s=>({camera:'camera',proj:'projector',mag:'magnifier',scope:'microscope',myopia:'glasses',hyper:'glasses'})[s.dev]||null,
+  temp:s=>s.mode==='types'?(s.kind==='ir'?'earthermo':'thermometers'):s.mode==='scale'?'icebath':null,
+  heat:s=>s.mode==='mix'?'mixwater':null,
   color:s=>({prism:'prism',rainbow:'rainbow',clear:'cellophane',mix:'stagelights'})[s.mode]||null};
 let lastPhoto;
 function setPhoto(){const f=PHOTO_OF[current],k=f?f(state):null,fig=labEl.querySelector('.photo');if(k===lastPhoto||!fig)return;lastPhoto=k;fig.hidden=!k;if(k){fig.querySelector('img').src=PHOTOS[k][0];fig.querySelector('figcaption').innerHTML=PHOTOS[k][1];}}
@@ -1624,11 +1926,11 @@ labEl.addEventListener('pointermove',e=>{if(!drag)return;cfg.drag[drag.name](svg
 const endDrag=()=>{drag=null;labEl.classList.remove('dragging');};labEl.addEventListener('pointerup',endDrag);labEl.addEventListener('pointercancel',endDrag);
 
 /* ---------- 頁面 ---------- */
-let nav='';[1,2].forEach(g=>{nav+=`<div class="nav-group-label">${g===1?'第一次段考':'第二次段考 · 光學'}</div>`;Object.entries(LABS).filter(([,t])=>t.group===g).forEach(([key,t])=>{nav+=`<a href="#${key}" data-key="${key}"><span class="count" aria-hidden="true">${t.n}</span>${t.name}</a>`;});});
+let nav='';[1,2,3].forEach(g=>{nav+=`<div class="nav-group-label">${g===1?'第一次段考':g===2?'第二次段考 · 光學':'第二次段考 · 溫度與熱'}</div>`;Object.entries(LABS).filter(([,t])=>t.group===g).forEach(([key,t])=>{nav+=`<a href="#${key}" data-key="${key}"><span class="count" aria-hidden="true">${t.n}</span>${t.name}</a>`;});});
 document.getElementById('nav').innerHTML=nav;
 window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，以老師指定為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>「透鏡成像 → 為什麼會偏折」在透鏡兩個球面各算一次折射，最外側的光會略偏離焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備；溫度與熱先做 5-1 溫度與溫度計、5-2 熱量（尚未教比熱，熱量只算水：H ＝ m × ΔT）。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>「透鏡成像 → 為什麼會偏折」在透鏡兩個球面各算一次折射，最外側的光會略偏離焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');
