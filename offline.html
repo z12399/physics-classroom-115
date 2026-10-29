@@ -240,6 +240,9 @@ dialog .small{font-size:13px;color:var(--muted)}
 .projection .photo figcaption{font-size:15px}
 .projection .seg button,.projection .ex-tools .btn,.projection .ex-who{font-size:15px}
 @media(max-width:760px){.viz-panel svg{position:static}}
+#scene [data-tap]{cursor:pointer}
+#scene [data-tap]:focus{outline:none}
+#scene [data-tap]:focus-visible rect{stroke:#ffcc6a;stroke-width:4}
 </style></head>
 <body>
 <header class="topbar"><a class="brand" href="#lens" aria-label="理化實驗室首頁"><span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 32 32" width="22" height="22"><path d="M16 4Q22 16 16 28Q10 16 16 4Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M3 12L16 16L29 21" fill="none" stroke="#f2b45a" stroke-width="2.2" stroke-linecap="round"/></svg></span><span class="brand-text">理化實驗室</span></a><div class="top-actions"><button class="btn ghost" id="focus">投影模式</button><button class="btn ghost" id="guide">說明</button><a class="btn primary" href="#" onclick="event.preventDefault();alert('你已在離線版。可將這個HTML檔案複製到其他電腦使用。')">離線版</a></div></header>
@@ -311,6 +314,29 @@ const COLOR_QUIZ=[
   {q:'只用<b>藍光</b>照射一張白紙，白紙看起來是：',opts:['白色','藍色','黑色','黃色'],ans:1,
     sol:'白紙會反射<b>所有</b>色光。照到的只有藍光，反射出來的也只有藍光 → <b>藍色</b>。',go:s=>{s.mode='opaque';s.ov='obj';s.obj='paper';[s.r,s.g,s.b]=[0,0,1];s.on=true;}}];
 
+/* ---------- 4-5 色光自由實驗室：理想色光模型（顏色只看紅、綠、藍三種色光） ---------- */
+const CF_COLORS={w:['白',[1,1,1]],k:['黑',[0,0,0]],r:['紅',[1,0,0]],g:['綠',[0,1,0]],b:['藍',[0,0,1]],y:['黃',[1,1,0]],c:['青',[0,1,1]],m:['洋紅',[1,0,1]]};
+const CF_ORDER=['w','k','r','g','b','y','c','m'];
+/* 條紋國旗（顏色簡化成上面八種；h 橫條由上到下、v 直條由左到右） */
+const CF_FLAGS={de:['德國','h',['k','r','y']],nl:['荷蘭','h',['r','w','b']],at:['奧地利','h',['r','w','r']],ru:['俄羅斯','h',['w','b','r']],
+  hu:['匈牙利','h',['r','w','g']],ua:['烏克蘭','h',['b','y']],fr:['法國','v',['b','w','r']],it:['義大利','v',['g','w','r']]};
+/* 由 RGB（0–255）說出顏色名稱；部分亮度時可能出現橙、紫等中間色 */
+function cfName(c){const mx=Math.max(...c),mn=Math.min(...c);if(mx<30)return '黑';if((mx-mn)/mx<0.18)return mx>200?'白':'灰';
+  const[r,g,b]=c,d=mx-mn;let h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;h=(h*60+360)%360;
+  const n=h<15||h>=335?'紅':h<40?'橙':h<70?'黃':h<165?'綠':h<195?'青':h<255?'藍':h<285?'紫':'洋紅';return (mx<110?'暗':mn/mx>0.45?'淡':'')+n;}
+const cfLight=s=>[s.lr,s.lg,s.lb].map(v=>v/100);
+const cfSeen=(s,key)=>{const L=cfLight(s),f=s.filt==='none'?[1,1,1]:FILTERS[s.filt][1];return CF_COLORS[key][1].map((v,i)=>255*L[i]*v*f[i]);};
+const cfInk=c=>(c[0]*0.3+c[1]*0.59+c[2]*0.11)>140?'#1b2330':'#ffffff';
+const cfObj=s=>s.guess?['mystery','h',CF_FLAGS[s.myst][2],CF_FLAGS[s.myst][1]]:s.obj==='card'?['card','g',CF_ORDER]:s.obj==='my'?['my','h',s.cust]:[s.obj,CF_FLAGS[s.obj][1],CF_FLAGS[s.obj][2]];
+const cfPickMystery=s=>{const keys=Object.keys(CF_FLAGS).filter(k=>k!==s.myst);s.myst=keys[Math.floor(Math.random()*keys.length)];s.reveal=false;};
+const CF_CHALLENGES=[
+  ['只開一盞燈，讓德國國旗（黑、紅、黃）看起來只剩兩條。','只開<b>紅燈</b>：黃條也會反射紅光，所以紅條、黃條都是紅色，連成一片 → 黑、紅、紅。只開<b>綠燈</b>也可以：紅條不反射綠光變黑 → 黑、黑、綠。'],
+  ['什麼燈光能讓奧地利國旗（紅、白、紅）看起來像一整塊布，完全看不出條紋？','<b>紅光</b>：紅條反射紅光、白條也反射紅光 → 三條都是紅色。'],
+  ['荷蘭國旗（紅、白、藍）在哪些燈光下，三條還是三種不同的顏色？','例如白光、<b>洋紅光</b>（紅＋藍）：紅→紅、白→洋紅、藍→藍；<b>黃光</b>（紅＋綠）：紅→紅、白→黃、藍→黑。要讓三條不同，燈光裡至少要有兩種色光。'],
+  ['在白光下透過綠色玻璃紙看義大利國旗（綠、白、紅），會看到什麼？','綠→綠、白→綠（只剩綠光過得了玻璃紙）、紅→黑。左邊兩條連成一片綠色，右邊是黑色。'],
+  ['把紅燈調到 100%、綠燈調到 50%，黃色和白色的條紋會變成什麼顏色？','照到的光是紅光加上較弱的綠光，看起來是<b>橙色</b>。黃條、白條都會反射紅光和綠光，所以都是橙色；紅條只反射紅光，還是紅色。'],
+  ['猜猜看模式：只用紅、綠、藍三種單色光，最少照幾次就能確定每一條在白光下的顏色？','<b>三次</b>。每次只開一盞燈，看每一條亮不亮，就知道它會不會反射紅光、綠光、藍光；三個答案合起來就是白光下的顏色（例如紅亮、綠亮、藍不亮 → 黃色）。']];
+const cfQHTML=()=>`<h3>挑戰</h3>${CF_CHALLENGES.map(([q,a],i)=>`<div class="ex-q"><b>${i+1}. ${q}</b></div><details data-k="${hashK(q)}"><summary>看解釋</summary><div class="answer">${a}</div></details>`).join('')}`;
 /* ---------- 光學共用：開關燈與光路前進 ---------- */
 const SPECTRUM=[['紅','#ff453a'],['橙','#ff9f0a'],['黃','#ffd60a'],['綠','#32d74b'],['藍','#0a84ff'],['靛','#5e5ce6'],['紫','#bf5af2']];
 const replay=s=>{s.prog=0;};
@@ -1873,6 +1899,60 @@ color:{group:2,n:'4-5',keep:['mode'],name:'色散與顏色',subtitle:'白光經�
     const abs=['紅','綠','藍'].filter((_,i)=>ref[i]<0.5),refl=['紅','綠','藍'].filter((_,i)=>ref[i]>0.5);
     return {svg:h,reads:[['顏料',sel.length?sel.map(p=>p[0]).join(' ＋ '):'（白紙）'],['吸收',!s.on?'—':abs.length?abs.join('、')+'光':'沒有'],['反射',!s.on?'—':refl.length?refl.join('、')+'光':'沒有'],['看起來',seen]],
       note:'（延伸）顏料三原色是<b>青、洋紅、黃</b>：青吸收紅光、洋紅吸收綠光、黃吸收藍光。混得越多吸收越多 → 越暗（<b>減色</b>）。'};}},
+/* ===== 4-5 色光自由實驗室 ===== */
+colorfree:{group:2,n:'4-5',name:'色光自由實驗室',subtitle:'自己調燈光、選物體、加玻璃紙：看到的顏色＝光源裡有、物體會反射、玻璃紙也讓它通過的色光。',dark:true,
+  q:()=>({html:cfQHTML()}),
+  state:{lr:100,lg:100,lb:100,obj:'de',filt:'none',cust:['w','r','k'],guess:false,myst:'de',reveal:false},
+  controls:[
+    {type:'buttons',label:'快速選燈光',items:[...LIGHTS,['關燈',[0,0,0]]].map(([n,c])=>[n,s=>{[s.lr,s.lg,s.lb]=c.map(v=>v*100);}])},
+    {type:'range',key:'lr',label:'紅燈亮度',min:0,max:100,step:5,unit:'%'},
+    {type:'range',key:'lg',label:'綠燈亮度',min:0,max:100,step:5,unit:'%'},
+    {type:'range',key:'lb',label:'藍燈亮度',min:0,max:100,step:5,unit:'%'},
+    {type:'seg',key:'obj',label:'物體',options:[['card','色卡'],...Object.entries(CF_FLAGS).map(([k,v])=>[k,v[0]+'國旗']),['my','自己設計']],show:s=>!s.guess},
+    {type:'seg',key:'filt',label:'眼睛前面的玻璃紙',options:[['none','不放'],...Object.entries(FILTERS).map(([k,v])=>[k,v[0]+'色'])]},
+    {type:'toggle',key:'guess',label:'猜猜看：藏起國旗原本的顏色',onChange:s=>{if(s.guess)cfPickMystery(s);}},
+    {type:'buttons',items:[['揭曉答案',s=>{s.reveal=true;}],['換一面國旗',s=>{cfPickMystery(s);}]],show:s=>s.guess}],
+  tap(s,v){const[k,i]=v.split(':');if(k==='cust'){const j=CF_ORDER.indexOf(s.cust[+i]);s.cust=s.cust.map((c,n)=>n===+i?CF_ORDER[(j+1)%CF_ORDER.length]:c);}},
+  render(s){
+    const[kind,dir,keys]=cfObj(s),lt=cfLight(s),lightOn=Math.max(...lt)>0,hide=s.guess&&!s.reveal,f=s.filt==='none'?null:FILTERS[s.filt];
+    const seen=keys.map(k=>cfSeen(s,k)),names=seen.map(cfName),lightName=lightOn?cfName(lt.map(v=>v*255))+'光':'沒有光（關燈）';
+    let h=`<rect x="20" y="20" width="520" height="460" rx="20" fill="#05080d"/>`;
+    /* 三盞燈與照下來的光 */
+    [['紅',0,'#ff3b30'],['綠',1,'#30d158'],['藍',2,'#0a84ff']].forEach(([n,i,c],j)=>{const x=200+j*80,v=lt[i];
+      h+=`<circle cx="${x}" cy="54" r="19" fill="${v?c:'#2a313c'}" fill-opacity="${v?0.25+0.75*v:1}" stroke="#ffffff55" stroke-width="2"/>`+T(x,59,n,{size:14,fill:v>0.5?'#05080d':D.ink,anchor:'middle',weight:700})+T(x,92,`${Math.round(v*100)}%`,{size:13,fill:D.muted,anchor:'middle'});});
+    if(lightOn)h+=`<defs><linearGradient id="cfbeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${rgbOf(lt.map(v=>v*255))}" stop-opacity=".45"/><stop offset="1" stop-color="${rgbOf(lt.map(v=>v*255))}" stop-opacity="0"/></linearGradient></defs><polygon points="185,76 375,76 500,160 60,160" fill="url(#cfbeam)"/>`;
+    /* 物體：照到這種光、再透過玻璃紙，看起來的樣子 */
+    const tapOK=kind==='my',box=(x,y,w,ht,c,i,lab)=>{const g=`<rect x="${x}" y="${y}" width="${w}" height="${ht}" fill="${rgbOf(c)}" stroke="#56606e" stroke-width="1.5"/>`+T(x+w/2,y+ht/2+7,lab,{size:19,fill:cfInk(c),anchor:'middle',weight:700});
+      return tapOK?`<g data-tap="cust:${i}" tabindex="0" role="button" aria-label="第 ${i+1} 條，點一下換顏色">${g}</g>`:g;};
+    if(kind==='card'){keys.forEach((k,i)=>{const x=78+(i%4)*104,y=170+Math.floor(i/4)*130;h+=box(x,y,92,92,seen[i],i,names[i]);h+=T(x+46,y+116,'白光下：'+CF_COLORS[k][0],{size:13,fill:D.muted,anchor:'middle'});});}
+    else{const X=100,Y=168,W=360,H=228,n=keys.length;keys.forEach((k,i)=>{h+=dir==='v'?box(X+i*W/n,Y,W/n,H,seen[i],i,names[i]):box(X,Y+i*H/n,W,H/n,seen[i],i,names[i]);});
+      if(tapOK)h+=T(280,436,'點國旗的每一條，可以換顏色',{size:14,fill:D.object,anchor:'middle'});}
+    if(f)h+=`<rect x="64" y="152" width="432" height="${kind==='card'?280:252}" rx="10" fill="none" stroke="${rgbOf(f[1].map(v=>v*255))}" stroke-width="4" stroke-dasharray="10 6"/>`+T(280,462,`透過${f[0]}色玻璃紙看`,{size:15,fill:D.ink,anchor:'middle',weight:700});
+    else h+=T(280,462,'直接看',{size:15,fill:D.muted,anchor:'middle'});
+    /* 右邊：白光下的樣子與每一條的推理 */
+    h+=T(715,46,'白光下（原本的顏色）',{size:15,fill:D.muted,anchor:'middle'});
+    if(hide)h+=`<rect x="640" y="60" width="150" height="96" rx="6" fill="#141b26" stroke="#56606e" stroke-dasharray="6 5"/>`+T(715,120,'？',{size:44,fill:D.object,anchor:'middle',weight:700});
+    else if(kind==='card')CF_ORDER.forEach((k,i)=>{h+=`<rect x="${631+(i%4)*43}" y="${62+Math.floor(i/4)*46}" width="38" height="40" fill="${rgbOf(CF_COLORS[k][1].map(v=>v*255))}" stroke="#56606e"/>`;});
+    else{const n=keys.length;keys.forEach((k,i)=>{const c=CF_COLORS[k][1].map(v=>v*255);h+=dir==='v'?`<rect x="${640+i*150/n}" y="60" width="${150/n}" height="96" fill="${rgbOf(c)}" stroke="#56606e"/>`:`<rect x="640" y="${60+i*96/n}" width="150" height="${96/n}" fill="${rgbOf(c)}" stroke="#56606e"/>`;});}
+    const title=kind==='card'?'色卡':kind==='my'?'自己設計的國旗':kind==='mystery'?(hide?'神秘國旗':CF_FLAGS[s.myst][0]+'國旗'):CF_FLAGS[kind][0]+'國旗';
+    h+=T(715,178,title,{size:15,fill:D.ink,anchor:'middle',weight:700});
+    const rows=keys.length,rh=Math.min(34,250/rows),y0=212;
+    h+=T(586,y0-6,dir==='v'?'由左到右':kind==='card'?'色卡':'由上到下',{size:12,fill:D.muted})+T(700,y0-6,'會反射',{size:12,fill:D.muted,anchor:'middle'})+T(812,y0-6,'看起來',{size:12,fill:D.muted,anchor:'middle'});
+    keys.forEach((k,i)=>{const y=y0+i*rh,c=CF_COLORS[k][1],cy=y+rh/2;
+      h+=hide?`<rect x="586" y="${cy-9}" width="22" height="18" fill="#141b26" stroke="#56606e" stroke-dasharray="3 3"/>`+T(614,cy+5,'？',{size:14,fill:D.object}):`<rect x="586" y="${cy-9}" width="22" height="18" fill="${rgbOf(c.map(v=>v*255))}" stroke="#56606e"/>`+T(614,cy+5,CF_COLORS[k][0],{size:14,fill:D.ink});
+      ['#ff3b30','#30d158','#0a84ff'].forEach((col,j)=>{const x=680+j*20;h+=hide?`<circle cx="${x}" cy="${cy}" r="6" fill="none" stroke="#56606e" stroke-dasharray="2 2"/>`:`<circle cx="${x}" cy="${cy}" r="6" fill="${c[j]?col:'none'}" stroke="${c[j]?col:'#56606e'}" stroke-width="1.5"/>`;});
+      h+=L(740,cy,762,cy,{stroke:D.muted,w:1.5})+`<rect x="768" y="${cy-9}" width="22" height="18" fill="${rgbOf(seen[i])}" stroke="#56606e"/>`+T(796,cy+5,names[i],{size:14,fill:D.ink,weight:700});});
+    h+=T(715,y0+rows*rh+18,'● 會反射　○ 不會反射（紅、綠、藍）',{size:12,fill:D.muted,anchor:'middle'});
+    /* 相鄰條紋看起來一樣 → 連成一片 */
+    const same=[];if(kind!=='card')for(let i=1;i<keys.length;i++)if(names[i]===names[i-1])same.push(i);
+    const groups=kind==='card'?0:keys.length-same.length;
+    let note='看到的顏色＝<b>光源裡有</b>、而且物體<b>會反射</b>的色光'+(f?'，還要<b>玻璃紙讓它通過</b>':'')+'。';
+    if(!lightOn)note+='關燈時沒有光可以反射，什麼都是黑的。';
+    else if(seen.every(c=>Math.max(...c)<30))note+='照到的光，物體都不反射'+(f?'（或被玻璃紙擋住）':'')+' → 一片黑。';
+    else if(same.length&&kind!=='card')note+=`相鄰的條紋看起來一樣，連成一片 → 只看得出 <b>${groups}</b> 條。`;
+    if(hide)note+='<br>換不同顏色的燈光照照看：每一條亮或不亮，告訴你它會不會反射那種色光。想好了再按「揭曉答案」。';
+    if(kind==='card'&&lightOn&&!f&&lt.every(v=>v===1))note+='白光含有紅、綠、藍光，色卡都是原本的顏色。換一種燈光，看看哪些色卡變黑。';
+    return {svg:h,reads:[['燈光',lightName],['玻璃紙',f?f[0]+'色':'沒有放'],[kind==='card'?'看起來':'由'+(dir==='v'?'左到右':'上到下')+'看起來',names.join('・')],...(kind==='card'?[]:[['看得出幾條',`${groups} 條`]])],note};}},
 /* ===== 5-1 溫度與溫度計 ===== */
 temp:{group:3,n:'5-1',keep:['mode'],name:'溫度與溫度計',subtitle:'溫度是物體的冷熱程度。溫度計利用物質隨溫度規律改變的性質來測量；溫標由兩個定點之間等分刻度而來。',
   q:s=>({html:qBlockHTML(TEMP_Q[s.mode==='types'?s.kind:s.mode])+quizHTML(s,TEMP_QUIZ)}),
@@ -2165,9 +2245,9 @@ function activate(key){
   else if(act){const sb=document.querySelector('.sidebar'),r=act.getBoundingClientRect(),rs=sb.getBoundingClientRect();if(r.bottom>rs.bottom||r.top<rs.top)sb.scrollTop+=r.top-rs.top-rs.height/2;}
 }
 labEl.addEventListener('input',e=>{const c=cfg.controls[e.target.dataset.c];if(!c)return;if(c.type==='range')state[c.key]=+e.target.value;else if(c.type==='toggle'){state[c.key]=e.target.checked;if(c.onChange)c.onChange(state);}render();});
-labEl.addEventListener('click',e=>{const ph=e.target.closest('.photo');if(ph&&lastPhoto){openPhoto(lastPhoto);return;}const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset')){const keep=(cfg.keep||[]).map(k=>[k,state[k]]);activate(current);if(keep.length){for(const[k,v]of keep){state[k]=v;const c=cfg.controls.find(c=>c.key===k&&c.onChange);if(c)c.onChange(state);}render();}return;}if(b.dataset.qa&&cfg.qAction){cfg.qAction(state,b.dataset.qa);render();return;}const c=cfg.controls[b.dataset.c];if(!c)return;
+labEl.addEventListener('click',e=>{const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){cfg.tap(state,tp.dataset.tap);render();return;}const ph=e.target.closest('.photo');if(ph&&lastPhoto){openPhoto(lastPhoto);return;}const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset')){const keep=(cfg.keep||[]).map(k=>[k,state[k]]);activate(current);if(keep.length){for(const[k,v]of keep){state[k]=v;const c=cfg.controls.find(c=>c.key===k&&c.onChange);if(c)c.onChange(state);}render();}return;}if(b.dataset.qa&&cfg.qAction){cfg.qAction(state,b.dataset.qa);render();return;}const c=cfg.controls[b.dataset.c];if(!c)return;
   if(c.type==='seg'){state[c.key]=c.options[b.dataset.o][0];if(c.onChange)c.onChange(state);}else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();});
-labEl.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('.photo')&&lastPhoto){e.preventDefault();openPhoto(lastPhoto);}});
+labEl.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){e.preventDefault();const id=tp.dataset.tap;cfg.tap(state,id);render();const again=svgEl.querySelector(`[data-tap="${id}"]`);if(again)again.focus();return;}if(e.target.closest('.photo')&&lastPhoto){e.preventDefault();openPhoto(lastPhoto);}});
 const svgPoint=e=>{const p=svgEl.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svgEl.getScreenCTM().inverse());};
 labEl.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-drag]');if(!h||!cfg.drag||!cfg.drag[h.dataset.drag])return;e.preventDefault();drag={name:h.dataset.drag,p0:svgPoint(e),s0:structuredClone(state)};svgEl.setPointerCapture(e.pointerId);labEl.classList.add('dragging');});
 labEl.addEventListener('pointermove',e=>{if(!drag)return;cfg.drag[drag.name](svgPoint(e),state,drag);if(!cfg.tick)render();});

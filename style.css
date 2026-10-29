@@ -239,3 +239,6 @@ dialog .small{font-size:13px;color:var(--muted)}
 .projection .photo figcaption{font-size:15px}
 .projection .seg button,.projection .ex-tools .btn,.projection .ex-who{font-size:15px}
 @media(max-width:760px){.viz-panel svg{position:static}}
+#scene [data-tap]{cursor:pointer}
+#scene [data-tap]:focus{outline:none}
+#scene [data-tap]:focus-visible rect{stroke:#ffcc6a;stroke-width:4}
