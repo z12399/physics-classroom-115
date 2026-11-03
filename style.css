@@ -242,3 +242,44 @@ dialog .small{font-size:13px;color:var(--muted)}
 #scene [data-tap]{cursor:pointer}
 #scene [data-tap]:focus{outline:none}
 #scene [data-tap]:focus-visible rect{stroke:#ffcc6a;stroke-width:4}
+
+/* ---------- 引導版面（4-4、4-5）：分頁、試試看、改了什麼、一屏看完 ---------- */
+.guided .steps{margin:0 0 12px}
+.step-tabs .seg{gap:6px;padding:0;background:none;border:0}
+.step-tabs .seg button{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px;font-size:16px;font-weight:700;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);color:var(--ink-2);white-space:nowrap}
+.step-tabs .seg button i{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-2);font-style:normal;font-size:12px;color:var(--muted)}
+.step-tabs .seg button:hover{border-color:var(--accent)}
+.step-tabs .seg button.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 2px 8px #0f766e40}
+.step-tabs .seg button.active i{background:#fff;border-color:#fff;color:var(--accent-ink)}
+.task{margin:10px 0 0;padding:9px 16px;border-radius:12px;background:var(--amber-soft);border:1px solid var(--amber-line);font-size:16px;font-weight:600;line-height:1.6;color:var(--ink)}
+.task:empty{display:none}
+.task b{display:inline-block;margin-right:10px;padding:0 9px;border-radius:6px;background:var(--amber);color:#fff;font-size:13px;vertical-align:1px}
+.guided .page-intro{margin-bottom:12px}
+.guided .control label,.guided .control>span,.guided .ctl-label,.guided .toggle{font-size:15px}
+.guided .seg button{font-size:14px;padding:7px 10px}
+.guided .note{font-size:15px}
+.more{margin:14px 0 0;border:1px solid var(--line);border-radius:12px;padding:0 14px}
+.more summary{cursor:pointer;padding:10px 0;font-size:14px;font-weight:700;color:var(--muted);list-style:none}
+.more summary::-webkit-details-marker{display:none}
+.more summary::before{content:"＋ "}
+.more[open] summary::before{content:"－ "}
+.more[open]{padding-bottom:4px}
+.more:not(:has(.control:not([hidden]))){display:none}
+.change-toast{position:absolute;left:50%;top:14px;transform:translate(-50%,-8px);z-index:3;max-width:calc(100% - 40px);padding:10px 20px;border-radius:14px;background:#0f1b2de6;border:2px solid #ffcc6a;color:#fff;font-size:20px;font-weight:600;line-height:1.5;text-align:center;box-shadow:0 8px 24px #0006;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+.change-toast.show{opacity:1;transform:translate(-50%,0)}
+.change-toast b{color:#ffcc6a}
+.change-toast s{color:#9fb2c8;text-decoration-thickness:2px}
+.projection .change-toast{font-size:24px}
+.control.changed{animation:changed 1.6s ease-out}
+@keyframes changed{0%,40%{background:#ffe9b3;box-shadow:0 0 0 6px #ffe9b3}100%{background:transparent;box-shadow:0 0 0 6px transparent}}
+.control{border-radius:8px}
+@media(min-width:1181px){
+  .guided .sim-layout{height:var(--fit,auto);min-height:440px}
+  .guided .viz-panel{min-height:0}
+  .guided .viz-panel svg{flex:1 1 auto;height:100%;min-height:0;position:static;margin:0}
+  .guided .controls{overflow-y:auto;overscroll-behavior:contain}
+}
+@media(max-width:1180px){.step-tabs .seg{flex-wrap:wrap}.step-tabs .seg button{flex:1 1 auto}}
+@media(max-width:760px){.step-tabs .seg button{font-size:14px;padding:8px 10px}.task{font-size:15px}.change-toast{font-size:16px;top:8px}}
+@media(prefers-reduced-motion:reduce){.control.changed{animation:none}}
+.steps .control{margin:0}

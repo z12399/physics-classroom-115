@@ -1103,26 +1103,27 @@ refraction:{group:2,n:'4-3',name:'光的折射',subtitle:'單束光看折射角�
       note:same?'兩邊是同一種介質 → 光直直前進，不偏折。':crit===null?'光從光速快的介質進入光速慢的介質：每一條都能折射進去，斜射的光都<b>偏向法線</b>。':'光從光速慢的介質射向光速快的介質：越斜的光入射角越大；超過<b>臨界角</b>的光（黃色）全部反射回來（<b>全反射</b>）。拖動光源試試。'};}},
 
 /* ===== 4-4 透鏡成像 ===== */
-lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折：先看光為什麼會偏、找出焦點，再看像怎麼形成，最後用光具座做實驗。',dark:true,
+lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折：先看光為什麼會偏、找出焦點，再看像怎麼形成，最後用光具座做實驗。',dark:true,steps:'mode',
+  tasks:{why:'把「透鏡彎曲程度」調大或調小，焦點往哪裡移？再換成凹透鏡比較。',focus:'打開「拿一張紙，找最亮的點」，拖動紙張找到最小、最亮的光點：那就是焦點，它到透鏡的距離就是焦距。',image:'按「把物體放到」的各個位置（或按 ▶ 讓物體慢慢靠近），看像的正倒、大小、虛實怎麼變。',bench:'移動紙屏，直到燭焰的像最清楚，再按「記錄這一次」；換個物距再做一次，比較物距和像距。',blur:'先只開 1 個小孔，再開 2 個、5 個：紙屏不在成像位置時，像為什麼會糊掉？最後按「把紙屏移到成像位置」。'},
   q:s=>s.mode==='image'?{html:lensTableHTML(s)+quizHTML(s,LENS_QUIZ)}:s.mode==='bench'?{html:quizHTML(s,LENS_QUIZ)}:LENS_Q[s.mode],
   qAction(s,v){if(v==='tab'){s.tab=!s.tab;return;}quizAction(s,v,LENS_QUIZ);},
   state:{on:true,prog:0,mode:'why',type:1,wbeam:'parallel',bulge:3,prisms:false,wnorm:false,wy:80,side:'left',terms:true,paper:false,pd:120,
     beam:'main',f:80,u:200,oh:30,aim:20,block:false,sweep:null,tab:false,su:null,bf:10,bu:30,bv:10,log:[],bdev:'lens',bh:'5',bu2:20,bd:30,bcol:true,breal:false,flash:'',flashT:0,qi:0,qp:null,qc:false,qs:false},
-  controls:[LAMP,
+  controls:[{...LAMP,adv:true},
     {type:'seg',key:'mode',label:'實驗',options:[['why','為什麼會偏折'],['focus','焦點與焦距'],['image','成像'],['bench','光具座實驗'],['blur','為什麼會模糊']],onChange:s=>{s.prog=0;s.sweep=null;}},
     {type:'seg',key:'type',label:'透鏡',options:[[1,'凸透鏡'],[-1,'凹透鏡']],onChange:replay,show:s=>s.mode!=='bench'&&s.mode!=='blur'},
     {type:'seg',key:'wbeam',label:'光線',options:[['single','單束光'],['parallel','平行光']],onChange:replay,show:s=>s.mode==='why'},
     {type:'range',key:'bulge',label:'透鏡彎曲程度',min:1,max:5,step:1,fmt:s=>['很平','較平','中等','較彎','很彎'][s.bulge-1],show:s=>s.mode==='why'},
     {type:'toggle',key:'prisms',label:'看成一疊三稜鏡',onChange:replay,show:s=>s.mode==='why'},
-    {type:'toggle',key:'wnorm',label:'顯示法線',show:s=>s.mode==='why'&&s.wbeam==='parallel'},
+    {type:'toggle',key:'wnorm',label:'顯示法線',adv:true,show:s=>s.mode==='why'&&s.wbeam==='parallel'},
     {type:'seg',key:'side',label:'平行光從',options:[['left','左邊射入'],['right','右邊射入']],onChange:replay,show:s=>s.mode==='focus'},
     {type:'range',key:'f',label:'焦距 f',min:40,max:140,step:1,unit:' cm',show:s=>s.mode==='focus'||s.mode==='image'},
-    {type:'toggle',key:'terms',label:'標示名詞（主軸、光心、焦點、焦距）',show:s=>s.mode==='focus'},
+    {type:'toggle',key:'terms',label:'標示名詞（主軸、光心、焦點、焦距）',adv:true,show:s=>s.mode==='focus'},
     {type:'toggle',key:'paper',label:'拿一張紙，找最亮的點',show:s=>s.mode==='focus'},
     {type:'range',key:'pd',label:'紙 → 透鏡',min:10,max:170,step:1,unit:' cm',show:s=>s.mode==='focus'&&s.paper},
     {type:'seg',key:'beam',label:'光線',options:[['single','單束光'],['main','主要光線'],['full','全光']],onChange:replay,show:s=>s.mode==='image'},
     {type:'range',key:'u',label:'物距',min:20,max:360,step:1,unit:' cm',show:s=>s.mode==='image'},
-    {type:'range',key:'oh',label:'物高',min:10,max:50,step:1,unit:' cm',show:s=>s.mode==='image'},
+    {type:'range',key:'oh',label:'物高',min:10,max:50,step:1,unit:' cm',adv:true,show:s=>s.mode==='image'},
     {type:'buttons',label:'把物體放到',items:[['2F 以外',s=>{s.u=snap('u',s.f*2.6);s.sweep=null;}],['2F 上',s=>{s.u=snap('u',s.f*2);s.sweep=null;}],['F 與 2F 之間',s=>{s.u=snap('u',s.f*1.5);s.sweep=null;}],['F 上',s=>{s.u=snap('u',s.f);s.sweep=null;}],['F 以內',s=>{s.u=snap('u',s.f*0.55);s.sweep=null;}]],show:s=>s.mode==='image'&&s.type===1},
     {type:'buttons',label:'',items:[['▶ 物體從遠處慢慢靠近',s=>{s.sweep=0;s.su=null;}]],show:s=>s.mode==='image',primary:true},
     {type:'toggle',key:'block',label:'用黑紙遮住透鏡上半部',onChange:replay,show:s=>s.mode==='image'&&s.beam!=='single'},
@@ -1131,14 +1132,14 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
     {type:'range',key:'bu2',label:'物體 → 透鏡（物距）',min:13,max:40,step:1,unit:' cm',show:s=>s.mode==='blur'},
     {type:'range',key:'bd',label:'透鏡 → 紙屏',min:5,max:50,step:0.5,unit:' cm',show:s=>s.mode==='blur'},
     {type:'buttons',label:'',items:[['🔍 把紙屏移到成像位置',s=>{const v=10*s.bu2/(s.bu2-10);if(v<=50)s.bd=snap('bd',v);}]],show:s=>s.mode==='blur'&&s.bdev==='lens',primary:true},
-    {type:'toggle',key:'bcol',label:'依小孔位置上色',show:s=>s.mode==='blur'},
+    {type:'toggle',key:'bcol',label:'依小孔位置上色',adv:true,show:s=>s.mode==='blur'},
     {type:'toggle',key:'breal',label:'看實際的樣子（像糊成一片）',show:s=>s.mode==='blur'&&s.bh==='all'},
     {type:'seg',key:'bf',label:'凸透鏡的焦距',options:[[10,'10 cm'],[15,'15 cm']],onChange:s=>{s.log=[];},show:s=>s.mode==='bench'},
     {type:'range',key:'bu',label:'蠟燭 → 透鏡（物距）',min:4,max:50,step:1,unit:' cm',show:s=>s.mode==='bench'},
     {type:'range',key:'bv',label:'透鏡 → 紙屏',min:4,max:50,step:0.5,unit:' cm',show:s=>s.mode==='bench'},
     {type:'buttons',label:'',items:[['📋 記錄這一次',s=>benchLog(s)]],show:s=>s.mode==='bench',primary:true},
     {type:'buttons',label:'',items:[['🔍 幫我對焦',s=>{const v=s.bf*s.bu/(s.bu-s.bf);if(s.bu>s.bf&&v<=50)s.bv=snap('bv',v);else{s.flash=s.bu<=s.bf?'蠟燭在焦點上或焦點內，紙屏接不到像':'像太遠了，紙屏放不到';s.flashT=3;}}],['清除紀錄',s=>{s.log=[];}]],show:s=>s.mode==='bench'},
-    {type:'buttons',label:'',items:[['🤔 沒對準時為什麼會模糊？',s=>{s.mode='blur';s.bdev='lens';s.bh='5';s.prog=0;if(s.bf===10){s.bu2=snap('bu2',s.bu);s.bd=snap('bd',s.bv);}}]],show:s=>s.mode==='bench'}],
+    {type:'buttons',label:'',items:[['🤔 沒對準時為什麼會模糊？',s=>{s.mode='blur';s.bdev='lens';s.bh='5';s.prog=0;if(s.bf===10){s.bu2=snap('bu2',s.bu);s.bd=snap('bd',s.bv);}}]],adv:true,show:s=>s.mode==='bench'}],
   tick:(s,dt)=>{LIGHT_TICK(s,dt);if(s.flashT>0)s.flashT-=dt;
     if(s.sweep!==null){if(s.su!==null&&s.u!==s.su){s.sweep=null;return;}s.sweep=Math.min(1,s.sweep+dt/7);const e=1-Math.pow(1-s.sweep,2),to=s.type===1?s.f*1.08:20;s.u=s.su=snap('u',360-(360-to)*e);if(s.sweep>=1)s.sweep=null;}},
   drag:{obj:(p,s)=>{s.u=snap('u',(450-p.x)/1.15);s.sweep=null;},top:(p,s)=>{s.oh=snap('oh',(250-p.y)/2.4);},aim:(p,s)=>{s.aim=clamp((250-p.y)/2.4,-76,76);},
@@ -1332,11 +1333,12 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
   render(s){return this[s.mode](s);}},
 
 /* ===== 4-4 生活中的透鏡 ===== */
-life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機、放大鏡、顯微鏡和眼睛：物體放在哪裡，就形成什麼樣的像。',dark:true,
+life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機、放大鏡、顯微鏡和眼睛：物體放在哪裡，就形成什麼樣的像。',dark:true,steps:'dev',
+  tasks:{camera:'畫面現在是模糊的：調「對焦」讓它變清楚。再把物體拉近，鏡頭要往前伸還是往後縮？',proj:'移動投影片靠近或遠離鏡頭：螢幕上的像變大還是變小？投影片要怎麼放，字才是正的？',mag:'把字慢慢移近、移遠（都在焦點以內）：看到的虛像大小怎麼變？',scope:'先「只看物鏡」形成的像，再「加上目鏡」：最後看到的像是正立還是倒立？',eye:'拖動物體遠近：視網膜不能移動，眼睛靠什麼讓像一直清楚？',myopia:'近視眼的像落在視網膜的前面還是後面？打開「戴上眼鏡」，看凹透鏡怎麼修正。',hyper:'遠視眼的像落在視網膜的前面還是後面？打開「戴上眼鏡」，看凸透鏡怎麼修正。'},
   q:s=>({html:qBlockHTML(LIFE_Q[s.dev])+quizHTML(s,LIFE_QUIZ)}),
   qAction(s,v){quizAction(s,v,LIFE_QUIZ);},
   state:{on:true,prog:0,beam:'full',dev:'camera',u:900,glasses:false,focus:118,cu:900,pu:150,flip:false,mu:100,step:'obj',qi:0,qp:null,qc:false,qs:false},
-  controls:[LAMP,{...BEAM,show:s=>!['proj','mag','scope'].includes(s.dev)},
+  controls:[{...LAMP,adv:true},{...BEAM,adv:true,show:s=>!['proj','mag','scope'].includes(s.dev)},
     {type:'seg',key:'dev',label:'裝置',options:[['camera','照相機'],['proj','投影機'],['mag','放大鏡'],['scope','顯微鏡'],['eye','眼睛'],['myopia','近視'],['hyper','遠視']],onChange:s=>{replay(s);const i=LIFE_QUIZ.findIndex(q=>{const t={};if(q.go)q.go(t);return t.dev===s.dev;});if(i>=0){s.qi=i;s.qp=null;s.qc=false;s.qs=false;}}},
     {type:'seg',key:'step',label:'顯微鏡',options:[['obj','只看物鏡'],['both','加上目鏡']],onChange:replay,show:s=>s.dev==='scope'},
     {type:'range',key:'pu',label:'投影片 → 鏡頭（焦距 10 cm）',min:120,max:190,step:1,fmt:s=>`${(s.pu/10).toFixed(1)} cm`,show:s=>s.dev==='proj'},
@@ -1451,11 +1453,12 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機�
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:s.dev==='myopia'?[['眼球','前後太長（也可能是水晶體太厚）'],['光會聚在',where],['看遠處',ok?'清楚':'模糊'],['矯正','凹透鏡（發散）']]:[['眼球','前後太短（也可能是水晶體太薄）'],['光會聚在',where],['看近處',ok?'清楚':'模糊'],['矯正','凸透鏡（會聚）']],
       note:s.dev==='myopia'?'近視：光會聚在視網膜<b>前方</b> → 戴<b>凹透鏡</b>讓光先發散一點。':'遠視：光會聚在視網膜<b>後方</b> → 戴<b>凸透鏡</b>幫忙會聚。'};}},
 /* ===== 11 顏色 ===== */
-color:{group:2,n:'4-5',keep:['mode'],name:'色散與顏色',subtitle:'白光經過三稜鏡會分成各種色光（色散），彩虹也是這樣形成的；物體的顏色，看它讓哪些色光透過或反射。',dark:true,
+color:{group:2,n:'4-5',keep:['mode'],steps:'mode',
+  tasks:{prism:'看紙屏上的顏色順序：哪一色光偏折最多？再改成單色光，或再放一個倒置的三稜鏡。',rainbow:'跟著光走一遍：進入小水滴折射 → 反射 → 再折射出來；再切到「為什麼外紅內紫？」。',clear:'換不同顏色的玻璃紙：透過來的是什麼色光？兩張疊在一起又會怎樣？',opaque:'改變照射的光或物體：物體看起來是什麼顏色？什麼時候會變成黑色？',mix:'開關紅、綠、藍光：兩兩重疊是什麼顏色？三種都開呢？',paint:'（延伸）加入青、洋紅、黃顏料：顏料是越混越亮，還是越混越暗？'},name:'色散與顏色',subtitle:'白光經過三稜鏡會分成各種色光（色散），彩虹也是這樣形成的；物體的顏色，看它讓哪些色光透過或反射。',dark:true,
   q:s=>({html:qBlockHTML(COLOR_Q[s.mode==='opaque'&&s.ov==='text'?'text':s.mode]||COLOR_Q.prism)+quizHTML(s,COLOR_QUIZ)}),
   qAction(s,v){quizAction(s,v,COLOR_QUIZ);},
   state:{on:true,prog:0,mode:'prism',beam:'full',hue:3,newton:false,rv:'drop',tv:'one',f1:'r',f2:'g',fR:true,fG:true,fB:true,ov:'obj',obj:'apple',ink:'r',gv:'g',r:1,g:1,b:1,pc:true,pm:true,py:true,compare:false,qi:0,qp:null,qc:false,qs:false},
-  controls:[LAMP,
+  controls:[{...LAMP,adv:true},
     {type:'seg',key:'mode',label:'實驗',options:[['prism','色散（三稜鏡）'],['rainbow','彩虹'],['clear','透明物體'],['opaque','不透明物體'],['mix','色光三原色'],['paint','顏料混色（延伸）']],onChange:s=>{if(!s.r&&!s.g&&!s.b)[s.r,s.g,s.b]=[1,1,1];replay(s);}},
     {type:'seg',key:'beam',label:'光線',options:[['full','白光'],['single','單色光']],show:s=>s.mode==='prism',onChange:replay},
     {type:'seg',key:'hue',label:'色光',options:SPECTRUM.map(([n],i)=>[i,n]),show:s=>s.mode==='prism'&&s.beam==='single',onChange:replay},
@@ -1649,7 +1652,7 @@ color:{group:2,n:'4-5',keep:['mode'],name:'色散與顏色',subtitle:'白光經�
     return {svg:h,reads:[['顏料',sel.length?sel.map(p=>p[0]).join(' ＋ '):'（白紙）'],['吸收',!s.on?'—':abs.length?abs.join('、')+'光':'沒有'],['反射',!s.on?'—':refl.length?refl.join('、')+'光':'沒有'],['看起來',seen]],
       note:'（延伸）顏料三原色是<b>青、洋紅、黃</b>：青吸收紅光、洋紅吸收綠光、黃吸收藍光。混得越多吸收越多 → 越暗（<b>減色</b>）。'};}},
 /* ===== 4-5 色光自由實驗室 ===== */
-colorfree:{group:2,n:'4-5',name:'色光自由實驗室',subtitle:'自己調燈光、選物體、加玻璃紙：看到的顏色＝光源裡有、物體會反射、玻璃紙也讓它通過的色光。',dark:true,
+colorfree:{group:2,n:'4-5',tasks:s=>s.guess?'只看這個燈光下的樣子，猜國旗原本是什麼顏色，再按「揭曉答案」。':'先選一面國旗，再把燈光換成紅光（或關掉綠燈）：每一條會變成什麼顏色？',name:'色光自由實驗室',subtitle:'自己調燈光、選物體、加玻璃紙：看到的顏色＝光源裡有、物體會反射、玻璃紙也讓它通過的色光。',dark:true,
   q:()=>({html:cfQHTML()}),
   state:{lr:100,lg:100,lb:100,obj:'de',filt:'none',cust:['w','r','k'],guess:false,myst:'de',reveal:false},
   controls:[
@@ -1946,7 +1949,28 @@ function questionHTML(){const q=typeof cfg.q==='function'?cfg.q(state):cfg.q;ret
 /* 問題卡重畫時，保留已經打開的「看解釋」 */
 function setQuestion(qh){const el=labEl.querySelector('.question'),open=new Set([...el.querySelectorAll('details[open]')].map(d=>d.dataset.k));el.innerHTML=qh;el.querySelectorAll('details').forEach(d=>{if(d.dataset.k&&open.has(d.dataset.k))d.open=true;});}
 let lastQ='';
-function render(){const out=cfg.render(state);if(typeof cfg.q==='function'){const qh=questionHTML();if(qh!==lastQ){setQuestion(qh);lastQ=qh;}}svgEl.innerHTML=DEFS+out.svg;const hint=labEl.querySelector('.drag-hint');if(hint)hint.style.visibility=svgEl.querySelector('[data-drag]')?'':'hidden';setIf(labEl.querySelector('.readouts'),out.reads.map(([a,b])=>`<div class="readout"><span>${a}</span><b>${b}</b></div>`).join(''));setIf(labEl.querySelector('.note'),out.note||'');setPhoto();sync();}
+function render(){const out=cfg.render(state);if(typeof cfg.q==='function'){const qh=questionHTML();if(qh!==lastQ){setQuestion(qh);lastQ=qh;}}svgEl.innerHTML=DEFS+out.svg;const hint=labEl.querySelector('.drag-hint');if(hint)hint.style.visibility=svgEl.querySelector('[data-drag]')?'':'hidden';setIf(labEl.querySelector('.readouts'),out.reads.map(([a,b])=>`<div class="readout"><span>${a}</span><b>${b}</b></div>`).join(''));setIf(labEl.querySelector('.note'),out.note||'');const task=labEl.querySelector('.task');if(task)setIf(task,taskText());setPhoto();sync();}
+function taskText(){const t=typeof cfg.tasks==='function'?cfg.tasks(state):cfg.tasks?.[state[cfg.steps]];return t?`<b>試試看</b>${t}`:'';}
+/* 引導版面：圖和控制項一起放進一個螢幕高度（窄螢幕改成上下排，不固定高度） */
+function fitStage(){const sim=labEl.querySelector('.sim-layout');if(!sim)return;if(!labEl.classList.contains('guided')||innerWidth<=1180){sim.style.removeProperty('--fit');return;}
+  sim.style.setProperty('--fit',Math.max(440,innerHeight-(sim.getBoundingClientRect().top+scrollY)-18)+'px');}
+addEventListener('resize',fitStage);
+/* ---------- 改了什麼：老師一調整，圖上就用大字顯示「哪個條件 → 變成什麼」 ---------- */
+const ann={base:null,timer:0};
+function ctlVal(c){if(c.show&&!c.show(state))return null;
+  if(c.type==='range')return c.fmt?c.fmt(state):`${state[c.key]}${c.unit||''}`;
+  if(c.type==='seg'){const o=c.options.find(([v])=>String(v)===String(state[c.key]));return o?o[1]:null;}
+  if(c.type==='toggle')return !!state[c.key];return null;}
+const snapCtl=()=>cfg.controls.map(ctlVal);
+function announce(before,head,first){
+  const box=labEl.querySelector('.change-toast');if(!box)return;if(!ann.base)ann.base=before;
+  const now=snapCtl(),idx=now.map((v,i)=>i).filter(i=>now[i]!==null&&ann.base[i]!==null&&now[i]!==ann.base[i]&&i!==first);
+  if(first!=null&&now[first]!==null)idx.unshift(first);
+  const line=i=>{const c=cfg.controls[i],v=now[i];if(c.type==='toggle')return v?`✓ ${c.label}`:`✗ 取消：${c.label}`;const was=ann.base[i];return `${c.label}：${was!==null&&was!==v?`<s>${was}</s> → `:''}<b>${v}</b>`;};
+  const lines=[...(head?[`<b>${head}</b>`]:[]),...idx.slice(0,head?2:3).map(line)];if(!lines.length)return;
+  box.innerHTML=lines.map(l=>`<div>${l}</div>`).join('');box.classList.add('show');
+  idx.forEach(i=>{const el=labEl.querySelector(`.controls .control[data-c="${i}"]`);if(el){el.classList.remove('changed');void el.offsetWidth;el.classList.add('changed');}});
+  clearTimeout(ann.timer);ann.timer=setTimeout(()=>{box.classList.remove('show');ann.base=null;},2400);}
 /* ---------- 實物圖：依實驗與模式顯示一張生活或實驗照片（插圖由 AI 生成，僅供示意） ---------- */
 const PHOTOS={
   pinhole:['img/pinhole.webp','自製<b>針孔成像</b>盒：燭光穿過小孔，在描圖紙上形成上下顛倒、左右相反的像。'],
@@ -1987,27 +2011,33 @@ function activate(key){
   if(!LABS[key])key='lens';cancelAnimationFrame(raf);audioSync(false);current=key;cfg=LABS[key];state=structuredClone(cfg.state);
   document.querySelectorAll('nav a').forEach(a=>{const on=a.dataset.key===key;a.classList.toggle('active',on);on?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');});
   document.getElementById('title').textContent=cfg.name;document.getElementById('subtitle').textContent=cfg.subtitle;document.title=cfg.name+'｜理化實驗室';
-  labEl.innerHTML=`<div class="sim-layout"><div class="viz-panel${cfg.dark?' dark':''}"><svg id="scene" viewBox="0 0 900 500" role="img" aria-label="${cfg.name}"></svg>${cfg.drag?'<p class="drag-hint"><i></i>虛線圓圈可以直接拖曳</p>':''}</div><div class="controls">${cfg.controls.map(controlHTML).join('')}<div class="readouts"></div><p class="note"></p><figure class="photo" hidden title="點一下放大" tabindex="0" role="button" aria-label="放大實物圖"><img alt=""><figcaption></figcaption></figure><button type="button" class="btn ghost reset">↺ 重設</button></div></div><section class="question">${lastQ=questionHTML()}</section>`;
-  svgEl=labEl.querySelector('#scene');lastPhoto=undefined;render();
+  /* 引導版面（4-4、4-5）：子實驗變成圖上方的分頁＋「試試看」，進階選項收進「更多選項」 */
+  const si=cfg.steps?cfg.controls.findIndex(c=>c.type==='seg'&&c.key===cfg.steps):-1,st=cfg.controls[si],guided=!!(cfg.steps||cfg.tasks);
+  const basic=cfg.controls.map((c,i)=>i===si||c.adv?'':controlHTML(c,i)).join(''),adv=cfg.controls.map((c,i)=>c.adv?controlHTML(c,i):'').join('');
+  const top=!guided?'':`<div class="steps">${st?`<div class="control step-tabs" data-c="${si}"><div class="seg" role="group" aria-label="${st.label}">${st.options.map(([,t],j)=>`<button type="button" data-c="${si}" data-o="${j}"><i>${j+1}</i>${t}</button>`).join('')}</div></div>`:''}<p class="task"></p></div>`;
+  const tail=`<div class="readouts"></div><p class="note"></p>${adv?`<details class="more"><summary>更多選項</summary>${adv}</details>`:''}<figure class="photo" hidden title="點一下放大" tabindex="0" role="button" aria-label="放大實物圖"><img alt=""><figcaption></figcaption></figure><button type="button" class="btn ghost reset">↺ 重設</button>`;
+  labEl.classList.toggle('guided',guided);
+  labEl.innerHTML=`${top}<div class="sim-layout"><div class="viz-panel${cfg.dark?' dark':''}"><svg id="scene" viewBox="0 0 900 500" role="img" aria-label="${cfg.name}"></svg>${guided?'<div class="change-toast" aria-live="polite"></div>':''}${cfg.drag?'<p class="drag-hint"><i></i>虛線圓圈可以直接拖曳</p>':''}</div><div class="controls">${guided?basic+tail:cfg.controls.map(controlHTML).join('')+tail}</div></div><section class="question">${lastQ=questionHTML()}</section>`;
+  svgEl=labEl.querySelector('#scene');lastPhoto=undefined;ann.base=null;render();fitStage();
   if(cfg.tick){let last=0;const loop=now=>{const dt=last?Math.min((now-last)/1000,0.1):0;last=now;cfg.tick(state,dt);render();raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);}
   const act=document.querySelector('nav a.active');if(act&&matchMedia('(max-width:760px)').matches)act.scrollIntoView({block:'nearest',inline:'center'});
   else if(act){const sb=document.querySelector('.sidebar'),r=act.getBoundingClientRect(),rs=sb.getBoundingClientRect();if(r.bottom>rs.bottom||r.top<rs.top)sb.scrollTop+=r.top-rs.top-rs.height/2;}
 }
-labEl.addEventListener('input',e=>{const c=cfg.controls[e.target.dataset.c];if(!c)return;if(c.type==='range')state[c.key]=+e.target.value;else if(c.type==='toggle'){state[c.key]=e.target.checked;if(c.onChange)c.onChange(state);}render();});
-labEl.addEventListener('click',e=>{const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){cfg.tap(state,tp.dataset.tap);render();return;}const ph=e.target.closest('.photo');if(ph&&lastPhoto){openPhoto(lastPhoto);return;}const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset')){const keep=(cfg.keep||[]).map(k=>[k,state[k]]);activate(current);if(keep.length){for(const[k,v]of keep){state[k]=v;const c=cfg.controls.find(c=>c.key===k&&c.onChange);if(c)c.onChange(state);}render();}return;}if(b.dataset.qa&&cfg.qAction){cfg.qAction(state,b.dataset.qa);render();return;}const c=cfg.controls[b.dataset.c];if(!c)return;
-  if(c.type==='seg'){state[c.key]=c.options[b.dataset.o][0];if(c.onChange)c.onChange(state);}else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();});
+labEl.addEventListener('input',e=>{const c=cfg.controls[e.target.dataset.c];if(!c)return;const before=snapCtl();if(c.type==='range')state[c.key]=+e.target.value;else if(c.type==='toggle'){state[c.key]=e.target.checked;if(c.onChange)c.onChange(state);}render();announce(before,null,+e.target.dataset.c);});
+labEl.addEventListener('click',e=>{const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){cfg.tap(state,tp.dataset.tap);render();return;}const ph=e.target.closest('.photo');if(ph&&lastPhoto){openPhoto(lastPhoto);return;}const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset')){const keep=(cfg.keep||[]).map(k=>[k,state[k]]);activate(current);if(keep.length){for(const[k,v]of keep){state[k]=v;const c=cfg.controls.find(c=>c.key===k&&c.onChange);if(c)c.onChange(state);}render();}return;}const before=snapCtl();if(b.dataset.qa&&cfg.qAction){cfg.qAction(state,b.dataset.qa);render();announce(before,null,null);return;}const c=cfg.controls[b.dataset.c];if(!c)return;
+  if(c.type==='seg'){state[c.key]=c.options[b.dataset.o][0];if(c.onChange)c.onChange(state);}else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();announce(before,c.type==='buttons'?b.textContent:null,c.type==='seg'?+b.dataset.c:null);});
 labEl.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){e.preventDefault();const id=tp.dataset.tap;cfg.tap(state,id);render();const again=svgEl.querySelector(`[data-tap="${id}"]`);if(again)again.focus();return;}if(e.target.closest('.photo')&&lastPhoto){e.preventDefault();openPhoto(lastPhoto);}});
 const svgPoint=e=>{const p=svgEl.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svgEl.getScreenCTM().inverse());};
-labEl.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-drag]');if(!h||!cfg.drag||!cfg.drag[h.dataset.drag])return;e.preventDefault();drag={name:h.dataset.drag,p0:svgPoint(e),s0:structuredClone(state)};svgEl.setPointerCapture(e.pointerId);labEl.classList.add('dragging');});
-labEl.addEventListener('pointermove',e=>{if(!drag)return;cfg.drag[drag.name](svgPoint(e),state,drag);if(!cfg.tick)render();});
+labEl.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-drag]');if(!h||!cfg.drag||!cfg.drag[h.dataset.drag])return;e.preventDefault();drag={name:h.dataset.drag,p0:svgPoint(e),s0:structuredClone(state),before:snapCtl()};svgEl.setPointerCapture(e.pointerId);labEl.classList.add('dragging');});
+labEl.addEventListener('pointermove',e=>{if(!drag)return;cfg.drag[drag.name](svgPoint(e),state,drag);if(!cfg.tick)render();announce(drag.before,null,null);});
 const endDrag=()=>{drag=null;labEl.classList.remove('dragging');};labEl.addEventListener('pointerup',endDrag);labEl.addEventListener('pointercancel',endDrag);
 
 /* ---------- 頁面 ---------- */
 let nav='';[1,2,3].forEach(g=>{nav+=`<div class="nav-group-label">${g===1?'第一次段考':g===2?'第二次段考 · 光學':'第二次段考 · 溫度與熱'}</div>`;Object.entries(LABS).filter(([,t])=>t.group===g).forEach(([key,t])=>{nav+=`<a href="#${key}" data-key="${key}"><span class="count" aria-hidden="true">${t.n}</span>${t.name}</a>`;});});
 document.getElementById('nav').innerHTML=nav;
 window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
-document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';};
+document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';fitStage();};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備；溫度與熱先做 5-1 溫度與溫度計、5-2 熱量（尚未教比熱，熱量只算水：H ＝ m × ΔT）。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>「透鏡成像 → 為什麼會偏折」在透鏡兩個球面各算一次折射，最外側的光會略偏離焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>4-4、4-5 的頁面：上方的編號分頁是各個小實驗，下面一行「試試看」告訴學生這一步要觀察什麼；每改一個條件，圖上會用大字顯示「改了什麼 → 變成什麼」，右側對應的控制項也會閃一下。不常用的開關收在「更多選項」。</p><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備；溫度與熱先做 5-1 溫度與溫度計、5-2 熱量（尚未教比熱，熱量只算水：H ＝ m × ΔT）。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>「透鏡成像 → 為什麼會偏折」在透鏡兩個球面各算一次折射，最外側的光會略偏離焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');
