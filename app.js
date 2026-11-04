@@ -1244,7 +1244,7 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
       if(fade>0)h+=`<g opacity="${fade}">${hot?`<circle cx="${pX}" cy="${cy}" r="26" fill="#ffd27a" opacity=".45"/>`:''}<ellipse cx="${pX}" cy="${cy}" rx="5" ry="${Math.max(3,Math.min(w,210))}" fill="#fff7c2" opacity="${clamp(16/Math.max(w,3),.18,1)}"/></g>`;
       h+=handle('paper',pX,452,D.object,11);
       if(fade>=1){const flip=dir>0?pX>700:pX<200;h+=T(pX+(flip?-dir:dir)*16,cy-36,hot?'最小最亮 → 焦點！':cc?'光點還不是最小':'光點越來越大',{size:16,fill:hot?D.object:D.muted,anchor:(dir>0)!==flip?'start':'end',weight:700});}}
-    if(s.terms){h+=T(dir>0?880:20,cy-10,'主軸',{size:15,fill:D.muted,anchor:dir>0?'end':'start'})+`<circle cx="${cx}" cy="${cy}" r="4" fill="${D.ink}"/>`+T(cx+10,cy+50,'光心',{size:15,fill:D.ink,halo:true});
+    if(s.terms){h+=T(dir>0?880:20,cy-10,'主軸',{size:15,fill:D.muted,anchor:dir>0?'end':'start'})+`<circle cx="${cx}" cy="${cy}" r="4" fill="${D.ink}"/>`+T(cx+10,cy+50,'光心（鏡心）',{size:15,fill:D.ink,halo:true});
       const Fk=cc?Fo:Fi;h+=L(cx,470,Fk,470,{stroke:D.object,w:1.5})+L(cx,462,cx,478,{stroke:D.object,w:1.5})+L(Fk,462,Fk,478,{stroke:D.object,w:1.5})+T((cx+Fk)/2,462,`焦距 f = ${s.f} cm`,{size:15,fill:D.object,anchor:'middle',weight:700});
       if(fade>0&&!s.paper)h+=T(Fk,cy-18,cc?'焦點':'虛焦點',{size:15,fill:D.object,anchor:'middle',weight:700});}
     if(!s.on)h+=T(450,40,'按「開燈」',{size:20,fill:D.muted,anchor:'middle'});
