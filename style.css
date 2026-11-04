@@ -293,3 +293,20 @@ dialog .small{font-size:13px;color:var(--muted)}
 .step-group.ext .seg button.active{background:var(--amber);border-color:var(--amber);border-style:solid;color:#fff;box-shadow:0 2px 8px #b8661a40}
 .step-group.ext .seg button.active i{background:#fff;border-color:#fff;color:var(--amber)}
 @media(max-width:760px){.step-group{flex-direction:column;align-items:stretch;gap:4px}.step-group-label{width:auto;text-align:left}}
+
+/* ---------- 考到什麼程度（生活中的透鏡） ---------- */
+.question:has(.exam-card){display:block}
+.exam-card{background:#fff;border:1px solid var(--amber-line);border-radius:14px;padding:14px 18px 10px;margin:0 0 14px}
+.exam-card h3{margin:0 0 10px}
+.exam-card h3::before{content:"★"}
+.exam-row{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;padding:8px 0;border-top:1px dashed var(--amber-line)}
+.exam-tag{align-self:start;justify-self:start;font-size:13px;font-weight:700;padding:2px 10px;border-radius:999px;color:#fff}
+.exam-row.base .exam-tag{background:var(--accent)}
+.exam-row.test .exam-tag{background:var(--amber)}
+.exam-row.ext .exam-tag{background:#8a96a0}
+.exam-row ul{margin:0;padding-left:20px;font-size:15px;line-height:1.75;color:var(--ink)}
+.exam-row.ext ul{color:var(--ink-2)}
+.exam-row b{color:var(--accent-ink)}
+.exam-foot{margin:6px 0 0;font-size:12px;color:var(--muted)}
+.projection .exam-row ul{font-size:18px}
+@media(max-width:760px){.exam-row{grid-template-columns:1fr}}
