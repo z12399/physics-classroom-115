@@ -341,7 +341,7 @@ const DEFS=`<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerW
 const SPECIES={
   O2:{label:'O₂ 氧氣',atoms:['O','O']},N2:{label:'N₂ 氮氣',atoms:['N','N']},H2:{label:'H₂ 氫氣',atoms:['H','H']},
   He:{label:'He 氦氣',atoms:['He']},H2O:{label:'H₂O 水',atoms:['O','H','H']},CO2:{label:'CO₂ 二氧化碳',atoms:['C','O','O']}};
-const ATOM={H:{r:10,c:'#7fa6d6'},O:{r:15,c:'#df7c44'},N:{r:15,c:'#0f9488'},C:{r:14,c:'#4a5860'},He:{r:12,c:'#a37acc'}};
+const ATOM={H:{r:10,c:'#f3f5f7'},O:{r:15,c:'#e04a3a'},N:{r:15,c:'#3b6fd8'},C:{r:14,c:'#3f4a52'},He:{r:12,c:'#5fc7d6'}};/* 顏色和第六章的原子模型一致（EL_COLOR） */
 const SLOTS=(()=>{const out=[];for(let r=0;r<4;r++)for(let c=0;c<6;c++){const i=r*6+c;out.push([185+c*106+((i*37)%23-11),128+r*84+((i*53)%21-10)]);}const order=[7,16,2,21,11,4,19,13,0,9,22,5,14,1,18,10,23,6,15,3,20,8,12,17];return order.map(i=>out[i]);})();
 const SOLUBILITY={KNO3:{name:'硝酸鉀',data:[13.3,31.6,63.9,110,169,246]},NaCl:{name:'食鹽',data:[35.7,36.0,36.6,37.3,38.4,39.8]}};
 const solubility=(sub,t)=>{const d=SOLUBILITY[sub].data,i=clamp(Math.floor(t/20),0,4),k=(t-i*20)/20;return d[i]+(d[i+1]-d[i])*k;};
@@ -615,10 +615,12 @@ const thermBubble=(x,y,text,c)=>`<rect x="${x-62}" y="${y-24}" width="124" heigh
 /* 華氏、攝氏、自訂溫標 */
 const toF=c=>c*9/5+32,toX=(c,s)=>s.xa+c*(s.xb-s.xa)/100;
 const tnum=v=>{const r=Math.round(v*10)/10;return Number.isInteger(r)?String(r):r.toFixed(1);};
-/* 5-2 熱平衡：A 在內杯、B 在外杯，熱流 = K × 溫差；散熱時外杯對 25°C 的空氣散熱 */
-function mixCurve(s){const K=200,KL=s.loss?10:0,dt=.01,out=[];let a=s.ta,b=s.tb,lost=0;
+/* 5-2 熱平衡：A 在內杯、B 在外杯，熱流 ＝ K × 溫差；K 依兩杯水量調整，任何水量都約 5 分鐘接近熱平衡（快慢為示意）；散熱時外杯對 25°C 的空氣散熱 */
+const MIX_CACHE={key:'',C:null};
+function mixCurve(s){const key=[s.ma,s.ta,s.mb,s.tb,s.loss].join();if(MIX_CACHE.key===key)return MIX_CACHE.C;
+  const K=1.1*s.ma*s.mb/(s.ma+s.mb),KL=s.loss?10:0,dt=.01,out=[];let a=s.ta,b=s.tb,lost=0;
   for(let i=0;i<=1000;i++){if(i%5===0)out.push([i*dt,a,b,lost]);const p=K*(a-b)*dt,q=KL*(b-25)*dt;a-=p/s.ma;b+=(p-q)/s.mb;lost+=q;}
-  return out;}
+  MIX_CACHE.key=key;MIX_CACHE.C=out;return out;}
 
 /* 5-1 想一想與例題 */
 const TEMP_Q={
@@ -652,16 +654,33 @@ const TEMP_QUIZ=[
 /* 5-2 想一想與例題 */
 const HEAT_Q={
   define:['用同一個熱源，把 100 g 和 200 g 的水各加熱 2 分鐘，哪一杯吸收的熱量多？哪一杯升溫多？','同一熱源、加熱時間相同 → 吸收的<b>熱量相同</b>。由 <b>H ＝ m × ΔT</b>，熱量相同時質量越大升溫越少：100 g 升溫是 200 g 的 <b>2 倍</b>。（打開「比較不同水量」比較哪一條線比較陡）'],
+  compare:['一杯 100°C 的沸水和一浴缸 40°C 的洗澡水，哪一個溫度高？冷卻到室溫 20°C 時，哪一個放出的熱量多？','沸水的<b>溫度</b>比較高；但洗澡水的質量大得多。例如 250 g 的沸水冷卻到 20°C，放出 250 × 80 ＝ 20000 cal；150 kg 的洗澡水冷卻到 20°C，放出 150000 × 20 ＝ 3000000 cal。放出多少熱量要看<b>質量和溫度變化</b>，不是只看溫度。'],
   mix:['熱水和冷水達到熱平衡時，兩杯的「熱量」相同，還是「溫度」相同？','<b>溫度相同</b>。熱由高溫傳到低溫，直到溫度相同就熱不再傳遞。不計散熱時，<b>熱水放出的熱量 ＝ 冷水吸收的熱量</b>；兩杯水量不同時，升高與下降的溫度就不同。熱量是傳過去的能量，不能說兩杯「含有的熱量」相同。']};
+/* 5-2 考到什麼程度 */
+const HEAT_EXAM={
+  define:{base:['熱量是因<b>溫度差</b>而傳遞的能量，熱由<b>高溫傳到低溫</b>。','<b>1 卡（cal）</b>：使 1 g 的水升高 1°C 所需的熱量；1 千卡（kcal）＝ 1000 卡，食品標示的「大卡」就是千卡。','水吸收或放出的熱量 <b>H ＝ m × ΔT</b>。'],
+    test:['穩定熱源：吸收的熱量和<b>加熱時間成正比</b>。','吸熱相同時，水越多升溫越少（ΔT 和 m 成反比）；溫度–時間圖越平緩，水量越多。','單位換算：kcal ↔ cal、kg ↔ g。'],
+    ext:['熱量也常用焦耳（J）表示，1 卡約 4.2 焦耳。']},
+  compare:{base:['<b>溫度</b>表示冷熱程度；<b>熱量</b>是傳遞的能量，兩者不同。'],
+    test:['溫度高的物體，放出的熱量<b>不一定</b>比較多：還要看質量和溫度變化（H ＝ m × ΔT）。','熱由<b>高溫</b>傳到低溫，不是由「熱量多」傳到「熱量少」；也不說物體「含有」多少熱量。']},
+  mix:{base:['熱由高溫物體傳到低溫物體，直到<b>溫度相同</b>（熱平衡）。','不計散熱：<b>高溫放出的熱量 ＝ 低溫吸收的熱量</b>。'],
+    test:['冷熱水混合求<b>末溫</b>，或反過來求水量、初溫（只有兩杯等量時，末溫才是平均）。','實驗測得的混合溫度比算出來的低：有熱散失到空氣和容器（用保麗龍杯、加蓋可以減少）。','溫度計要等液柱不動才讀數：溫度計和待測物要達到熱平衡。'],
+    ext:['金屬放進水中這類不同物質的熱平衡，要用比熱計算，見 5-3。']}};
 const HEAT_QUIZ=[
   {q:'「1 卡」的定義是：',opts:['使 1 g 的水升高 1°C 所需的熱量','使 1 kg 的水升高 1°C 所需的熱量','使 1 g 的任何物質升高 1°C 所需的熱量','使 1 g 的水升高 100°C 所需的熱量'],ans:0,
     sol:'<b>1 卡（cal）</b>：使 1 g 的水溫度升高 1°C 所需的熱量。1 千卡（kcal）＝ 1000 卡，可使 1 kg 的水升高 1°C。食品包裝上的「大卡」就是千卡。'},
+  {q:'一瓶飲料標示熱量 150 大卡。這些熱量若全部被水吸收，可以使 3 kg 的水升高多少 °C？',opts:['0.05°C','5°C','50°C','150°C'],ans:2,
+    sol:'1 大卡 ＝ 1 千卡 ＝ 1000 卡，所以 150 大卡 ＝ 150000 cal。3 kg ＝ 3000 g，ΔT ＝ H ÷ m ＝ 150000 ÷ 3000 ＝ <b>50°C</b>。'},
   {q:'把 200 g 的水由 20°C 加熱到 50°C，水吸收了多少熱量？（不計散熱）',opts:['30 cal','600 cal','6000 cal','10000 cal'],ans:2,
     sol:'H ＝ m × ΔT ＝ 200 × (50 − 20) ＝ <b>6000 cal</b> ＝ 6 kcal。',go:s=>{s.mode='define';s.m=200;s.t=6;},goLabel:'用加熱實驗驗證'},
   {q:'500 g 的水吸收 2 kcal 的熱量，溫度升高多少？（不計散熱）',opts:['0.4°C','4°C','40°C','250°C'],ans:1,
     sol:'2 kcal ＝ 2000 cal。ΔT ＝ H ÷ m ＝ 2000 ÷ 500 ＝ <b>4°C</b>。',go:s=>{s.mode='define';s.m=500;s.t=2;},goLabel:'用加熱實驗驗證'},
   {q:'用同一個穩定熱源分別加熱甲杯 100 g、乙杯 300 g 的水，加熱時間相同。不計散熱，甲杯升高的溫度是乙杯的幾倍？',opts:['1/3 倍','1 倍','3 倍','9 倍'],ans:2,
     sol:'同熱源、同時間 → 吸收的熱量相同。H ＝ m × ΔT，H 相同時 ΔT 與 m 成反比：甲的質量是乙的 1/3，升溫是乙的 <b>3 倍</b>。',go:s=>{s.mode='define';s.m=100;s.t=3;s.cmp=true;},goLabel:'比較不同水量'},
+  {q:'下列關於溫度與熱量的敘述，何者正確？',opts:['溫度高的物體，含有的熱量一定比較多','熱量是因溫度差而傳遞的能量','兩物體接觸時，熱由熱量多的傳到熱量少的','溫度的單位是卡'],ans:1,
+    sol:'熱量是因<b>溫度差</b>而傳遞的能量，熱由<b>高溫</b>傳到低溫（不是由「熱量多」傳到「熱量少」），也不說物體「含有」熱量。溫度的單位是 °C，熱量的單位才是卡。',go:s=>{s.mode='compare';s.ca=100;s.cta=80;s.cb=1000;s.ctb=40;s.cool=0;},goLabel:'看溫度與熱量的比較'},
+  {q:'甲：200 g、90°C 的熱水；乙：1000 g、40°C 的溫水。兩杯都冷卻到 20°C，哪一杯放出的熱量比較多？',opts:['甲，因為溫度比較高','乙','一樣多','無法比較'],ans:1,
+    sol:'甲放出 200 × (90 − 20) ＝ 14000 cal；乙放出 1000 × (40 − 20) ＝ <b>20000 cal</b>。乙的溫度比較低，但質量大得多，放出的熱量反而比較多。',go:s=>{s.mode='compare';s.ca=200;s.cta=90;s.cb=1000;s.ctb=40;s.cool=1;},goLabel:'用比較實驗驗證'},
   {q:'80°C 的熱水 100 g 和 20°C 的冷水 300 g 混合，不計散熱，達到熱平衡時的溫度是：',opts:['35°C','45°C','50°C','65°C'],ans:0,
     sol:'熱水放出的熱量 ＝ 冷水吸收的熱量：100 × (80 − T) ＝ 300 × (T − 20)，8000 − 100T ＝ 300T − 6000，T ＝ <b>35°C</b>。只有兩邊水量相同時，才是兩個溫度的平均。',go:s=>{s.mode='mix';s.ma=100;s.ta=80;s.mb=300;s.tb=20;s.loss=false;s.tm=10;},goLabel:'用熱平衡實驗驗證'},
   {q:'60°C 的熱水 100 g 倒入一杯 20°C 的冷水中，混合後的溫度是 30°C。不計散熱，冷水有多少 g？',opts:['100 g','200 g','300 g','400 g'],ans:2,
@@ -672,6 +691,98 @@ const HEAT_QUIZ=[
     sol:'熱水放出的熱量，有一部分<b>散失到空氣中、被容器吸收</b>，冷水實際吸收的比較少，所以混合溫度較低。實驗時可用保麗龍杯、加蓋來減少散熱。',go:s=>{s.mode='mix';s.ma=100;s.ta=80;s.mb=300;s.tb=20;s.loss=true;s.tm=10;},goLabel:'打開散熱比較'},
   {q:'用溫度計量一杯熱水，要等液柱不再移動才讀數，主要原因是：',opts:['要等溫度計和熱水的溫度相同（熱平衡）','要等熱水冷卻到室溫','液柱移動時刻度會改變','要讓熱水吸收溫度計的熱'],ans:0,
     sol:'溫度計放進熱水後，熱由熱水傳給溫度計，直到兩者<b>溫度相同（熱平衡）</b>，液柱才停止移動，這時的讀數才是熱水的溫度。'}];
+
+/* ---------- 第五、六章共用：圖表軸、熱源、播放、考到什麼程度 ---------- */
+/* 折線圖的座標軸：回傳 {h:SVG 字串, X(v), Y(v)}。格線用淡虛線，字和 5-2 的圖一致 */
+function chartAxes(o){const{x0,y0,w,h,xmax,xmin=0,ymin=0,ymax,xstep,ystep,xl='',yl='',xfmt=v=>String(v),yfmt=v=>String(v).replace('-','−'),size=15,grid=true}=o;
+  const X=v=>x0+(v-xmin)/(xmax-xmin)*w,Y=v=>y0-(v-ymin)/(ymax-ymin)*h;let s='';
+  for(let v=ymin;v<=ymax+1e-9;v+=ystep){const y=Y(v);if(grid&&v>ymin+1e-9)s+=L(x0,y,x0+w,y,{stroke:P.faint,w:1,dash:'3 5'});s+=T(x0-10,y+5,yfmt(+v.toFixed(4)),{size,anchor:'end',fill:P.muted});}
+  for(let v=xmin;v<=xmax+1e-9;v+=xstep){const x=X(v);s+=L(x,y0,x,y0+6,{stroke:P.muted})+T(x,y0+24,xfmt(+v.toFixed(4)),{size,anchor:'middle',fill:P.muted});}
+  s+=L(x0,y0,x0+w+6,y0,{stroke:P.muted,w:1.5})+L(x0,y0,x0,y0-h-8,{stroke:P.muted,w:1.5});
+  if(yl)s+=T(x0+6,y0-h-12,yl,{size,fill:P.muted});if(xl)s+=T(x0+w,y0+48,xl,{size,anchor:'end',fill:P.muted});
+  return {h:s,X,Y};}
+/* 加熱板：x 左緣、y 頂端、w 寬；on 時電熱絲變橘紅 */
+function hotPlate(x,y,w,on){let h=`<rect x="${x}" y="${y}" width="${w}" height="28" rx="6" fill="#4a5860"/>`;const n=Math.max(2,Math.round(w/44));for(let i=0;i<n;i++){const cx=x+w*(i+.5)/n;h+=`<path d="M${cx-10} ${y+9}q10 10 20 0" fill="none" stroke="${on?'#ff7b4a':'#7c8a92'}" stroke-width="3"/>`;}return h;}
+/* 酒精燈：x 中心、y 燈芯頂端；on 時有火焰（t 讓火焰微微晃動） */
+function lampFlame(x,y,on=true,t=0,k=1){const f=reduceMotion?0:Math.sin(t*9)*2*k;
+  let h=`<path d="M${x-30*k} ${y+66*k}Q${x-34*k} ${y+20*k} ${x-12*k} ${y+12*k}H${x+12*k}Q${x+34*k} ${y+20*k} ${x+30*k} ${y+66*k}Z" fill="#e8f1f4" fill-opacity=".85" stroke="#8fa3a8" stroke-width="2"/>`
+    +`<rect x="${x-26*k}" y="${y+40*k}" width="${52*k}" height="${24*k}" rx="${6*k}" fill="#bcd9e6" opacity=".7"/>`
+    +`<rect x="${x-8*k}" y="${y+2*k}" width="${16*k}" height="${12*k}" rx="2" fill="#9aa3ad"/>`+L(x,y+2*k,x,y-4*k,{stroke:'#3c4a52',w:3});
+  if(on)h+=`<path d="M${x} ${y-46*k+f}Q${x+15*k} ${y-18*k} ${x+8*k} ${y-6*k}Q${x} ${y} ${x-8*k} ${y-6*k}Q${x-15*k} ${y-18*k} ${x} ${y-46*k+f}Z" fill="#ffb347" opacity=".9"/><path d="M${x} ${y-30*k+f/2}Q${x+7*k} ${y-14*k} ${x+3*k} ${y-7*k}Q${x} ${y-4*k} ${x-3*k} ${y-7*k}Q${x-7*k} ${y-14*k} ${x} ${y-30*k+f/2}Z" fill="#5aa9e6" opacity=".85"/>`;
+  return h;}
+/* 播放鈕：讓 s[key] 從目前位置走到 max（已在終點就從 0 開始）；老師一拖滑桿就自動停 */
+const playBtn=(key,max,label='▶ 播放',o={})=>({type:'buttons',label:'',primary:true,show:o.show,items:[[label,s=>{if(s[key]>=max-1e-9)s[key]=0;s.play=key;s._pv=s[key];}],['⏸ 暫停',s=>{s.play=false;},{primary:false}]]});
+function playTick(s,dt,max,speed){const k=s.play;if(!k)return false;if(s[k]!==s._pv){s.play=false;return false;}s[k]=Math.min(max,s[k]+dt*speed);s._pv=s[k];if(s[k]>=max)s.play=false;return true;}
+/* 「考到什麼程度」卡：e = {base:[…], test:[…], ext:[…], testLabel?} */
+function examCard(e){if(!e)return '';
+  return `<div class="exam-card"><h3>考到什麼程度</h3>${[['base','基本必會（會考）'],['test',e.testLabel||'段考常考'],['ext','延伸（不一定考）']].map(([t,l])=>e[t]&&e[t].length?`<div class="exam-row ${t}"><span class="exam-tag">${l}</span><ul>${e[t].map(x=>`<li>${x}</li>`).join('')}</ul></div>`:'').join('')}<p class="exam-foot">依課本與常見段考、會考題型整理；實際範圍以學校公告為準。</p></div>`;}
+
+/* ---------- 第六章共用：元素資料、原子球 ---------- */
+/* 原子序 符號 中文 原子量 類別(m 金屬 n 非金屬 d 類金屬 x 人工合成未明) 常溫狀態(s 固 l 液 g 氣 ? 未知) 族(f＝鑭系、錒系) 週期 */
+const ELEM=`1 H 氫 1.008 n g 1 1|2 He 氦 4.003 n g 18 1|3 Li 鋰 6.94 m s 1 2|4 Be 鈹 9.012 m s 2 2|5 B 硼 10.81 d s 13 2|6 C 碳 12.01 n s 14 2|7 N 氮 14.01 n g 15 2|8 O 氧 16.00 n g 16 2|9 F 氟 19.00 n g 17 2|10 Ne 氖 20.18 n g 18 2|11 Na 鈉 22.99 m s 1 3|12 Mg 鎂 24.31 m s 2 3|13 Al 鋁 26.98 m s 13 3|14 Si 矽 28.09 d s 14 3|15 P 磷 30.97 n s 15 3|16 S 硫 32.06 n s 16 3|17 Cl 氯 35.45 n g 17 3|18 Ar 氬 39.95 n g 18 3|19 K 鉀 39.10 m s 1 4|20 Ca 鈣 40.08 m s 2 4|21 Sc 鈧 44.96 m s 3 4|22 Ti 鈦 47.87 m s 4 4|23 V 釩 50.94 m s 5 4|24 Cr 鉻 52.00 m s 6 4|25 Mn 錳 54.94 m s 7 4|26 Fe 鐵 55.85 m s 8 4|27 Co 鈷 58.93 m s 9 4|28 Ni 鎳 58.69 m s 10 4|29 Cu 銅 63.55 m s 11 4|30 Zn 鋅 65.38 m s 12 4|31 Ga 鎵 69.72 m s 13 4|32 Ge 鍺 72.63 d s 14 4|33 As 砷 74.92 d s 15 4|34 Se 硒 78.97 n s 16 4|35 Br 溴 79.90 n l 17 4|36 Kr 氪 83.80 n g 18 4|37 Rb 銣 85.47 m s 1 5|38 Sr 鍶 87.62 m s 2 5|39 Y 釔 88.91 m s 3 5|40 Zr 鋯 91.22 m s 4 5|41 Nb 鈮 92.91 m s 5 5|42 Mo 鉬 95.95 m s 6 5|43 Tc 鎝 (97) m s 7 5|44 Ru 釕 101.1 m s 8 5|45 Rh 銠 102.9 m s 9 5|46 Pd 鈀 106.4 m s 10 5|47 Ag 銀 107.9 m s 11 5|48 Cd 鎘 112.4 m s 12 5|49 In 銦 114.8 m s 13 5|50 Sn 錫 118.7 m s 14 5|51 Sb 銻 121.8 d s 15 5|52 Te 碲 127.6 d s 16 5|53 I 碘 126.9 n s 17 5|54 Xe 氙 131.3 n g 18 5|55 Cs 銫 132.9 m s 1 6|56 Ba 鋇 137.3 m s 2 6|57 La 鑭 138.9 m s f 6|58 Ce 鈰 140.1 m s f 6|59 Pr 鐠 140.9 m s f 6|60 Nd 釹 144.2 m s f 6|61 Pm 鉕 (145) m s f 6|62 Sm 釤 150.4 m s f 6|63 Eu 銪 152.0 m s f 6|64 Gd 釓 157.3 m s f 6|65 Tb 鋱 158.9 m s f 6|66 Dy 鏑 162.5 m s f 6|67 Ho 鈥 164.9 m s f 6|68 Er 鉺 167.3 m s f 6|69 Tm 銩 168.9 m s f 6|70 Yb 鐿 173.0 m s f 6|71 Lu 鎦 175.0 m s f 6|72 Hf 鉿 178.5 m s 4 6|73 Ta 鉭 180.9 m s 5 6|74 W 鎢 183.8 m s 6 6|75 Re 錸 186.2 m s 7 6|76 Os 鋨 190.2 m s 8 6|77 Ir 銥 192.2 m s 9 6|78 Pt 鉑 195.1 m s 10 6|79 Au 金 197.0 m s 11 6|80 Hg 汞 200.6 m l 12 6|81 Tl 鉈 204.4 m s 13 6|82 Pb 鉛 207.2 m s 14 6|83 Bi 鉍 209.0 m s 15 6|84 Po 釙 (209) m s 16 6|85 At 砈 (210) d s 17 6|86 Rn 氡 (222) n g 18 6|87 Fr 鍅 (223) m s 1 7|88 Ra 鐳 (226) m s 2 7|89 Ac 錒 (227) m s f 7|90 Th 釷 232.0 m s f 7|91 Pa 鏷 231.0 m s f 7|92 U 鈾 238.0 m s f 7|93 Np 錼 (237) m s f 7|94 Pu 鈽 (244) m s f 7|95 Am 鋂 (243) m s f 7|96 Cm 鋦 (247) m s f 7|97 Bk 鉳 (247) m s f 7|98 Cf 鉲 (251) m s f 7|99 Es 鑀 (252) m s f 7|100 Fm 鐨 (257) m s f 7|101 Md 鍆 (258) m s f 7|102 No 鍩 (259) m s f 7|103 Lr 鐒 (266) m s f 7|104 Rf - (267) x ? 4 7|105 Db - (268) x ? 5 7|106 Sg - (269) x ? 6 7|107 Bh - (270) x ? 7 7|108 Hs - (269) x ? 8 7|109 Mt - (278) x ? 9 7|110 Ds - (281) x ? 10 7|111 Rg - (282) x ? 11 7|112 Cn - (285) x ? 12 7|113 Nh - (286) x ? 13 7|114 Fl - (289) x ? 14 7|115 Mc - (290) x ? 15 7|116 Lv - (293) x ? 16 7|117 Ts - (294) x ? 17 7|118 Og - (294) x ? 18 7`
+  .split('|').map(r=>{const[z,sym,zh,mass,cat,st,g,p]=r.split(' ');return {z:+z,sym,zh:zh==='-'?'':zh,mass,cat,st,g:g==='f'?null:+g,p:+p,f:g==='f'};});
+const EL=Object.fromEntries(ELEM.map(e=>[e.sym,e]));
+/* 週期表上的位置：col 1–18、row 1–7；鑭系、錒系放在下方第 9、10 列（第 3 族的位置留給「鑭系」「錒系」） */
+const elemPos=e=>e.f?{col:3+(e.z-(e.p===6?57:89)),row:e.p+2.4}:{col:e.g,row:e.p};
+const CAT_NAME={m:'金屬',n:'非金屬',d:'類金屬',x:'人工合成（性質未明）'},ST_NAME={s:'固態',l:'液態',g:'氣態','?':'未知'};
+const GROUP_NAME={1:'鹼金屬（氫除外）',2:'鹼土金屬',17:'鹵素',18:'鈍氣（惰性氣體）'};
+const groupName=g=>GROUP_NAME[g]||(g>=3&&g<=12?'過渡元素':'');
+/* 常見元素的性質與用途（國中程度） */
+const ELEM_NOTE={
+  H:'最輕的氣體；可以燃燒，燃燒後只生成水，是乾淨的燃料（燃料電池）。',
+  He:'很輕、不會燃燒，用來充填氣球、飛船；性質非常穩定（鈍氣）。',
+  Li:'最輕的金屬，用在鋰電池（手機、電動車）。',
+  C:'鑽石、石墨都只由碳組成（同素異形體）；生物體的主要元素之一。',
+  N:'約占空氣體積的 78%；性質穩定，食品包裝充氮可防止變質；液態氮可以急速冷凍。',
+  O:'約占空氣體積的 21%；可以幫助燃燒（助燃）、供生物呼吸；臭氧（O₃）也是由氧組成。',
+  F:'活性最大的非金屬；含氟牙膏裡的氟化物可以預防蛀牙。',
+  Ne:'通電時發出紅橙色的光，用在霓虹燈。',
+  Na:'很軟的銀白色金屬，可以用刀切；活性很大，遇水劇烈反應，要保存在煤油中；食鹽（氯化鈉）含有鈉。',
+  Mg:'燃燒時發出強烈的白光（煙火）；鎂合金又輕又堅固。',
+  Al:'地殼中含量最多的金屬；密度小，表面有一層緻密的氧化鋁保護，不容易鏽蝕；鋁罐、鋁箔、飛機。',
+  Si:'地殼中含量第二多的元素（僅次於氧）；高純度的矽是半導體，用來做晶片、太陽能電池。',
+  P:'紅磷用在火柴盒側面的摩擦面；白磷在空氣中會自燃，要保存在水中。',
+  S:'黃色固體（硫磺），用來製造硫酸、火藥。',
+  Cl:'黃綠色、有刺激性臭味的有毒氣體；用來消毒自來水、製造漂白水。',
+  Ar:'約占空氣的 0.9%；性質穩定，充填在燈泡裡、焊接時當保護氣體。',
+  K:'很軟的金屬，活性比鈉更大，要保存在煤油中；植物生長需要鉀（肥料）。',
+  Ca:'骨骼、牙齒、貝殼、大理石裡都有含鈣的化合物。',
+  Ti:'強度高、質量輕、耐腐蝕，用在飛機、人工關節。',
+  Cr:'鍍在金屬表面光亮又耐腐蝕；不鏽鋼裡含有鉻。',
+  Mn:'乾電池裡有二氧化錳。',
+  Fe:'用途最廣的金屬（鋼筋、橋樑、鍋子）；會被磁鐵吸引；在潮濕的空氣中容易生鏽；血液的血紅素含鐵。',
+  Ni:'用在不鏽鋼、硬幣、充電電池。',
+  Cu:'紅色金屬，導電性很好（僅次於銀），用來做電線；黃銅是銅鋅合金。',
+  Zn:'鍍在鐵上防鏽（鍍鋅鐵）；乾電池的外殼。',
+  Ga:'熔點約 30°C，放在手心就會熔化；門得列夫預言過的「類鋁」。',
+  Ge:'門得列夫預言過的「類矽」；早期的半導體材料。',
+  Br:'常溫下唯一呈液態的非金屬，紅棕色、有毒。',
+  Kr:'通電發光，用在特殊燈具。',
+  Ag:'導電、導熱性最好的金屬；銀飾、鏡子背面的鍍層。',
+  Sn:'鍍在鐵上防鏽（馬口鐵罐頭）；焊錫。',
+  I:'紫黑色固體，加熱會昇華成紫色的蒸氣；碘酒可以消毒；加碘鹽可以預防甲狀腺腫大。',
+  Xe:'通電發出很亮的光，用在汽車大燈、閃光燈。',
+  W:'熔點最高的金屬（約 3400°C），用來做燈泡的燈絲。',
+  Pt:'俗稱白金，很不容易起反應，用在首飾、汽車的觸媒轉化器。',
+  Au:'延展性最好的金屬，很不容易起反應，能長久保持光澤；首飾、電子零件的接點。',
+  Hg:'俗稱水銀，常溫下唯一呈液態的金屬；有毒；以前用在溫度計。',
+  Pb:'密度大、很軟、有毒；汽車的鉛蓄電池、阻擋輻射的材料。',
+  Rn:'有放射性的氣體。',
+  Ra:'居禮夫人發現的放射性元素。',
+  U:'核能發電的燃料。'};
+/* 原子模型的顏色（接近課本常見的配色：氫白、碳黑、氮藍、氧紅、氯綠、硫黃）。[填色, 字色] */
+const EL_COLOR={H:['#f3f5f7','#1b2a33'],He:['#5fc7d6','#fff'],C:['#3f4a52','#fff'],N:['#3b6fd8','#fff'],O:['#e04a3a','#fff'],F:['#9ad66f','#1b2a33'],Ne:['#f06a8a','#fff'],
+  Na:['#8e6bd6','#fff'],Mg:['#2f9e6f','#fff'],Al:['#aab4be','#1b2a33'],Si:['#c9a77c','#1b2a33'],P:['#f08a24','#fff'],S:['#e6c228','#1b2a33'],Cl:['#43a047','#fff'],Ar:['#5fb0d0','#fff'],
+  K:['#7a52c4','#fff'],Ca:['#8f9aa0','#fff'],Fe:['#c06a2b','#fff'],Cu:['#c8783a','#fff'],Zn:['#7d8fa8','#fff'],Ag:['#c3ccd4','#1b2a33'],Au:['#e3b33b','#1b2a33'],Hg:['#b9c2c9','#1b2a33'],
+  Br:['#a33a2a','#fff'],I:['#7b3fa0','#fff'],Li:['#b07ad6','#fff'],Pb:['#5c6670','#fff']};
+const shadeHex=(c,k=.68)=>'#'+[1,3,5].map(i=>Math.round(parseInt(c.slice(i,i+2),16)*k).toString(16).padStart(2,'0')).join('');
+/* 原子球：x、y 圓心，r 半徑；o.label 是否寫符號、o.op 透明度、o.ring 外圈顏色（強調用） */
+function ball(x,y,sym,r=16,o={}){const[c,t]=EL_COLOR[sym]||['#9aa5ad','#fff'],{label=true,op=1,ring=null,size=null}=o;
+  return `<g opacity="${op}">${ring?`<circle cx="${x}" cy="${y}" r="${r+5}" fill="none" stroke="${ring}" stroke-width="3"/>`:''}<circle cx="${x}" cy="${y}" r="${r}" fill="${c}" stroke="${shadeHex(c)}" stroke-width="1.5"/><ellipse cx="${(x-r*.42).toFixed(1)}" cy="${(y-r*.5).toFixed(1)}" rx="${(r*.26).toFixed(1)}" ry="${(r*.17).toFixed(1)}" fill="#fff" opacity=".5" transform="rotate(-35 ${(x-r*.42).toFixed(1)} ${(y-r*.5).toFixed(1)})"/>`
+    +(label?`<text x="${x}" y="${y}" dominant-baseline="central" font-size="${size||Math.max(10,Math.round(r*(sym.length>1?.8:.95)))}" fill="${t}" text-anchor="middle" font-weight="700">${sym}</text>`:'')+`</g>`;}
+/* 化學式的下標：'H2O' → 'H₂O'；'2H2O' 前面的係數保留一般數字 */
+const SUBS='₀₁₂₃₄₅₆₇₈₉';
+const chem=f=>{const m=f.match(/^(\d*)(.*)$/);return m[1]+m[2].replace(/(\D)(\d+)/g,(_,a,d)=>a+[...d].map(x=>SUBS[x]).join(''));};
 
 const LABS={
 /* ===== 01 測量 ===== */
@@ -740,7 +851,7 @@ matter:{group:1,n:'03',name:'物質與粒子',subtitle:'自己放入不同分子
     const cls=!kinds.length?'空的':kinds.length>1?'混合物':els.length===1?'純物質 · 元素':'純物質 · 化合物';
     let h=T(450,52,cls,{size:26,anchor:'middle',weight:700,fill:kinds.length>1?P.orange:kinds.length?P.accent:P.muted});
     h+=`<rect x="120" y="76" width="660" height="384" rx="28" fill="#fff" stroke="#c9d6cf" stroke-width="2"/>`;
-    const atom=(x,y,a,rot)=>`<circle cx="${x}" cy="${y}" r="${ATOM[a].r}" fill="${ATOM[a].c}" stroke="#fff" stroke-width="1.5"/>${s.labels?`<text x="${x}" y="${y+5}" font-size="${a==='H'?11:13}" fill="#fff" text-anchor="middle" font-weight="700" transform="rotate(${-rot} ${x} ${y})">${a}</text>`:''}`;
+    const atom=(x,y,a,rot)=>{const c=ATOM[a].c,tc=(EL_COLOR[a]||[c,'#fff'])[1];return `<circle cx="${x}" cy="${y}" r="${ATOM[a].r}" fill="${c}" stroke="${shadeHex(c)}" stroke-width="1.5"/>${s.labels?`<text x="${x}" y="${y+5}" font-size="${a==='H'?11:13}" fill="${tc}" text-anchor="middle" font-weight="700" transform="rotate(${-rot} ${x} ${y})">${a}</text>`:''}`;};
     list.forEach((k,i)=>{const[bx,by]=SLOTS[i],t=reduceMotion?0:s.t,x=bx+8*Math.sin(t*1.3+i*1.7),y=by+8*Math.cos(t*1.1+i*2.3),rot=(i*47+(reduceMotion?0:25*Math.sin(t*.8+i)))%360,a=SPECIES[k].atoms;let g='';
       if(a.length===1)g=atom(0,0,a[0],rot);
       else if(k==='H2O')g=atom(-13,13,'H',rot)+atom(13,13,'H',rot)+atom(0,0,'O',rot);
@@ -2345,43 +2456,79 @@ temp:{group:3,n:'5-1',keep:['mode'],steps:'mode',
 
 /* ===== 5-2 熱量與熱平衡 ===== */
 heat:{group:3,n:'5-2',keep:['mode'],steps:'mode',
-  tasks:{define:'加熱時間每多 1 分鐘，水溫升高幾度？再打開「比較不同水量」：水越多，升溫越快還是越慢？',mix:'拉動「經過時間」：熱從哪一杯傳到哪一杯？兩杯溫度相同時，A 放出的熱和 B 吸收的熱一樣多嗎？'},name:'熱量與熱平衡',subtitle:'熱量是因溫度差而傳遞的能量，單位是卡（cal）。水吸收的熱量 H ＝ m × ΔT；冷熱物體接觸，熱由高溫傳到低溫，直到溫度相同。',
-  q:s=>({html:qBlockHTML(HEAT_Q[s.mode])+quizHTML(s,HEAT_QUIZ)}),
-  qAction(s,v){quizAction(s,v,HEAT_QUIZ);},
-  state:{mode:'define',m:200,t:0,cmp:false,ma:100,ta:80,mb:300,tb:20,tm:0,loss:false,qi:0,qp:null,qc:false,qs:false},
+  tasks:{define:'按「▶ 開始加熱」：加熱時間每多 1 分鐘，水溫升高幾度？再打開「比較不同水量」：水越多，升溫越快還是越慢？',
+    compare:'先猜：哪一杯的溫度比較高？兩杯都冷卻到室溫 20°C 時，哪一杯放出的熱量比較多？再按「▶ 冷卻到室溫」驗證。',
+    mix:'按「▶ 開始混合」（或拉動「經過時間」）：熱從哪一杯傳到哪一杯？兩杯溫度相同時，A 放出的熱和 B 吸收的熱一樣多嗎？'},
+  name:'熱量與熱平衡',subtitle:'熱量是因溫度差而傳遞的能量，單位是卡（cal）。水吸收的熱量 H ＝ m × ΔT；冷熱物體接觸，熱由高溫傳到低溫，直到溫度相同。',
+  q:s=>({html:examCard(HEAT_EXAM[s.mode])+qBlockHTML(HEAT_Q[s.mode])+quizHTML(s,HEAT_QUIZ)}),
+  qAction(s,v){if(v==='qgo')s.play=false;quizAction(s,v,HEAT_QUIZ);},
+  state:{mode:'define',m:200,t:0,cmp:false,ca:100,cta:80,cb:1000,ctb:40,cool:0,ma:100,ta:80,mb:300,tb:20,tm:0,loss:false,play:false,qi:0,qp:null,qc:false,qs:false},
   controls:[
-    {type:'seg',key:'mode',label:'實驗',options:[['define','熱量與卡'],['mix','熱平衡']]},
+    {type:'seg',key:'mode',label:'實驗',options:[['define','熱量與卡'],['compare','溫度與熱量'],['mix','熱平衡']],onChange:s=>{s.play=false;}},
     {type:'range',key:'m',label:'水的質量 m',min:100,max:500,step:50,unit:' g',show:s=>s.mode==='define'},
-    {type:'range',key:'t',label:'加熱時間',min:0,max:10,step:.5,unit:' 分鐘',show:s=>s.mode==='define'},
+    {type:'range',key:'t',label:'加熱時間',min:0,max:10,step:.5,fmt:s=>tnum(s.t)+' 分鐘',show:s=>s.mode==='define'},
+    playBtn('t',10,'▶ 開始加熱',{show:s=>s.mode==='define'}),
     {type:'toggle',key:'cmp',label:'比較不同水量',show:s=>s.mode==='define'},
+    {type:'range',key:'ca',label:'甲杯水量',min:50,max:1000,step:50,unit:' g',show:s=>s.mode==='compare'},
+    {type:'range',key:'cta',label:'甲杯水溫',min:20,max:100,step:1,unit:'°C',show:s=>s.mode==='compare'},
+    {type:'range',key:'cb',label:'乙杯水量',min:50,max:1000,step:50,unit:' g',show:s=>s.mode==='compare'},
+    {type:'range',key:'ctb',label:'乙杯水溫',min:20,max:100,step:1,unit:'°C',show:s=>s.mode==='compare'},
+    {type:'range',key:'cool',label:'冷卻進度',min:0,max:1,step:.05,fmt:s=>s.cool>=1?'已到 20°C':Math.round(s.cool*100)+'%',show:s=>s.mode==='compare'},
+    playBtn('cool',1,'▶ 冷卻到室溫',{show:s=>s.mode==='compare'}),
+    {type:'buttons',label:'例子',items:[['小杯熱水、大桶溫水',s=>{s.ca=100;s.cta=80;s.cb=1000;s.ctb=40;s.cool=0;}],['同溫度、水量不同',s=>{s.ca=100;s.cta=80;s.cb=500;s.ctb=80;s.cool=0;}],['同水量、溫度不同',s=>{s.ca=300;s.cta=80;s.cb=300;s.ctb=40;s.cool=0;}]],show:s=>s.mode==='compare'},
     {type:'range',key:'ma',label:'A（內杯）水量',min:50,max:500,step:50,unit:' g',show:s=>s.mode==='mix'},
     {type:'range',key:'ta',label:'A 的初溫',min:0,max:100,step:1,unit:'°C',show:s=>s.mode==='mix'},
     {type:'range',key:'mb',label:'B（外杯）水量',min:50,max:500,step:50,unit:' g',show:s=>s.mode==='mix'},
     {type:'range',key:'tb',label:'B 的初溫',min:0,max:100,step:1,unit:'°C',show:s=>s.mode==='mix'},
-    {type:'range',key:'tm',label:'經過時間',min:0,max:10,step:.1,unit:' 分鐘',fmt:s=>s.tm.toFixed(1)+' 分鐘',show:s=>s.mode==='mix'},
+    {type:'range',key:'tm',label:'經過時間',min:0,max:10,step:.1,fmt:s=>s.tm.toFixed(1)+' 分鐘',show:s=>s.mode==='mix'},
+    playBtn('tm',10,'▶ 開始混合',{show:s=>s.mode==='mix'}),
     {type:'buttons',label:'例子',items:[['等量混合',s=>{s.ma=100;s.ta=80;s.mb=100;s.tb=20;s.tm=0;}],['100 g＋300 g',s=>{s.ma=100;s.ta=80;s.mb=300;s.tb=20;s.tm=0;}],['直接到熱平衡',s=>{s.tm=10;}]],show:s=>s.mode==='mix'},
     {type:'toggle',key:'loss',label:'考慮散熱（室溫 25°C）',show:s=>s.mode==='mix'}],
-  render(s){return s.mode==='mix'?this.mix(s):this.define(s);},
+  tick:(s,dt)=>{const mx={t:10,tm:10,cool:1}[s.play];if(mx)playTick(s,dt,mx,s.play==='cool'?.3:1.2);},
+  render(s){return s.mode==='mix'?this.mix(s):s.mode==='compare'?this.compare(s):this.define(s);},
   graph(xl,yl){const X=t=>500+t*36,Y=T=>440-T*3.3;let h='';
     for(let v=20;v<=100;v+=20)h+=L(500,Y(v),860,Y(v),{stroke:P.faint,w:1,dash:'3 5'})+T(490,Y(v)+6,v,{size:16,anchor:'end',fill:P.muted});
     for(let t=0;t<=10;t+=2)h+=L(X(t),440,X(t),446,{stroke:P.muted})+T(X(t),466,t,{size:16,anchor:'middle',fill:P.muted});
     h+=L(500,440,866,440,{stroke:P.muted,w:1.5})+L(500,440,500,96,{stroke:P.muted,w:1.5})+T(506,92,yl,{size:16,fill:P.muted})+T(860,490,xl,{size:16,anchor:'end',fill:P.muted});
     return {h,X,Y};},
-  define(s){const R=1000,H=R*s.t,rise=H/s.m,Tw=Math.min(100,20+rise),boil=20+rise>100,dT=Tw-20,wh=50+s.m*.32,bt=400;
+  /* 計算用的時間取到 0.1 分鐘（播放時是連續的），讓熱量是整百卡、算式對得起來 */
+  define(s){const R=1000,tq=Math.round(s.t*10)/10,H=Math.round(R*tq),rise=H/s.m,Tw=Math.min(100,20+rise),boil=20+rise>100,dT=Tw-20,wh=50+s.m*.32,bt=400,ap=Math.abs(dT*10-Math.round(dT*10))>1e-6;
     let h=`<rect x="125" y="${bt-wh}" width="230" height="${wh}" fill="${WARM(Tw)}" fill-opacity=".5"/>`+L(125,bt-wh,355,bt-wh,{stroke:WARM(Tw),w:3})+beakerPath(120,360,165,bt+2);
     h+=T(205,bt-wh-14,`${s.m} g 的水`,{size:18,anchor:'middle',weight:700})+T(205,bt-wh/2+12,`${tnum(Tw)}°C`,{size:28,anchor:'middle',weight:700,fill:P.red});
     h+=glassTherm(320,bt-26,140,bt-46-Tw*2.2,{c:ALC,br:10,w:5});
-    h+=`<rect x="130" y="408" width="220" height="30" rx="6" fill="#4a5860"/>`;for(let i=0;i<5;i++)h+=`<path d="M${150+i*40} 418q10 10 20 0" fill="none" stroke="${s.t>0?'#ff7b4a':'#7c8a92'}" stroke-width="3"/>`;
+    h+=hotPlate(130,408,220,s.t>0);
     h+=T(240,468,'穩定熱源：每分鐘供熱 1000 cal',{size:16,anchor:'middle',fill:P.muted});
     const g=this.graph('加熱時間（分鐘）','水溫（°C）');h+=g.h;
     const line=(m,w,c,op)=>{const tEnd=Math.min(10,80*m/R);let d=`M${g.X(0)} ${g.Y(20)}L${g.X(tEnd).toFixed(1)} ${g.Y(20+R*tEnd/m).toFixed(1)}`;return `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" opacity="${op}"/>`;};
     if(s.cmp)[100,200,300,400,500].forEach(m=>{if(m===s.m)return;h+=line(m,2,P.muted,.55);const tEnd=Math.min(10,80*m/R);h+=T(g.X(tEnd)-4,g.Y(20+R*tEnd/m)-7,m+' g',{size:13,anchor:'end',fill:P.muted});});
-    h+=line(s.m,4,P.red,1)+`<circle cx="${g.X(s.t)}" cy="${g.Y(Tw).toFixed(1)}" r="7" fill="${P.red}" stroke="#fff" stroke-width="2"/>`;
-    if(boil)h+=T(680,g.Y(100)-12,'100°C 沸騰（本節不討論）',{size:15,anchor:'middle',fill:P.red});
+    h+=line(s.m,4,P.red,1)+`<circle cx="${g.X(tq)}" cy="${g.Y(Tw).toFixed(1)}" r="7" fill="${P.red}" stroke="#fff" stroke-width="2"/>`;
+    if(boil)h+=T(680,g.Y(100)-12,'100°C 沸騰（見 5-5）',{size:15,anchor:'middle',fill:P.red});
     const kc=v=>Number.isInteger(v/1000)?v/1000:(v/1000).toFixed(1);
-    return {svg:h,reads:[['供給熱量 H',`${H} cal ＝ ${kc(H)} kcal`],['升高溫度 ΔT',tnum(dT)+'°C'],['水溫',tnum(Tw)+'°C']],
-      note:boil?'水溫到 100°C 就會沸騰，之後吸收的熱不再使溫度上升，所以 H ＝ m × ΔT 只用在溫度改變、沒有沸騰的時候。'
-        :`<b>1 卡（cal）</b>：使 1 g 的水升高 1°C 所需的熱量；1 千卡（kcal）＝ 1000 卡。<br><b>H ＝ m × ΔT</b> ＝ ${s.m} × ${tnum(dT)} ＝ ${H} cal（不計散熱與容器吸熱）`};},
+    return {svg:h,reads:[['供給熱量 H',`${H} cal ＝ ${kc(H)} kcal`],['升高溫度 ΔT',(ap?'約 ':'')+tnum(dT)+'°C'],['水溫',tnum(Tw)+'°C']],
+      note:boil?'水溫到 100°C 就會沸騰，之後吸收的熱用來讓水汽化，溫度不再上升（5-5 加熱曲線）。所以 H ＝ m × ΔT 只用在溫度改變、沒有沸騰的時候。'
+        :`<b>1 卡（cal）</b>：使 1 g 的水升高 1°C 所需的熱量；1 千卡（kcal）＝ 1000 卡。<br>供熱 H ＝ 1000 × ${tnum(tq)} ＝ ${H} cal；由 <b>H ＝ m × ΔT</b>，ΔT ＝ ${H} ÷ ${s.m} ${ap?'≈':'＝'} ${tnum(dT)}°C（不計散熱與容器吸熱）`};},
+  /* 溫度與熱量：兩杯水冷卻到室溫 20°C 時各放出多少熱量 */
+  compare(s){const R=20,c=clamp(s.cool,0,1),done=c>=1-1e-9;
+    const cups=[['甲',s.ca,s.cta,165,P.red],['乙',s.cb,s.ctb,400,P.blue]].map(([n,m,T0,x,col])=>{const Tn=T0-c*(T0-R);return {n,m,T0,x,col,Tn,Hf:m*(T0-R),Hn:m*(T0-Tn)};});
+    let h=T(450,44,'溫度比較高，放出的熱量就一定比較多嗎？',{size:22,anchor:'middle',weight:700});
+    cups.forEach(({n,m,T0,x,col,Tn})=>{const w=clamp(80+m*.13,100,210),wh=(6000+40*m)/w,yb=402,yt=yb-wh;
+      h+=`<rect x="${(x-w/2).toFixed(1)}" y="${yt.toFixed(1)}" width="${w.toFixed(1)}" height="${wh.toFixed(1)}" fill="${WARM(Tn)}" fill-opacity=".55"/>`+L(x-w/2,yt,x+w/2,yt,{stroke:WARM(Tn),w:3})+beakerPath(x-w/2-4,x+w/2+4,yt-24,yb+2);
+      if(Tn>=45)for(let i=-1;i<=1;i++)h+=`<path d="M${x+i*28} ${yt-30}q-7 -10 0 -20q7 -10 0 -20" fill="none" stroke="${P.red}" stroke-width="2" opacity="${(.2+(Tn-45)/110).toFixed(2)}"/>`;
+      h+=T(x,yt+Math.min(wh/2+10,64),tnum(Tn)+'°C',{size:26,anchor:'middle',weight:700,fill:Tn>=35?P.red:P.blue});
+      h+=T(x,434,`${n}：${m} g`,{size:19,anchor:'middle',weight:700,fill:col})+T(x,460,c>0?`原本 ${T0}°C`:'',{size:15,anchor:'middle',fill:P.muted});});
+    h+=`<rect x="560" y="84" width="320" height="356" rx="14" fill="#fffdf8" stroke="#ddd7c9"/>`+T(720,118,'冷卻到 20°C 時放出的熱量',{size:19,anchor:'middle',weight:700});
+    const mx=Math.max(1000,...cups.map(k=>k.Hf)),W=200;
+    if(c<=0)h+=T(720,250,'先猜猜看：哪一杯比較多？',{size:18,anchor:'middle',fill:P.muted})+T(720,282,'再按「▶ 冷卻到室溫」',{size:16,anchor:'middle',fill:P.muted});
+    else cups.forEach(({n,m,T0,col,Hf,Hn},i)=>{const y=168+i*126;
+      h+=T(582,y+20,n,{size:20,weight:700,fill:col})+`<rect x="612" y="${y}" width="${W}" height="30" rx="6" fill="#f1eee6"/>`+`<rect x="612" y="${y}" width="${(W*Hn/mx).toFixed(1)}" height="30" rx="6" fill="${col}" opacity=".85"/>`;
+      h+=T(612,y+58,`${num(Hn,0)} cal`,{size:18,weight:700,fill:col});
+      if(done)h+=T(612,y+84,`${m} × (${T0} − 20) ＝ ${Hf} cal`,{size:15,fill:P.ink});});
+    const [A,B]=cups;
+    if(done){const msg=A.Hf===B.Hf?'兩杯放出的熱量一樣多':`${A.Hf>B.Hf?'甲':'乙'}放出的熱量比較多`;h+=T(720,424,msg,{size:18,anchor:'middle',weight:700,fill:P.accent});}
+    const hot=A.T0===B.T0?'':`${A.T0>B.T0?'甲':'乙'}的溫度比較高`,big=A.Hf===B.Hf?'':`${A.Hf>B.Hf?'甲':'乙'}放熱比較多`;
+    return {svg:h,reads:[['甲的水溫',tnum(A.Tn)+'°C'],['乙的水溫',tnum(B.Tn)+'°C'],['甲放出',num(A.Hn,0)+' cal'],['乙放出',num(B.Hn,0)+' cal']],
+      note:'<b>溫度</b>是冷熱程度；<b>熱量</b>是因溫度差而傳遞的能量。冷卻時放出的熱量 <b>H ＝ m × ΔT</b>，同時取決於<b>質量</b>和<b>溫度變化</b>。'
+        +(done&&hot&&big&&hot[0]!==big[0]?`<br>${hot}，但${big}：溫度高，放出的熱量不一定多。`:'')};},
   mix(s){const C=mixCurve(s),i=clamp(Math.round(s.tm/.05),0,C.length-1),[,a,b,lost]=C[i],tf=(s.ma*s.ta+s.mb*s.tb)/(s.ma+s.mb),eq=Math.abs(a-b)<.2;
     const qa=s.ma*(a-s.ta),qb=s.mb*(b-s.tb);
     let h=`<rect x="94" y="250" width="292" height="176" fill="${WARM(b)}" fill-opacity=".5"/>`+L(94,250,386,250,{stroke:WARM(b),w:3})+beakerPath(90,390,180,430);
@@ -2418,7 +2565,7 @@ function controlHTML(c,i){
   if(c.type==='range')return `<div class="control" data-c="${i}"><label for="c-${c.key}">${c.label}<output></output></label><input id="c-${c.key}" type="range" data-c="${i}" min="${c.min}" max="${c.max}" step="${c.step}"></div>`;
   if(c.type==='seg')return `<div class="control" data-c="${i}">${lab}<div class="seg" role="group" aria-label="${c.label}">${c.options.map(([,t],j)=>`<button type="button" data-c="${i}" data-o="${j}">${t}</button>`).join('')}</div></div>`;
   if(c.type==='toggle')return `<div class="control" data-c="${i}"><label class="toggle"><input type="checkbox" data-c="${i}"><span>${c.label}</span></label></div>`;
-  if(c.type==='buttons')return `<div class="control" data-c="${i}">${lab}<div class="control-buttons">${c.items.map(([t],j)=>`<button type="button" class="btn${c.primary?' primary':''}" data-c="${i}" data-a="${j}">${t}</button>`).join('')}</div></div>`;
+  if(c.type==='buttons')return `<div class="control" data-c="${i}">${lab}<div class="control-buttons">${c.items.map(([t,,o],j)=>`<button type="button" class="btn${(o&&'primary' in o?o.primary:c.primary)?' primary':''}" data-c="${i}" data-a="${j}">${t}</button>`).join('')}</div></div>`;
   if(c.type==='counter')return `<div class="control" data-c="${i}">${lab}<div class="counter">${c.items.map(([k,t])=>`<div class="count-row"><span>${t}</span><span class="stepper"><button type="button" data-c="${i}" data-k="${k}" data-d="-1" aria-label="減少${t}">−</button><output data-k="${k}"></output><button type="button" data-c="${i}" data-k="${k}" data-d="1" aria-label="增加${t}">＋</button></span></div>`).join('')}</div></div>`;
   return '';
 }
@@ -2522,12 +2669,13 @@ labEl.addEventListener('pointermove',e=>{if(!drag)return;cfg.drag[drag.name](svg
 const endDrag=()=>{drag=null;labEl.classList.remove('dragging');};labEl.addEventListener('pointerup',endDrag);labEl.addEventListener('pointercancel',endDrag);
 
 /* ---------- 頁面 ---------- */
-let nav='';[1,2,3].forEach(g=>{nav+=`<div class="nav-group-label">${g===1?'第一次段考':g===2?'第二次段考 · 光學':'第二次段考 · 溫度與熱'}</div>`;Object.entries(LABS).filter(([,t])=>t.group===g).forEach(([key,t])=>{nav+=`<a href="#${key}" data-key="${key}"><span class="count" aria-hidden="true">${t.n}</span>${t.name}</a>`;});});
+const NAV_GROUPS=['','第一次段考','第二次段考 · 光學','第二次段考 · 溫度與熱','第三次段考 · 溫度與熱（續）','第三次段考 · 物質的基本結構'];
+let nav='';[1,2,3,4,5].forEach(g=>{const list=Object.entries(LABS).filter(([,t])=>t.group===g);if(!list.length)return;nav+=`<div class="nav-group-label">${NAV_GROUPS[g]}</div>`;list.forEach(([key,t])=>{nav+=`<a href="#${key}" data-key="${key}"><span class="count" aria-hidden="true">${t.n}</span>${t.name}</a>`;});});
 document.getElementById('nav').innerHTML=nav;
 window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';fitStage();};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>4-4、4-5 的頁面：上方的編號分頁是各個小實驗，下面一行「試試看」告訴學生這一步要觀察什麼；每改一個條件，圖上會用大字顯示「改了什麼 → 變成什麼」，右側對應的控制項也會閃一下。不常用的開關收在「更多選項」。</p><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備；溫度與熱先做 5-1 溫度與溫度計、5-2 熱量（尚未教比熱，熱量只算水：H ＝ m × ΔT）。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>光路圖以「看得清楚」為先，不一定完全照真實比例：「透鏡成像 → 為什麼會偏折」把透鏡畫得比較厚，光在兩個表面各轉折一次（白點標出轉折處），每條平行光都畫成正好經過焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」和課本一樣理想化：平行光反射後都正好經過焦點 F（凸面鏡是反向延長線）。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>4-4 以後的頁面：上方的編號分頁是各個小實驗，下面一行「試試看」告訴學生這一步要觀察什麼；每改一個條件，圖上會用大字顯示「改了什麼 → 變成什麼」，右側對應的控制項也會閃一下。不常用的開關收在「更多選項」。</p><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，另外先做了 5-1 溫度與溫度計、5-2 熱量與熱平衡。第三次範圍也還沒公告：5-3～6-5 依翰林第三冊目錄（5-3 比熱、5-4 熱量的傳播、5-5 熱對物質的影響、6-1 元素與化合物、6-2 生活中常見的元素、6-3 物質結構與原子、6-4 週期表、6-5 分子與化學式）預備到第三冊結束。側欄的段考分組是預估，實際範圍以學校公告為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>光路圖以「看得清楚」為先，不一定完全照真實比例：「透鏡成像 → 為什麼會偏折」把透鏡畫得比較厚，光在兩個表面各轉折一次（白點標出轉折處），每條平行光都畫成正好經過焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」和課本一樣理想化：平行光反射後都正好經過焦點 F（凸面鏡是反向延長線）。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');
 </script></body></html>
