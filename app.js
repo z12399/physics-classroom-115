@@ -2262,7 +2262,12 @@ function questionHTML(){const q=typeof cfg.q==='function'?cfg.q(state):cfg.q;ret
 /* 問題卡重畫時，保留已經打開的「看解釋」 */
 function setQuestion(qh){const el=labEl.querySelector('.question'),open=new Set([...el.querySelectorAll('details[open]')].map(d=>d.dataset.k));el.innerHTML=qh;el.querySelectorAll('details').forEach(d=>{if(d.dataset.k&&open.has(d.dataset.k))d.open=true;});}
 let lastQ='';
-function render(){const out=cfg.render(state);if(typeof cfg.q==='function'){const qh=questionHTML();if(qh!==lastQ){setQuestion(qh);lastQ=qh;}}svgEl.innerHTML=DEFS+out.svg;const hint=labEl.querySelector('.drag-hint');if(hint)hint.style.visibility=svgEl.querySelector('[data-drag]')?'':'hidden';setIf(labEl.querySelector('.readouts'),out.reads.map(([a,b])=>`<div class="readout"><span>${a}</span><b>${b}</b></div>`).join(''));setIf(labEl.querySelector('.note'),out.note||'');const task=labEl.querySelector('.task');if(task)setIf(task,taskText());setPhoto();sync();}
+function render(){const out=cfg.render(state);if(typeof cfg.q==='function'){const qh=questionHTML();if(qh!==lastQ){setQuestion(qh);lastQ=qh;}}
+  /* 重畫會換掉 SVG 裡的節點：原本用鍵盤選到的 data-tap 元素，重畫後把焦點還給同一個 id 的新元素 */
+  const ae=document.activeElement,fid=ae&&svgEl.contains(ae)?ae.getAttribute('data-tap'):null;
+  svgEl.innerHTML=DEFS+out.svg;
+  if(fid){const again=svgEl.querySelector(`[data-tap="${CSS.escape(fid)}"]`);if(again)again.focus({preventScroll:true});}
+  const hint=labEl.querySelector('.drag-hint');if(hint)hint.style.visibility=svgEl.querySelector('[data-drag]')?'':'hidden';setIf(labEl.querySelector('.readouts'),out.reads.map(([a,b])=>`<div class="readout"><span>${a}</span><b>${b}</b></div>`).join(''));setIf(labEl.querySelector('.note'),out.note||'');const task=labEl.querySelector('.task');if(task)setIf(task,taskText());setPhoto();sync();}
 function taskText(){const t=typeof cfg.tasks==='function'?cfg.tasks(state):cfg.tasks?.[state[cfg.steps]];return t?`<b>試試看</b>${t}`:'';}
 /* 引導版面：圖和控制項一起放進一個螢幕高度（窄螢幕改成上下排，不固定高度） */
 function fitStage(){const sim=labEl.querySelector('.sim-layout');if(!sim)return;if(!labEl.classList.contains('guided')||innerWidth<=1180){sim.style.removeProperty('--fit');return;}
@@ -2341,13 +2346,19 @@ function activate(key){
   else if(act){const sb=document.querySelector('.sidebar'),r=act.getBoundingClientRect(),rs=sb.getBoundingClientRect();if(r.bottom>rs.bottom||r.top<rs.top)sb.scrollTop+=r.top-rs.top-rs.height/2;}
 }
 labEl.addEventListener('input',e=>{const c=cfg.controls[e.target.dataset.c];if(!c)return;const before=snapCtl();if(c.type==='range')state[c.key]=+e.target.value;else if(c.type==='toggle'){state[c.key]=e.target.checked;if(c.onChange)c.onChange(state);}render();announce(before,null,+e.target.dataset.c);});
-labEl.addEventListener('click',e=>{const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){cfg.tap(state,tp.dataset.tap);render();return;}const ph=e.target.closest('.photo');if(ph&&lastPhoto){openPhoto(lastPhoto);return;}const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset')){const keep=(cfg.keep||[]).map(k=>[k,state[k]]);activate(current);if(keep.length){for(const[k,v]of keep){state[k]=v;const c=cfg.controls.find(c=>c.key===k&&c.onChange);if(c)c.onChange(state);}render();}return;}const before=snapCtl();if(b.dataset.qa&&cfg.qAction){cfg.qAction(state,b.dataset.qa);render();announce(before,null,null);return;}const c=cfg.controls[b.dataset.c];if(!c)return;
+labEl.addEventListener('click',e=>{const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){if(e.detail===0){cfg.tap(state,tp.dataset.tap);render();}return;}const ph=e.target.closest('.photo');if(ph&&lastPhoto){openPhoto(lastPhoto);return;}const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset')){const keep=(cfg.keep||[]).map(k=>[k,state[k]]);activate(current);if(keep.length){for(const[k,v]of keep){state[k]=v;const c=cfg.controls.find(c=>c.key===k&&c.onChange);if(c)c.onChange(state);}render();}return;}const before=snapCtl();if(b.dataset.qa&&cfg.qAction){cfg.qAction(state,b.dataset.qa);render();announce(before,null,null);return;}const c=cfg.controls[b.dataset.c];if(!c)return;
   if(c.type==='seg'){state[c.key]=c.options[b.dataset.o][0];if(c.onChange)c.onChange(state);}else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();announce(before,c.type==='buttons'?b.textContent:null,c.type==='seg'?+b.dataset.c:null);});
 labEl.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){e.preventDefault();const id=tp.dataset.tap;cfg.tap(state,id);render();const again=svgEl.querySelector(`[data-tap="${id}"]`);if(again)again.focus();return;}if(e.target.closest('.photo')&&lastPhoto){e.preventDefault();openPhoto(lastPhoto);}});
 const svgPoint=e=>{const p=svgEl.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svgEl.getScreenCTM().inverse());};
 labEl.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-drag]');if(!h||!cfg.drag||!cfg.drag[h.dataset.drag])return;e.preventDefault();drag={name:h.dataset.drag,p0:svgPoint(e),s0:structuredClone(state),before:snapCtl()};svgEl.setPointerCapture(e.pointerId);labEl.classList.add('dragging');});
 labEl.addEventListener('pointermove',e=>{if(!drag)return;cfg.drag[drag.name](svgPoint(e),state,drag);if(!cfg.tick)render();announce(drag.before,null,null);});
 const endDrag=()=>{drag=null;labEl.classList.remove('dragging');};labEl.addEventListener('pointerup',endDrag);labEl.addEventListener('pointercancel',endDrag);
+/* 圖上可點的元素（data-tap）：有動畫的單元每一幀都重畫，按下和放開會落在不同的節點，click 找不到元素；
+   所以用 pointerdown／pointerup 比對同一個 data-tap（沒移動太遠才算點一下）。鍵盤與輔助工具的 click（detail＝0）在上面處理。 */
+let tapStart=null;
+labEl.addEventListener('pointerdown',e=>{const tp=e.target.closest('[data-tap]');tapStart=tp&&cfg.tap?{id:tp.dataset.tap,x:e.clientX,y:e.clientY}:null;});
+labEl.addEventListener('pointerup',e=>{const t=tapStart;tapStart=null;if(!t)return;const tp=e.target.closest('[data-tap]');if(!tp||tp.dataset.tap!==t.id||Math.hypot(e.clientX-t.x,e.clientY-t.y)>12)return;cfg.tap(state,t.id);render();});
+labEl.addEventListener('pointercancel',()=>{tapStart=null;});
 
 /* ---------- 頁面 ---------- */
 const NAV_GROUPS=['','第一次段考','第二次段考 · 光學','第二次段考 · 溫度與熱','第三次段考 · 溫度與熱（續）','第三次段考 · 物質的基本結構'];
