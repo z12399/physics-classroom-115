@@ -527,7 +527,8 @@ function benchLog(s){
   s.log=s.log.filter(r=>r.u!==u);s.log.push(row);if(s.log.length>5)s.log.shift();s.flash='已記錄！';s.flashT=1.5;}
 
 /* ---------- 第五章 溫度與熱：共用繪圖 ---------- */
-const WARM=t=>{const f=clamp(t/100,0,1);return `rgb(${Math.round(76+f*124)},${Math.round(133-f*48)},${Math.round(187-f*130)})`;};
+/* 水的顏色跟著溫度變：冷偏藍、熱偏紅（示意，讓冷熱一眼看得出來） */
+const WARM=t=>{const f=clamp(t/100,0,1);return `rgb(${Math.round(40+f*200)},${Math.round(120-f*60)},${Math.round(230-f*190)})`;};
 const HG='#9aa3ad',ALC='#d94b3d';
 /* 玻璃管溫度計：x 中心、yb 玻璃泡圓心、yt 管頂、yl 液面。o.c 液體顏色、o.br 泡半徑、o.w 管內徑、o.neck 縮口高度、o.gap 液柱在縮口斷開 */
 function glassTherm(x,yb,yt,yl,o={}){const{c=ALC,br=15,w=8,neck=0,gap=false}=o,ow=w+12;yl=clamp(yl,yt,yb);
@@ -1523,7 +1524,7 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
       for(const[y0,yh,c,w,arrow,op]of hits){const stop=blk&&yh>0.01;h+=ray(stop?[P([-u,y0]),P([0,yh])]:[P([-u,y0]),P([0,yh]),P(out(y0,yh))],c,{w,arrow:arrow&&!stop,op});}
     }
     const fade=fadeIn(),onStage=!inf&&X(v)>20&&X(v)<880&&Y(m*oh)>20&&Y(m*oh)<480,dim=blk?.5:1;
-    if(fade>0&&!inf&&v<0)for(const[y0,yh,c]of hits)if(!(blk&&yh>0.01))h+=L(X(0),Y(yh),X(v),Y(m*y0),{stroke:c,w:1.4,dash:'7 6',op:.75*fade});
+    if(fade>0&&!inf&&v<0)for(const[y0,yh,c]of hits)if(!(blk&&yh>0.01))h+=L(X(0),Y(yh),X(v),Y(m*y0),{stroke:c,w:2.2,dash:'8 6',op:.95*fade});
     /* 凹透鏡的主要光線：①的延長線通過同側焦點、③原本射向另一側焦點 */
     if(fade>0&&s.type===1&&s.beam==='main'&&u<s.f)h+=L(X(-u),Y(oh),X(-s.f),cy,{stroke:D.third,w:1.4,dash:'3 5',op:.7*fade});
     if(fade>0&&s.type===-1&&s.beam==='main'&&!inf&&!blk){h+=L(X(0),Y(oh),X(-s.f),cy,{stroke:D.ray,w:1.4,dash:'3 5',op:.7*fade});const y3=f*oh/(f-u);if(Math.abs(y3)<400)h+=L(X(0),Y(y3),X(s.f),cy,{stroke:D.third,w:1.4,dash:'3 5',op:.7*fade});}
@@ -1561,11 +1562,11 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
     const fade=fadeIn();
     if(s.on&&fade>0){h+=`<g opacity="${fade}"><rect x="${sx-4}" y="${clamp(Y(hi),206,424)}" width="8" height="${Math.max(2,clamp(Y(lo),208,426)-clamp(Y(hi),206,424))}" fill="#fff2b0" opacity="${clamp(1.2/(1+b),.25,1)}"/>${real&&v<sv-0.5?`<circle cx="${X(v)}" cy="${Y(-m*yo)}" r="4" fill="${D.image}"/>`:''}</g>`;}
     /* 紙屏上看到的（正面） */
-    const ix=590,iy=12,iw=290,ihh=184,cxI=ix+iw/2,ayI=iy+28,g=7,sc=sv/u,sd=Math.min(18,b*g*0.45);
-    h+=`<clipPath id="scrc"><rect x="${ix}" y="${iy}" width="${iw}" height="${ihh}" rx="10"/></clipPath><rect x="${ix}" y="${iy}" width="${iw}" height="${ihh}" rx="10" fill="#efe6c8"/>`+T(ix+12,iy+22,'紙屏上看到的',{size:13,fill:'#6f6448',weight:700});
+    const ix=590,iy=12,iw=290,ihh=184,cxI=ix+iw/2,ayI=iy+34,g=13,sc=sv/u,sd=Math.min(18,b*g*0.45);
+    h+=`<clipPath id="scrc"><rect x="${ix}" y="${iy}" width="${iw}" height="${ihh}" rx="10"/></clipPath><rect x="${ix}" y="${iy}" width="${iw}" height="${ihh}" rx="10" fill="#efe6c8"/>`+T(ix+12,iy+22,'紙屏上看到的',{size:15,fill:'#6f6448',weight:700});
     if(s.on&&fade>0){const op=clamp(1.5/(1+b*0.9),.3,1)*fade,glyph=`<rect x="-0.8" y="-4" width="1.6" height="4" fill="#d9cfb4"/><path d="M0 -6.8Q1 -5.4 0.5 -4.8Q0 -4.4 -0.5 -4.8Q-1 -5.4 0 -6.8Z" fill="#ff9a2e"/>`;
       h+=`<filter id="bblur" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="${sd.toFixed(2)}"/></filter><g clip-path="url(#scrc)"><g filter="url(#bblur)" opacity="${op.toFixed(2)}"><g transform="translate(${cxI} ${ayI}) scale(${(sc*g).toFixed(3)}) rotate(180)">${glyph}</g></g></g>`;
-      h+=T(ix+iw-12,iy+ihh-12,sharp?`清楚：倒立・${Math.abs(m-1)<0.02?'等大':m>1?'放大':'縮小'}`:b>4?'只有一片模糊的光':'模糊',{size:13,fill:sharp?'#0f766e':'#6f6448',anchor:'end',weight:700});}
+      h+=T(ix+iw-12,iy+ihh-12,sharp?`清楚：倒立・${Math.abs(m-1)<0.02?'等大':m>1?'放大':'縮小'}`:b>4?'只有一片模糊的光':'模糊',{size:16,fill:sharp?'#0f766e':'#6f6448',anchor:'end',weight:700});}
     else h+=T(cxI,iy+90,s.on?'':'蠟燭沒點燃',{size:14,fill:'#6f6448',anchor:'middle'});
     /* 實驗紀錄 */
     h+=`<rect x="20" y="12" width="440" height="164" rx="10" fill="#0b1422" stroke="#3a4554"/>`+T(36,38,'物距',{size:13,fill:D.muted,weight:700})+T(128,38,'像距',{size:13,fill:D.muted,weight:700})+T(220,38,`像的性質（f = ${f} cm）`,{size:13,fill:D.muted,weight:700})+L(30,46,450,46,{stroke:'#3a4554',w:1});
@@ -1678,7 +1679,7 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機�
     let h=L(15,cy,885,cy,{stroke:D.muted,w:1,dash:true,op:.6});
     h+=`<rect x="16" y="178" width="${xl+26-16}" height="144" rx="16" fill="#1b2738" stroke="#5d7088" stroke-width="2"/>`+T(28,342,'投影機',{size:14,fill:D.muted});
     h+=`<rect x="28" y="226" width="34" height="48" rx="8" fill="${s.on?'#fff2c4':'#56606e'}"/>`+(s.on?`<circle cx="45" cy="250" r="30" fill="#fff2c4" opacity=".18"/><polygon points="62,232 ${xo},${cy-oh-14} ${xo},${cy+oh+14} 62,268" fill="#fff2c4" opacity=".1"/>`:'')+T(45,214,'燈',{size:13,fill:D.muted,anchor:'middle'});
-    for(const[k,t]of[[1,'F'],[2,'2F']])for(const sd of[-1,1]){const x=xl+sd*k*fl;h+=L(x,cy-6,x,cy+6,{stroke:D.muted,w:2})+T(x,cy+24,t,{size:13,fill:D.ink,anchor:'middle',halo:true});}
+    for(const[k,t]of[[1,'F'],[2,'2F']])for(const sd of[-1,1]){const x=xl+sd*k*fl;h+=L(x,cy-6,x,cy+6,{stroke:D.muted,w:2})+(sd<0&&k===2?'':T(x,cy+26,t,{size:15,fill:D.ink,anchor:'middle',halo:true}));}/* 左邊的 2F 在燈箱裡，只畫刻度不寫字 */
     h+=lensPath(xl,fl,64)+T(xl,cy-74,'鏡頭（凸透鏡）',{size:13,fill:D.ray,anchor:'middle'});
     h+=`<g data-drag="slide" class="handle-body"><rect x="${xo-4}" y="${cy-46}" width="8" height="92" rx="2" fill="#9fb2c8" opacity=".45"/>${vArrow(xo,cy,Y(sg*oh),D.object,{w:4})}</g>`+handle('slide',xo,cy+62,D.object,11)+T(xo,cy-54,'投影片',{size:13,fill:D.object,anchor:'middle'});
     if(s.on)for(const[yh,c]of[[sg*oh,D.ray],[0,D.second],[-sg*48,D.third]]){const t=paraxTrace(xo,sg*oh,(yh-sg*oh)/u,lenses,xS);h+=ray(t.pts.map(([x,y])=>[x,Y(y)]),c,{w:2.4,arrow:false,op:.9});}
@@ -1723,6 +1724,9 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機�
       const fade=fadeIn();
       if(fade>0){const ih=-oh*s.focus/u;h+=`<g opacity="${fade}">${sharp?vArrow(xs-14,cy,Y(ih),D.image):`<rect x="${xs-16}" y="${Y(Math.max(0,ih)+blur/2)}" width="10" height="${Math.abs(ih)+blur}" fill="${D.image}" opacity=".45" rx="5"/>`}</g>`;}
       if(ox>30)h+=`<g opacity="${s.on?1:.35}">${vArrow(ox,cy,Y(oh),D.object)}</g>`+handle('cobj',ox,cy,D.object);else h+=T(40,Y(oh)-10,`← ${u>=2400?'很遠':'較遠'}的物體`,{size:15,fill:D.object});
+      /* 感光元件上的畫面：倒立的樹，沒對準就糊掉 */
+      if(s.on&&fade>0){const sd=sharp?0:Math.min(9,1.5+blur*.6),tree=`<rect x="-7" y="-10" width="14" height="44" fill="#8a5a3b"/><circle cx="0" cy="-34" r="30" fill="#3fbf6a"/><circle cx="-20" cy="-18" r="18" fill="#35a85c"/><circle cx="20" cy="-18" r="18" fill="#35a85c"/>`;
+        h+=`<g opacity="${fade}"><rect x="40" y="290" width="250" height="180" rx="14" fill="#0b1220" stroke="#3a4554"/>${T(165,316,'感光元件上的畫面',{size:15,fill:D.ink,anchor:'middle',weight:700})}<defs><filter id="camblur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${sd.toFixed(1)}"/></filter></defs><g filter="url(#camblur)" transform="translate(165 370) scale(1 -1)">${tree}</g>${T(165,460,sharp?'清楚：倒立的像':'模糊：要再對焦',{size:15,fill:sharp?'#7be0a2':'#ffb38a',anchor:'middle',weight:700})}</g>`;}
       const move=sharp?'剛好':s.focus<v?'往前伸（遠離感光元件）':'往後縮（靠近感光元件）';
       return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['畫面',sharp?'清楚':'模糊'],['鏡頭應該',move],['物體位置','2F 以外'],['成像','倒立・縮小・實像']],
         note:'相機用<b>移動鏡頭</b>對焦：物體越近，像距越大，鏡頭就要往前伸。'};
@@ -1734,7 +1738,7 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機�
     else{u=520;oh=0;fEye=160;lenses=[{x:X0,f:fEye}];if(s.glasses){const Dv=1/(1/160-1/L0);lenses.unshift({x:X0-70,f:1/(1/(u-70)+1/-(Dv-70))});}}
     const ox=X0-u,first=lenses[0].x;
     h+=`<ellipse cx="${(X0-24+xr)/2}" cy="${cy}" rx="${(xr-X0+24)/2+12}" ry="115" fill="#1a2536" stroke="#c9d6e6" stroke-width="2.5"/>`+`<path d="M${xr-4} ${cy-90}Q${xr+14} ${cy} ${xr-4} ${cy+90}" fill="none" stroke="#ff92bc" stroke-width="5"/>`+T(xr+18,cy-80,'視網膜',{size:14,fill:D.second});
-    h+=lensShape(X0,fEye,58)+T(X0,cy-74,'水晶體',{size:14,fill:D.ray,anchor:'middle'});
+    h+=lensShape(X0,fEye,58)+T(X0,cy-74,'水晶體',{size:15,fill:D.ray,anchor:'middle',halo:true});
     if(lenses.length>1)h+=lensShape(lenses[0].x,lenses[0].f,70)+T(lenses[0].x,cy+96,lenses[0].f>0?'凸透鏡':'凹透鏡',{size:14,fill:D.ink,anchor:'middle'});
     const ys=s.beam==='single'?[38]:[-45,-30,-15,0,15,30,45];let conv=null;
     for(const yk of ys){const t=trace(ox,oh,(yk-oh)/(first-ox),lenses,xr);if(Math.abs(t.m)>1e-9&&oh===0)conv=t.x-t.y/t.m;
@@ -1742,6 +1746,9 @@ life:{group:2,n:'4-4',name:'生活中的透鏡',subtitle:'照相機、投影機�
     const fade=fadeIn();
     if(oh===0&&conv!==null&&fade>0&&conv>xr+2){for(const yk of ys){const t=trace(ox,oh,(yk-oh)/(first-ox),lenses,xr);h+=L(xr,Y(t.pts[t.pts.length-1][1]),conv,cy,{stroke:'#ffe8a5',w:1.2,dash:'4 5',op:.6*fade});}h+=`<circle cx="${conv}" cy="${cy}" r="5" fill="${D.object}" opacity="${fade}"/>`;}
     if(oh===0&&conv!==null&&fade>0&&conv<xr-2)h+=`<circle cx="${conv}" cy="${cy}" r="5" fill="${D.object}" opacity="${fade}"/>`;
+    /* 標出光會聚的位置，以及視網膜上看到的是一個點還是一團 */
+    if(oh===0&&conv!==null&&fade>0){const on=Math.abs(conv-xr)<3,lab=on?'剛好會聚在視網膜上 → 清楚':conv<xr?'會聚點在視網膜前方':'會聚點在視網膜後方';
+      h+=`<g opacity="${fade}">${on?'':`<rect x="${xr-5}" y="${cy-Math.min(60,Math.abs(conv-xr)*0.9)}" width="10" height="${2*Math.min(60,Math.abs(conv-xr)*0.9)}" rx="5" fill="#ffe8a5" opacity=".45"/>`}${T(on?xr-40:conv-20,cy+(on?150:140),lab,{size:16,fill:D.object,anchor:'middle',weight:700,halo:true})}${on?'':T(conv-20,cy+164,'視網膜上是一團光 → 看起來模糊',{size:15,fill:D.ink,anchor:'middle',halo:true})}</g>`;}
     if(s.dev==='eye'){if(fade>0)h+=`<g opacity="${fade}">${vArrow(xr-8,cy,Y(-oh*L0/u),D.image)}</g>`;if(ox>30)h+=`<g opacity="${s.on?1:.35}">${vArrow(ox,cy,Y(oh),D.object)}</g>`+handle('eobj',ox,cy,D.object);else h+=T(40,Y(oh)-10,`← ${u>=2400?'很遠':'較遠'}的物體`,{size:15,fill:D.object});}
     else if(ox>30)h+=`<circle cx="${ox}" cy="${cy}" r="7" fill="${s.on?D.object:'#56606e'}"/>`+T(ox,cy-16,'近處物體',{size:15,fill:D.object,anchor:'middle'});else h+=T(40,cy-14,'← 遠方物體',{size:15,fill:D.object});
     if(s.dev==='eye')return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads:[['水晶體',u<900?'變厚（看近）':u<2400?'稍厚':'較薄（看遠）'],['視網膜上的像','倒立・縮小・實像'],['畫面','清楚（自動調焦）']],
@@ -1792,7 +1799,7 @@ color:{group:2,n:'4-5',keep:['mode'],steps:'mode',
     h+=`<rect x="852" y="40" width="18" height="420" rx="4" fill="#3a4554"/>`+T(861,30,'紙屏',{size:15,fill:D.muted,anchor:'middle'});
     if(s.on)h+=ray([src,H],full?'#ffffff':SPECTRUM[s.hue][1],{w:4,arrow:false})+T(170,392,full?'白光':nm+'光',{size:16,fill:full?D.ink:SPECTRUM[s.hue][1],anchor:'middle',weight:700});
     const spots=[];
-    for(const i of full?SPECTRUM.map((c,j)=>j):[s.hue]){const n=1.50+i*0.02,d1=cRefr(d0,[-0.866,-0.5],1,n),P2=hitFace(H,d1,A,C);let e=cRefr(d1,[-0.866,0.5],n,1);if(!e)continue;const pts=[H,P2];
+    for(const i of full?SPECTRUM.map((c,j)=>j):[s.hue]){const n=1.50+i*0.03,d1=cRefr(d0,[-0.866,-0.5],1,n),P2=hitFace(H,d1,A,C);let e=cRefr(d1,[-0.866,0.5],n,1);if(!e)continue;const pts=[H,P2];
       if(nw){const Q1=hitFace(P2,e,C2,A2),e1=cRefr(e,[-0.866,0.5],1,n),Q2=hitFace(Q1,e1,A2,B2);e=cRefr(e1,[-0.866,-0.5],n,1);if(!e)continue;pts.push(Q1,Q2);}
       const P=pts[pts.length-1],S=[852,P[1]+e[1]*(852-P[0])/e[0]];pts.push(S);spots.push([S[1],SPECTRUM[i][1],SPECTRUM[i][0],P]);
       if(s.on)h+=ray(pts,SPECTRUM[i][1],{w:full?2.2:3.5,arrow:false,op:.95,delay:len});}
@@ -1807,7 +1814,7 @@ color:{group:2,n:'4-5',keep:['mode'],steps:'mode',
       note:!full?'單色光通過三稜鏡只會<b>偏折</b>，不會再分出其他顏色。':nw?'倒置的三稜鏡把各色光<b>反方向偏折</b>回來，重疊在一起 → <b>又變回白光</b>（牛頓的實驗）。可見顏色不是三稜鏡「染」上去的，白光本來就含有各種色光。':'各色光在玻璃中的<b>光速不同</b>（4-3）→ 偏折程度不同：<b>紫光最多、紅光最少</b>，白光就分成各種色光，這叫<b>色散</b>。光都偏向三稜鏡<b>較厚的底部</b>，這也是凸透鏡能會聚光的原因（4-4）。<br><small>延伸：4-3「光的折射」的波前圖，可以比較紅光和紫光。</small>'};},
   rainbow(s){
     /* 彩虹：陽光在水滴裡折射 → 反射 → 再折射。水的折射率紅光約 1.331、紫光約 1.343，圖中色散放大 4 倍 */
-    const nOf=i=>1.331+0.008*i,drop=(c,R,n)=>{const b=0.86*R,E=[c[0]-Math.sqrt(R*R-b*b),c[1]-b],un=p=>[(p[0]-c[0])/R,(p[1]-c[1])/R],cut=(p,d)=>{const t=-2*((p[0]-c[0])*d[0]+(p[1]-c[1])*d[1]);return[p[0]+d[0]*t,p[1]+d[1]*t];};
+    const nOf=i=>1.331+0.011*i,drop=(c,R,n)=>{const b=0.86*R,E=[c[0]-Math.sqrt(R*R-b*b),c[1]-b],un=p=>[(p[0]-c[0])/R,(p[1]-c[1])/R],cut=(p,d)=>{const t=-2*((p[0]-c[0])*d[0]+(p[1]-c[1])*d[1]);return[p[0]+d[0]*t,p[1]+d[1]*t];};
       const d1=cRefr([1,0],un(E),1,n),P=cut(E,d1),u=un(P),k=2*(d1[0]*u[0]+d1[1]*u[1]),d2=[d1[0]-k*u[0],d1[1]-k*u[1]],Q=cut(P,d2),w=un(Q);return{E,P,Q,d:cRefr(d2,[-w[0],-w[1]],n,1)||d2};};
     const sun=(x,y)=>`<circle cx="${x}" cy="${y}" r="20" fill="${s.on?'#ffd60a':'#5a6573'}"/>`+[0,1,2,3,4,5,6,7].map(k=>{const a=k*Math.PI/4;return L(x+27*Math.cos(a),y+27*Math.sin(a),x+35*Math.cos(a),y+35*Math.sin(a),{stroke:s.on?'#ffd60a':'#5a6573',w:3});}).join('');
     const off=!s.on?T(s.rv==='sky'?450:200,250,'沒有陽光，就沒有彩虹',{size:20,fill:D.muted,anchor:'middle'}):'',RED=SPECTRUM[0][1],VIO=SPECTRUM[6][1];
@@ -1863,15 +1870,19 @@ color:{group:2,n:'4-5',keep:['mode'],steps:'mode',
     }
     /* 一張或兩張玻璃紙排在一起 */
     const ks=s.tv==='two'?[s.f1,s.f2]:[s.f1],xs=s.tv==='two'?[300,520]:[400],steps=[];let c=c0,x=74,dl=0;
+    /* 光畫成紅、綠、藍三股細光：被玻璃紙吸收的那一股停在玻璃紙上（打 ✕），透過的才繼續往前 */
+    const STR=[[-13,'#ff3b30'],[0,'#30d158'],[13,'#0a84ff']],strands=(cc,xa,xb,d)=>STR.map(([o,col],i)=>cc[i]>=40?ray([[xa,250+o],[xb,250+o]],col,{w:6,arrow:false,op:.35+.6*cc[i]/255,delay:d}):'').join('');
+    if(s.on&&white)h+=T(190,214,'白光 ＝ 紅＋綠＋藍…',{size:14,fill:D.ink,anchor:'middle',weight:700});
     ks.forEach((k,j)=>{const[nm,f]=FILTERS[k],x1=xs[j],out=cmul(c,f),abs=cmul(c,f.map(v=>1-v)),got=s.on&&has(c)&&REACH>=dl+x1-x;
-      if(s.on&&has(c))h+=ray([[x,250],[x1,250]],rgbOf(c),{w:14,arrow:false,op:.85,delay:dl});
+      if(s.on&&has(c))h+=strands(c,x,x1,dl);
+      if(got)STR.forEach(([o],i)=>{if(c[i]>=40&&out[i]<40)h+=T(x1-14,250+o+5,'✕',{size:15,fill:'#ffffff',anchor:'middle',weight:700});});
       h+=`<rect x="${x1}" y="150" width="16" height="200" rx="3" fill="${rgbOf(f.map(v=>v*255))}" opacity=".7" stroke="#ffffff66"/>`+T(x1+8,138,`${nm}色玻璃紙`,{size:15,fill:D.ink,anchor:'middle',weight:700});
       if(got)h+=T(x1+8,380,has(out)?`透過：${ln(out)}`:'全部被吸收',{size:14,fill:D.ink,anchor:'middle'})+(has(abs)?T(x1+8,402,`吸收：${c.every(v=>v>0)?'其餘色光':ln(abs)}`,{size:14,fill:D.muted,anchor:'middle'}):'');
       steps.push([nm,out]);dl+=x1-x;c=out;x=x1+16;});
-    if(s.on&&has(c))h+=ray([[x,250],[760,250]],rgbOf(c),{w:14,arrow:false,op:.85,delay:dl});
+    if(s.on&&has(c))h+=strands(c,x,760,dl);
     const done=!s.on||!any||arrived(),fade=s.on&&any?fadeIn():1,res=!any?'沒有光':has(c)?ln(c):'幾乎沒有光';
     h+=`<rect x="760" y="90" width="26" height="320" rx="4" fill="#2a313c" stroke="#3a4554"/>`+T(773,78,'白色屏幕',{size:15,fill:D.muted,anchor:'middle'});
-    if(done&&has(c))h+=`<ellipse cx="773" cy="250" rx="13" ry="40" fill="${rgbOf(c)}" opacity="${fade}"/>`;
+    if(done&&has(c))h+=`<ellipse cx="773" cy="250" rx="15" ry="46" fill="${rgbOf(c)}" opacity="${fade}"/>`;
     h+=T(773,446,done?res:'',{size:18,fill:D.ink,anchor:'middle',weight:700});
     const pass=o=>!any?'—':!done?'—':has(o)?ln(o):'幾乎沒有光',[n1]=FILTERS[s.f1],[n2]=FILTERS[s.f2],o1=steps[0][1];
     const reads=s.tv==='two'?[['照射的光',ln(c0)],[`第一張（${n1}）透過`,pass(o1)],[`第二張（${n2}）透過`,pass(c)],['屏幕上',done?res:'—']]:[['照射的光',ln(c0)],[`${n1}色玻璃紙透過`,pass(c)],['屏幕上',done?res:'—']];
@@ -1910,6 +1921,12 @@ color:{group:2,n:'4-5',keep:['mode'],steps:'mode',
     const len=Math.min(reach,380),w=len/380*220;
     if(len>0&&any)h+=`<polygon points="270,40 330,40 ${300+w},${40+len} ${300-w},${40+len}" fill="${rgbOf(c0)}" opacity=".22"/>`+(len>=380?`<ellipse cx="300" cy="420" rx="220" ry="34" fill="${rgbOf(c0)}" opacity=".35"/>`:'');
     h+=`<rect x="262" y="24" width="76" height="22" rx="6" fill="${s.on?'#c9d3df':'#5a6573'}"/><g transform="translate(300 330)">${shape(rgbOf(out))}</g>`;
+    /* 照下來的紅、綠、藍光；物體反射的那幾股射向右上的眼睛，被吸收的停在物體上 */
+    const STR=[[-16,'#ff3b30','紅'],[0,'#30d158','綠'],[16,'#0a84ff','藍']],eye=[520,120],top={apple:262,leaf:258,banana:300,paper:246,cloth:256}[s.obj];
+    if(s.on&&any){STR.forEach(([o,col],i)=>{if(c0[i]>0)h+=ray([[300+o,48],[300+o,top]],col,{w:5,op:.9});if(lit>=1&&out[i]>=40)h+=ray([[312+o*.5,top+4+o*.5],[eye[0]-14,eye[1]+o*.6]],col,{w:5,op:.95,delay:380});});
+      if(lit>=1){const ab=STR.filter((x,i)=>c0[i]>0&&out[i]<40).map(x=>x[2]),rf=STR.filter((x,i)=>out[i]>=40).map(x=>x[2]);
+        h+=`<ellipse cx="${eye[0]}" cy="${eye[1]}" rx="22" ry="13" fill="#fff"/><circle cx="${eye[0]-6}" cy="${eye[1]}" r="7" fill="#1b2a33"/>`+T(eye[0],eye[1]-24,'眼睛',{size:14,fill:D.muted,anchor:'middle'});
+        h+=T(470,178,rf.length?`反射：${rf.join('、')}光`:'沒有光反射',{size:15,fill:D.ink,anchor:'middle',weight:700,halo:true})+(ab.length?T(300,455,`吸收：${ab.join('、')}光`,{size:15,fill:D.muted,anchor:'middle',halo:true}):'');}}
     h+=T(735,70,'白光下',{size:17,fill:D.muted,anchor:'middle'})+`<g transform="translate(735 160) scale(.7)">${shape(rgbOf(ref.map(v=>v*255)))}</g>`+T(735,262,oname,{size:18,fill:D.ink,anchor:'middle'});
     h+=T(735,330,'現在看起來',{size:17,fill:D.muted,anchor:'middle'})+T(735,375,done?look:'',{size:32,fill:D.ink,anchor:'middle',weight:700});
     const refl=ref.every(v=>v>0)?'所有色光':ref.some(v=>v>0)?['紅','綠','藍'].filter((_,i)=>ref[i]).join('、')+'光':'幾乎不反射';
@@ -1986,12 +2003,12 @@ colorfree:{group:2,n:'4-5',tasks:s=>s.guess?'只看這個燈光下的樣子，�
     const title=kind==='card'?'色卡':kind==='my'?'自己設計的國旗':kind==='mystery'?(hide?'神秘國旗':CF_FLAGS[s.myst][0]+'國旗'):CF_FLAGS[kind][0]+'國旗';
     h+=T(715,178,title,{size:15,fill:D.ink,anchor:'middle',weight:700});
     const rows=keys.length,rh=Math.min(34,250/rows),y0=212;
-    h+=T(586,y0-6,dir==='v'?'由左到右':kind==='card'?'色卡':'由上到下',{size:12,fill:D.muted})+T(700,y0-6,'會反射',{size:12,fill:D.muted,anchor:'middle'})+T(812,y0-6,'看起來',{size:12,fill:D.muted,anchor:'middle'});
+    h+=T(586,y0-6,dir==='v'?'由左到右':kind==='card'?'色卡':'由上到下',{size:14,fill:D.muted})+T(700,y0-6,'會反射',{size:14,fill:D.muted,anchor:'middle'})+T(812,y0-6,'看起來',{size:14,fill:D.muted,anchor:'middle'});
     keys.forEach((k,i)=>{const y=y0+i*rh,c=CF_COLORS[k][1],cy=y+rh/2;
-      h+=hide?`<rect x="586" y="${cy-9}" width="22" height="18" fill="#141b26" stroke="#56606e" stroke-dasharray="3 3"/>`+T(614,cy+5,'？',{size:14,fill:D.object}):`<rect x="586" y="${cy-9}" width="22" height="18" fill="${rgbOf(c.map(v=>v*255))}" stroke="#56606e"/>`+T(614,cy+5,CF_COLORS[k][0],{size:14,fill:D.ink});
+      h+=hide?`<rect x="586" y="${cy-9}" width="22" height="18" fill="#141b26" stroke="#56606e" stroke-dasharray="3 3"/>`+T(614,cy+5,'？',{size:16,fill:D.object}):`<rect x="586" y="${cy-9}" width="22" height="18" fill="${rgbOf(c.map(v=>v*255))}" stroke="#56606e"/>`+T(614,cy+5,CF_COLORS[k][0],{size:16,fill:D.ink});
       ['#ff3b30','#30d158','#0a84ff'].forEach((col,j)=>{const x=680+j*20;h+=hide?`<circle cx="${x}" cy="${cy}" r="6" fill="none" stroke="#56606e" stroke-dasharray="2 2"/>`:`<circle cx="${x}" cy="${cy}" r="6" fill="${c[j]?col:'none'}" stroke="${c[j]?col:'#56606e'}" stroke-width="1.5"/>`;});
-      h+=L(740,cy,762,cy,{stroke:D.muted,w:1.5})+`<rect x="768" y="${cy-9}" width="22" height="18" fill="${rgbOf(seen[i])}" stroke="#56606e"/>`+T(796,cy+5,names[i],{size:14,fill:D.ink,weight:700});});
-    h+=T(715,y0+rows*rh+18,'● 會反射　○ 不會反射（紅、綠、藍）',{size:12,fill:D.muted,anchor:'middle'});
+      h+=L(740,cy,762,cy,{stroke:D.muted,w:1.5})+`<rect x="768" y="${cy-9}" width="22" height="18" fill="${rgbOf(seen[i])}" stroke="#56606e"/>`+T(796,cy+5,names[i],{size:16,fill:D.ink,weight:700});});
+    h+=T(715,y0+rows*rh+18,'● 會反射　○ 不會反射（紅、綠、藍）',{size:14,fill:D.muted,anchor:'middle'});
     /* 相鄰條紋看起來一樣 → 連成一片 */
     const same=[];if(kind!=='card')for(let i=1;i<keys.length;i++)if(names[i]===names[i-1])same.push(i);
     const groups=kind==='card'?0:keys.length-same.length;
@@ -2045,8 +2062,8 @@ temp:{group:3,n:'5-1',keep:['mode'],name:'溫度與溫度計',subtitle:'溫度�
     return {svg:h,reads:soak?[['左手','泡在 45°C 熱水'],['右手','泡在 10°C 冷水'],['接下來','一起放進溫水']]:[['左手覺得溫水','冷'],['右手覺得溫水','熱'],['溫度計',s.measure?'兩邊都是 30 °C':'（打開「用溫度計量量看」）']],
       note:'<b>溫度</b>：表示物體的<b>冷熱程度</b>。同一盆溫水，兩手感覺卻相反：手的感覺會受原來的狀態影響，<b>不可靠</b>，所以要用溫度計測量。'};},
   liquid(s){const hg=s.liq==='hg',x=300,yb=455,y=t=>420-(t+50)*2,frozen=hg&&s.tt<-39,boil=!hg&&s.tt>78,show=frozen?-39:boil?78:s.tt;
-    let h=`<rect x="226" y="372" width="148" height="114" fill="${WARM(s.tt)}" fill-opacity=".3"/>`+beakerPath(222,378,350,488)+T(370,395,'待測物',{size:15,anchor:'end',fill:P.muted});
-    h+=glassTherm(x,yb,70,y(show),{c:hg?(frozen?'#6f777f':HG):ALC,br:14,w:7})+thermTicks(x+12,-50,120,5,10,y,{size:14});
+    let h=`<rect x="226" y="372" width="148" height="114" fill="${WARM(s.tt)}" fill-opacity=".3"/>`+beakerPath(222,378,350,488)+T(214,440,'待測物',{size:16,anchor:'end',fill:P.muted});
+    h+=glassTherm(x,yb,70,y(show),{c:hg?(frozen?'#6f777f':HG):ALC,br:15,w:9})+thermTicks(x+12,-50,120,5,20,y,{size:17});
     h+=L(x-30,y(s.tt),x-12,y(s.tt),{stroke:P.accent,w:3,arrow:true})+T(x-36,y(s.tt)+6,`實際 ${s.tt}°C`,{size:15,anchor:'end',fill:P.accent,weight:700});
     h+=this.panel(470,70,400,330)+T(670,108,'液體溫度計：熱脹冷縮',{size:22,anchor:'middle',weight:700});
     h+=this.lines(495,148,['玻璃泡裡的液體受熱膨脹、遇冷收縮，','體積變化在細管中變成液柱長度的變化。'],{size:17,gap:28});
@@ -2061,7 +2078,7 @@ temp:{group:3,n:'5-1',keep:['mode'],name:'溫度與溫度計',subtitle:'溫度�
     const x=300,yb=455,neck=420,y=t=>395-(t-35)*40,inn=s.clin==='in',stale=inn&&s.cr>s.body+1e-9,top=s.cr===null?neck+12:y(s.cr);
     let h=inn?`<circle cx="${x}" cy="${yb}" r="44" fill="#f4b6a0" fill-opacity=".35"/>`+T(x-56,yb+6,`腋下 ${s.body.toFixed(1)}°C`,{size:16,anchor:'end',fill:P.red,weight:700})
       :T(x-40,yb+6,'在空氣中',{size:16,anchor:'end',fill:P.muted});
-    h+=glassTherm(x,yb,100,top,{c:HG,br:14,w:6,neck,gap:!inn&&s.cr!==null})+thermTicks(x+11,35,42,.1,1,y,{size:15});
+    h+=glassTherm(x,yb,100,top,{c:HG,br:14,w:6,neck,gap:!inn&&s.cr!==null})+thermTicks(x+11,35,42,.1,1,y,{size:18});
     h+=L(x+11,y(37),x+30,y(37),{stroke:P.red,w:2})+T(x-20,neck+5,'縮口',{size:15,anchor:'end',fill:P.muted})+L(x-18,neck,x-9,neck,{stroke:P.muted,w:1.5});
     h+=this.panel(470,70,400,330)+T(670,108,'體溫計的縮口',{size:22,anchor:'middle',weight:700});
     const zx=560,zy=230,c=HG;
@@ -2114,7 +2131,7 @@ temp:{group:3,n:'5-1',keep:['mode'],name:'溫度與溫度計',subtitle:'溫度�
   design(s){const V=s.bulb==='b'?2:1,A=s.bore==='thin'?1:2,p=4*V/A,y0=400,yb=452;
     let h=`<rect x="160" y="420" width="450" height="64" fill="${WARM(s.dt)}" fill-opacity=".3"/>`+beakerPath(156,614,404,486)+T(385,476,`水溫 ${s.dt}°C`,{size:16,anchor:'middle',fill:P.muted});
     [[250,2,13,10,'甲：小泡、粗管'],[520,p,V===2?19:13,A===1?5:10,`乙：${V===2?'大':'小'}泡、${A===1?'細':'粗'}管`]].forEach(([x,pp,br,w,name])=>{
-      h+=glassTherm(x,yb,70,y0-s.dt*pp,{c:ALC,br,w})+thermTicks(x+w/2+7,0,40,5,10,t=>y0-t*pp,{size:13});
+      h+=glassTherm(x,yb,70,y0-s.dt*pp,{c:ALC,br,w})+thermTicks(x+w/2+7,0,40,5,pp<4?20:10,t=>y0-t*pp,{size:16});
       h+=T(x,44,name,{size:18,anchor:'middle',weight:700})+T(x-w/2-10,y0-s.dt*pp+5,`${num(s.dt*pp/2,0)} mm`,{size:14,anchor:'end',fill:ALC});});
     h+=this.panel(650,90,220,300)+T(760,128,'每升高 1°C',{size:20,anchor:'middle',weight:700});
     h+=T(670,172,'甲：液柱上升 1 mm',{size:17})+T(670,206,`乙：液柱上升 ${num(p/2,0)} mm`,{size:17,fill:ALC,weight:700});
@@ -2129,13 +2146,13 @@ temp:{group:3,n:'5-1',keep:['mode'],name:'溫度與溫度計',subtitle:'溫度�
     if(s.mk==='ice')[[330,430],[372,446],[346,462],[380,470]].forEach(([a,b])=>{h+=`<rect x="${a}" y="${b}" width="15" height="13" rx="2" fill="#fff" stroke="#9cc0d9"/>`;});
     if(s.mk==='boil')[[334,470],[384,462],[350,436],[392,440],[326,446]].forEach(([a,b],i)=>{h+=`<circle cx="${a}" cy="${b}" r="${3+i%3}" fill="none" stroke="#fff" stroke-width="2"/>`;});
     h+=glassTherm(x,yb,62,y(Lc),{c:ALC,br:14,w:7});
-    h+=L(300,y(0),300,y(25),{stroke:P.muted,w:1.5});for(let c=0;c<=25;c++)h+=L(300,y(c),300-(c%5?6:12),y(c),{stroke:P.muted,w:1})+(c%5?'':T(282,y(c)+5,c,{size:13,anchor:'end',fill:P.muted}));
+    h+=L(300,y(0),300,y(25),{stroke:P.muted,w:1.5});for(let c=0;c<=25;c++)h+=L(300,y(c),300-(c%5?6:12),y(c),{stroke:P.muted,w:1})+(c%5?'':T(282,y(c)+6,c,{size:16,anchor:'end',fill:P.muted}));
     h+=T(290,y(25)-14,'cm',{size:13,anchor:'end',fill:P.muted});
     const mark=(Lm,v,name,c,on)=>on?L(372,y(Lm),560,y(Lm),{stroke:c,w:2,dash:true})+T(568,y(Lm)+6,`${tnum(v)}${u}　${name}（液柱 ${Lm} cm）`,{size:17,fill:c,weight:700}):'';
     h+=mark(4,lo,'冰水混合物',P.blue,true)+mark(24,hi,'沸水',P.red,s.mk!=='ice');
     if(s.mk==='test'){const N=hi-lo,cand=[1,2,5,10,20,50],minor=cand.find(c=>300/N*c>=3)||50,major=cand.find(c=>c>=minor*5&&300/N*c>=34)||100;
       for(let v=Math.ceil(lo/minor)*minor;v<=hi+1e-9;v+=minor){const yy=y(4+(v-lo)/N*20),big=Math.abs(v/major-Math.round(v/major))<1e-6;h+=L(372,yy,372+(big?14:7),yy,{stroke:P.ink,w:big?1.6:1});
-        if(big&&v-lo>N*.07&&hi-v>N*.07)h+=T(392,yy+5,v,{size:14,fill:P.ink});}
+        if(big&&v-lo>N*.07&&hi-v>N*.07)h+=T(392,yy+6,v,{size:16,fill:P.ink});}
       h+=L(372,y(Lc),470,y(Lc),{stroke:P.accent,w:3})+T(478,y(Lc)+6,`讀數 ${tnum(read)}${u}`,{size:19,fill:P.accent,weight:700});}
     h+=this.panel(600,150,270,190);
     const txt=s.mk==='ice'?['① 1 atm 下純水的冰水混合物，','溫度固定不變。','液柱停在 4 cm → 標上 '+tnum(lo)+u]:s.mk==='boil'?['② 1 atm 下的沸水，','溫度也固定不變。','液柱停在 24 cm → 標上 '+tnum(hi)+u]
@@ -2150,7 +2167,7 @@ temp:{group:3,n:'5-1',keep:['mode'],name:'溫度與溫度計',subtitle:'溫度�
     h+=L(60,y(0),860,y(0),{stroke:P.blue,w:1,dash:'4 6',op:.6})+L(60,y(100),860,y(100),{stroke:P.red,w:1,dash:'4 6',op:.6})+T(40,y(0)+5,'冰點',{size:14,fill:P.blue})+T(40,y(100)+5,'沸點',{size:14,fill:P.red});
     h+=L(60,y(s.cc),860,y(s.cc),{stroke:P.accent,w:2.5});
     cols.forEach(([id,name,f,inv,mi,ma],i)=>{const x=x0+i*gap,a=f(-40),b=f(110);
-      h+=L(x,y(-40),x,y(110),{stroke:P.ink,w:2})+T(x,82,name,{size:17,anchor:'middle',weight:700})+thermTicks(x,Math.min(a,b),Math.max(a,b),mi,ma,v=>y(inv(v)),{side:-1,size:13});
+      h+=L(x,y(-40),x,y(110),{stroke:P.ink,w:2})+T(x,82,name,{size:17,anchor:'middle',weight:700})+thermTicks(x,Math.min(a,b),Math.max(a,b),mi,ma,v=>y(inv(v)),{side:-1,size:16});
       const v=f(s.cc),txt=tnum(v)+(id==='K'?' K':'°');h+=`<rect x="${x+8}" y="${y(s.cc)-17}" width="86" height="32" rx="8" fill="#e5f3ef" stroke="${P.accent}"/>`+T(x+51,y(s.cc)+6,txt,{size:17,anchor:'middle',weight:700,fill:P.accent});});
     h+=T(450,482,`C ÷ 100 ＝ (F − 32) ÷ 180 ＝ ${s.xa<0?'(X ＋ '+(-s.xa)+')':s.xa?'(X − '+s.xa+')':'X'} ÷ ${s.xb-s.xa}`,{size:19,anchor:'middle'});
     const reads=[['攝氏',s.cc+' °C'],['華氏',tnum(toF(s.cc))+' °F'],['X 溫標',tnum(toX(s.cc,s))+' °X']];if(s.kel)reads.push(['克氏',s.cc+273+' K']);
@@ -2175,12 +2192,12 @@ heat:{group:3,n:'5-2',keep:['mode'],name:'熱量與熱平衡',subtitle:'熱量�
     {type:'toggle',key:'loss',label:'考慮散熱（外杯對 25°C 的空氣散熱）',show:s=>s.mode==='mix'}],
   render(s){return s.mode==='mix'?this.mix(s):this.define(s);},
   graph(xl,yl){const X=t=>500+t*36,Y=T=>440-T*3.3;let h='';
-    for(let v=20;v<=100;v+=20)h+=L(500,Y(v),860,Y(v),{stroke:P.faint,w:1,dash:'3 5'})+T(490,Y(v)+5,v,{size:13,anchor:'end',fill:P.muted});
-    for(let t=0;t<=10;t+=2)h+=L(X(t),440,X(t),446,{stroke:P.muted})+T(X(t),464,t,{size:13,anchor:'middle',fill:P.muted});
-    h+=L(500,440,866,440,{stroke:P.muted,w:1.5})+L(500,440,500,96,{stroke:P.muted,w:1.5})+T(506,94,yl,{size:14,fill:P.muted})+T(860,488,xl,{size:14,anchor:'end',fill:P.muted});
+    for(let v=20;v<=100;v+=20)h+=L(500,Y(v),860,Y(v),{stroke:P.faint,w:1,dash:'3 5'})+T(490,Y(v)+6,v,{size:16,anchor:'end',fill:P.muted});
+    for(let t=0;t<=10;t+=2)h+=L(X(t),440,X(t),446,{stroke:P.muted})+T(X(t),466,t,{size:16,anchor:'middle',fill:P.muted});
+    h+=L(500,440,866,440,{stroke:P.muted,w:1.5})+L(500,440,500,96,{stroke:P.muted,w:1.5})+T(506,92,yl,{size:16,fill:P.muted})+T(860,490,xl,{size:16,anchor:'end',fill:P.muted});
     return {h,X,Y};},
   define(s){const R=1000,H=R*s.t,rise=H/s.m,Tw=Math.min(100,20+rise),boil=20+rise>100,dT=Tw-20,wh=50+s.m*.32,bt=400;
-    let h=`<rect x="125" y="${bt-wh}" width="230" height="${wh}" fill="${WARM(Tw)}" fill-opacity=".35"/>`+L(125,bt-wh,355,bt-wh,{stroke:WARM(Tw),w:3})+beakerPath(120,360,165,bt+2);
+    let h=`<rect x="125" y="${bt-wh}" width="230" height="${wh}" fill="${WARM(Tw)}" fill-opacity=".5"/>`+L(125,bt-wh,355,bt-wh,{stroke:WARM(Tw),w:3})+beakerPath(120,360,165,bt+2);
     h+=T(205,bt-wh-14,`${s.m} g 的水`,{size:18,anchor:'middle',weight:700})+T(205,bt-wh/2+12,`${tnum(Tw)}°C`,{size:28,anchor:'middle',weight:700,fill:P.red});
     h+=glassTherm(320,bt-26,140,bt-46-Tw*2.2,{c:ALC,br:10,w:5});
     h+=`<rect x="130" y="408" width="220" height="30" rx="6" fill="#4a5860"/>`;for(let i=0;i<5;i++)h+=`<path d="M${150+i*40} 418q10 10 20 0" fill="none" stroke="${s.t>0?'#ff7b4a':'#7c8a92'}" stroke-width="3"/>`;
@@ -2196,8 +2213,8 @@ heat:{group:3,n:'5-2',keep:['mode'],name:'熱量與熱平衡',subtitle:'熱量�
         :`<b>1 卡（cal）</b>：使 1 g 的水升高 1°C 所需的熱量；1 千卡（kcal）＝ 1000 卡。<br><b>H ＝ m × ΔT</b> ＝ ${s.m} × ${tnum(dT)} ＝ ${H} cal（不計散熱與容器吸熱）`};},
   mix(s){const C=mixCurve(s),i=clamp(Math.round(s.tm/.05),0,C.length-1),[,a,b,lost]=C[i],tf=(s.ma*s.ta+s.mb*s.tb)/(s.ma+s.mb),eq=Math.abs(a-b)<.2;
     const qa=s.ma*(a-s.ta),qb=s.mb*(b-s.tb);
-    let h=`<rect x="94" y="250" width="292" height="176" fill="${WARM(b)}" fill-opacity=".35"/>`+L(94,250,386,250,{stroke:WARM(b),w:3})+beakerPath(90,390,180,430);
-    h+=`<rect x="170" y="225" width="140" height="185" fill="#fbfdff" fill-opacity=".6"/><rect x="172" y="262" width="136" height="146" fill="${WARM(a)}" fill-opacity=".45"/>`+L(172,262,308,262,{stroke:WARM(a),w:3})
+    let h=`<rect x="94" y="250" width="292" height="176" fill="${WARM(b)}" fill-opacity=".5"/>`+L(94,250,386,250,{stroke:WARM(b),w:3})+beakerPath(90,390,180,430);
+    h+=`<rect x="170" y="225" width="140" height="185" fill="#fbfdff" fill-opacity=".6"/><rect x="172" y="262" width="136" height="146" fill="${WARM(a)}" fill-opacity=".6"/>`+L(172,262,308,262,{stroke:WARM(a),w:3})
       +`<path d="M170 222V410H310V222" fill="none" stroke="#7e8b92" stroke-width="5"/>`;
     h+=glassTherm(285,385,150,365-a*2.1,{c:ALC,br:9,w:4})+glassTherm(365,402,150,382-b*2.1,{c:ALC,br:9,w:4});
     {const ca=Math.abs(a-b)<.2?P.accent:a>b?P.red:P.blue,cb=Math.abs(a-b)<.2?P.accent:a>b?P.blue:P.red;h+=T(222,330,tnum(a)+'°C',{size:22,anchor:'middle',weight:700,fill:ca})+T(130,350,tnum(b)+'°C',{size:20,anchor:'middle',weight:700,fill:cb});}
