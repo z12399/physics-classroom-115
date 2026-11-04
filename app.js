@@ -963,7 +963,7 @@ curved:{group:2,n:'4-2',name:'凹面鏡與凸面鏡',subtitle:'從每一條光�
   render(s){
     beginLight(s);const cy=250,cc=s.type===1;let h=L(15,cy,885,cy,{stroke:D.muted,w:1.5,dash:true});
     if(s.beam==='single'||s.beam==='parallel'){
-      /* 真實球面：每一點的法線都通過球心；凸面鏡往左放，讓鏡後的 F 留在畫面內 */
+      /* 球面鏡；示意圖以清楚為先：反射光一律正好經過 F（凸面鏡為延長線），法線畫成入射光與反射光的角平分線（幾乎就是指向球心 C）。凸面鏡往左放，讓鏡後的 F 留在畫面內 */
       const R=520,V=cc?760:540,Cx=cc?V-R:V+R,arcX=dy=>cc?Cx+Math.sqrt(R*R-dy*dy):Cx-Math.sqrt(R*R-dy*dy),Fx=cc?V-R/2:V+R/2;
       let arc='';for(let dy=-175;dy<=175;dy+=5)arc+=(dy===-175?'M':'L')+arcX(dy).toFixed(1)+' '+(cy-dy);
       for(let dy=-170;dy<=170;dy+=17){const x=arcX(dy);h+=L(x+3,cy-dy,x+13,cy-dy-8,{stroke:'#6f8196',w:1.5});}
@@ -972,10 +972,10 @@ curved:{group:2,n:'4-2',name:'凹面鏡與凸面鏡',subtitle:'從每一條光�
       h+=Cx<880?`<circle cx="${Cx}" cy="${cy}" r="5" fill="${D.muted}"/>`+T(Cx,cy+28,'C（球心）',{size:15,fill:D.muted,anchor:'middle',halo:true}):T(885,40,'C 在右方畫面外 →',{size:14,fill:D.muted,anchor:'end'});
       /* 平行光只取主軸附近 ±100，反射後都經過 F */
       const hs=s.beam==='single'?[s.hy]:[-100,-75,-50,-25,0,25,50,75,100];let rays='',exts='',norms='',ang=0;
-      for(const dy of hs){const y=cy-dy,x=arcX(dy),n=cc?[(Cx-x)/R,(cy-y)/R]:[(x-Cx)/R,(y-cy)/R],dot=n[0],r=[1-2*dot*n[0],-2*dot*n[1]],t=(x-20)/-r[0],end=[x+r[0]*t,y+r[1]*t];
+      for(const dy of hs){const y=cy-dy,x=arcX(dy),rv=cc?[Fx-x,cy-y]:[x-Fx,y-cy],rl=Math.hypot(rv[0],rv[1]),r=[rv[0]/rl,rv[1]/rl],nv=[r[0]-1,r[1]],nl=Math.hypot(nv[0],nv[1]),n=[nv[0]/nl,nv[1]/nl],t=(x-20)/-r[0],end=[x+r[0]*t,y+r[1]*t];
         rays+=ray([[20,y],[x,y],end],s.beam==='single'?D.object:'#ffe8a5',{w:s.beam==='single'?3.5:2,arrow:s.beam==='single',op:s.beam==='single'?1:.85});
         if(!cc)exts+=L(x,y,Fx,y-r[1]*(Fx-x)/-r[0],{stroke:'#ffe8a5',w:1.4,dash:'6 6',op:.7});
-        if(s.normals)norms+=cc?L(x,y,Cx,cy,{stroke:D.muted,w:1.2,dash:'3 5',op:.55}):L(x,y,x+(x-Cx)*-0.4,y+(y-cy)*-0.4,{stroke:D.muted,w:1.2,dash:'3 5',op:.55})+L(x,y,x+n[0]*60,y+n[1]*60,{stroke:D.muted,w:1.2,dash:'3 5',op:.55});
+        if(s.normals){/* 法線延伸到主軸（凹面鏡：往 C；凸面鏡：鏡後往 C 畫一段，鏡前再畫一小段） */const k=Math.abs(n[1])>1e-6?Math.abs((cy-y)/n[1]):Math.abs(Cx-x),g=cc?1:-0.4;norms+=L(x,y,x+n[0]*k*g,y+n[1]*k*g,{stroke:D.muted,w:1.2,dash:'3 5',op:.55})+(cc?'':L(x,y,x+n[0]*60,y+n[1]*60,{stroke:D.muted,w:1.2,dash:'3 5',op:.55}));}
         if(s.beam==='single'){ang=deg(Math.acos(Math.abs(n[0])));const pp=[-n[1],n[0]],side=Math.sign(-pp[0])||1,at=(sg)=>[x+n[0]*85+pp[0]*sg*side*22,y+n[1]*85+pp[1]*sg*side*22+5];
           if(dy!==0&&arrived()){const[a1,a2]=at(1),[b1,b2]=at(-1);h+=T(a1,a2,`入 ${ang.toFixed(0)}°`,{size:14,fill:D.object,anchor:'middle'})+T(b1,b2,`反 ${ang.toFixed(0)}°`,{size:14,fill:D.ink,anchor:'middle'});}}}
       const fade=fadeIn();h+=norms+rays;if(!cc&&fade>0)h+=`<g opacity="${fade}">${exts}</g>`;
@@ -983,7 +983,7 @@ curved:{group:2,n:'4-2',name:'凹面鏡與凸面鏡',subtitle:'從每一條光�
       if(!s.on)h+=T(300,120,'按「開燈」',{size:20,fill:D.muted,anchor:'middle'});
       const reads=s.beam==='single'?[['入射角 = 反射角',`${ang.toFixed(1)}°`],['這點的法線','通過球心 C'],['焦點 F','鏡面到 C 的一半']]:[['平行光反射後',!s.on?'（開燈後觀察）':cc?'會聚於 F':'散開'],['焦點種類',cc?'實焦點':'虛焦點（鏡後）'],['F 的位置','鏡面與 C 的中點']];
       return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,
-        note:s.beam==='single'?'拖動鏡面上的圓圈：每一點的法線方向不同，但都遵守<b>入射角 = 反射角</b>。':cc?'每條光都遵守反射定律；因為法線都指向 C，反射光都經過 <b>F</b>。<small>（延伸：離主軸很遠的光會稍微偏離 F，叫球面像差。）</small>':'反射光散開，它們的<b>反向延長線</b>交於鏡後的 F（虛焦點）。'};
+        note:s.beam==='single'?'拖動鏡面上的圓圈：每一點的法線方向不同，但都遵守<b>入射角 = 反射角</b>。':cc?'每條光都遵守反射定律；因為法線都指向 C，反射光都經過 <b>F</b>。':'反射光散開，它們的<b>反向延長線</b>交於鏡後的 F（虛焦點）。'};
     }
     /* 成像：近軸光線 */
     const V=600,f=s.type*s.f,u=s.u,oh=s.oh,inf=Math.abs(u-f)<1e-9,v=inf?null:f*u/(u-f),m=inf?null:-v/u,X=d=>V-d*1.15,Y=y=>cy-y*2.4,E=(V-20)/1.15,P=([d,y])=>[X(d),Y(y)],outEnd=yh=>[E,yh+(inf?-oh/u:(m*oh-yh)/v)*E];
@@ -1145,27 +1145,32 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
   drag:{obj:(p,s)=>{s.u=snap('u',(450-p.x)/1.15);s.sweep=null;},top:(p,s)=>{s.oh=snap('oh',(250-p.y)/2.4);},aim:(p,s)=>{s.aim=clamp((250-p.y)/2.4,-76,76);},
     wy:(p,s)=>{const m=s.type===1?118:110;s.wy=clamp(250-p.y,-m,m);},paper:(p,s)=>{s.pd=snap('pd',(p.x-450)*(s.side==='left'?1:-1)/2.4);},
     cand:(p,s)=>{s.bu=snap('bu',(450-p.x)/8);},bobj:(p,s)=>{s.bu2=snap('bu2',(330-p.x)/7);},bscr:(p,s)=>{s.bd=snap('bd',(p.x-330)/7);},scr:(p,s)=>{s.bv=snap('bv',(p.x-450)/8);}},
-  /* 為什麼會偏折：真實的球面（或切成一疊三稜鏡），在兩個表面各用一次折射定律 */
+  /* 為什麼會偏折：光在透鏡兩個表面各轉折一次。示意圖以清楚為先：透鏡畫厚一點，每條平行光都正好經過焦點（兩次轉折各分一半偏折） */
   why(s){
     beginLight(s);
-    const cc=s.type===1,cx=cc?340:560,cy=250,n=1.5,H=125,R=[500,420,350,300,260][s.bulge-1],sag=R-Math.sqrt(R*R-H*H),tc=cc?2*sag+6:8,xL=cx-tc/2,xR=cx+tc/2;
+    const cc=s.type===1,cx=cc?340:560,cy=250,H=125,R=[400,300,230,190,165][s.bulge-1],fx=cx+(cc?1:-1)*[420,340,270,220,180][s.bulge-1],sag=R-Math.sqrt(R*R-H*H),tc=cc?2*sag+6:8,xL=cx-tc/2,xR=cx+tc/2;
     const S1=cc?{c:xL+R,side:-1}:{c:xL-R,side:1},S2=cc?{c:xR-R,side:1}:{c:xR+R,side:-1},ax=(S,dy)=>S.c+S.side*Math.sqrt(R*R-dy*dy);
     const NB=7,E=k=>-H+k*2*H/NB,dot=(a,b)=>a[0]*b[0]+a[1]*b[1];
-    const refr=(d,N,n1,n2)=>{const nr=dot(N,d)>0?[-N[0],-N[1]]:N,ci=-dot(nr,d),k=n1/n2,t=1-k*k*(1-ci*ci);if(t<0)return null;const c=k*ci-Math.sqrt(t);return[k*d[0]+c*nr[0],k*d[1]+c*nr[1]];};
+    const unit=v=>{const l=Math.hypot(v[0],v[1]);return[v[0]/l,v[1]/l];};
     const arcHit=(p,d,S)=>{const o=[p[0]-S.c,p[1]-cy],b=dot(o,d),D=b*b-dot(o,o)+R*R;if(D<0)return null;for(const t of[-b-Math.sqrt(D),-b+Math.sqrt(D)])if(t>1e-6){const q=[p[0]+d[0]*t,p[1]+d[1]*t];if(Math.sign(q[0]-S.c)===S.side)return{p:q,N:[(q[0]-S.c)/R,(q[1]-cy)/R]};}return null;};
     const segHit=(p,d,S,k)=>{const a=[ax(S,E(k)),cy+E(k)],b=[ax(S,E(k+1)),cy+E(k+1)],e=[b[0]-a[0],b[1]-a[1]],den=d[0]*e[1]-d[1]*e[0];if(Math.abs(den)<1e-9)return null;const t=((a[0]-p[0])*e[1]-(a[1]-p[1])*e[0])/den,l=Math.hypot(e[0],e[1]);return{p:[p[0]+d[0]*t,p[1]+d[1]*t],N:[e[1]/l,-e[0]/l]};};
     const trace=(y0,flat)=>{const p0=[20,y0],d0=[1,0],k=clamp(Math.floor((y0-cy+H)/(2*H/NB)),0,NB-1),hit=(p,d,S)=>flat?segHit(p,d,S,k):arcHit(p,d,S);
-      const h1=hit(p0,d0,S1);if(!h1)return null;const d1=refr(d0,h1.N,1,n),h2=hit(h1.p,d1,S2);if(!h2)return null;const d2=refr(d1,h2.N,n,1);if(!d2)return null;
+      const h1=hit(p0,d0,S1);if(!h1)return null;let d1=d0,d2=d0,h2=null;
+      /* 出射光對準焦點（凸）或從虛焦點散開（凹）；玻璃內的方向取入射與出射的中間 → 兩個表面各轉一半 */
+      for(let i=0;i<8;i++){h2=hit(h1.p,d1,S2);if(!h2)return null;d2=unit(cc?[fx-h2.p[0],cy-h2.p[1]]:[h2.p[0]-fx,h2.p[1]-cy]);d1=unit([d0[0]+d2[0],d0[1]+d2[1]]);}
       return{pts:[p0,h1.p,h2.p,[h2.p[0]+d2[0]*1200,h2.p[1]+d2[1]*1200]],h1,h2,d0,d1,d2};};
-    const par=trace(cy-1,false),fx=par?par.h2.p[0]+(cy-par.h2.p[1])*par.d2[0]/par.d2[1]:cx+(cc?R:-R);
     let h=L(15,cy,885,cy,{stroke:D.muted,w:1.5,dash:true});
     if(s.prisms){for(let k=0;k<NB;k++){const a=E(k),b=E(k+1),q=[[ax(S1,a),cy+a],[ax(S2,a),cy+a],[ax(S2,b),cy+b],[ax(S1,b),cy+b]];h+=`<polygon points="${q.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="${k===3?'#61ddeb14':k%2?'#61ddeb34':'#61ddeb20'}" stroke="${D.ray}" stroke-width="2" stroke-linejoin="round"/>`;}}
     else{let d='';for(let dy=-H;dy<=H;dy+=5)d+=(dy===-H?'M':'L')+ax(S1,dy).toFixed(1)+' '+(cy+dy);for(let dy=H;dy>=-H;dy-=5)d+='L'+ax(S2,dy).toFixed(1)+' '+(cy+dy);h+=`<path d="${d}Z" fill="#61ddeb22" stroke="${D.ray}" stroke-width="3"/>`;}
-    h+=`<circle cx="${fx}" cy="${cy}" r="5" fill="${D.object}"/>`+T(clamp(fx,50,850),cy+28,cc?'F':'F（虛焦點）',{size:16,fill:D.object,anchor:'middle',weight:700,halo:true});
-    const single=s.wbeam==='single',wy=clamp(s.wy,cc?-118:-110,cc?118:110),ys=single?[cy-wy]:s.prisms?Array.from({length:NB},(_,k)=>cy+E(k)+H/NB):[-3,-2,-1,0,1,2,3].map(k=>cy+k*H*0.18),tr=ys.map(y=>trace(y,s.prisms)).filter(Boolean);
-    if(s.on)for(const t of tr)h+=ray(t.pts,single?D.object:'#ffe8a5',{w:single?3.5:2.2,arrow:single,op:.9});
+    h+=`<circle cx="${fx}" cy="${cy}" r="5" fill="${D.object}"/>`+(cc?T(clamp(fx,50,850),cy+28,'F',{size:16,fill:D.object,anchor:'middle',weight:700,halo:true}):T(fx-12,cy-11,'F（虛焦點）',{size:16,fill:D.object,anchor:'end',weight:700,halo:true}));
+    const single=s.wbeam==='single',wy=clamp(s.wy,cc?-118:-110,cc?118:110),ys=single?[cy-wy]:s.prisms?Array.from({length:NB},(_,k)=>cy+E(k)+H/NB):[-3,-2,-1,0,1,2,3].map(k=>cy+k*H*0.25),tr=ys.map(y=>trace(y,s.prisms)).filter(Boolean);
+    if(s.on)for(const t of tr)h+=ray(t.pts,single?D.object:'#ffe8a5',{w:single?3.5:2.6,arrow:single,op:.95});
+    /* 標出兩個轉折點（光走到才出現） */
+    if(s.on)for(const t of tr){const l1=Math.hypot(t.h1.p[0]-t.pts[0][0],t.h1.p[1]-t.pts[0][1]),l2=l1+Math.hypot(t.h2.p[0]-t.h1.p[0],t.h2.p[1]-t.h1.p[1]);
+      [[t.h1.p,l1,'① 進入玻璃，轉折',-1],[t.h2.p,l2,'② 離開玻璃，再轉折',1]].forEach(([q,l,lab,side])=>{if(REACH<l)return;h+=`<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${single?6:4}" fill="#fff" stroke="${D.object}" stroke-width="2.5"/>`;
+        if(single)h+=T(q[0]+side*14,q[1]+(q[1]<cy?-16:28),lab,{size:15,fill:D.ink,anchor:side<0?'end':'start',weight:700,halo:true});});}
     const fade=fadeIn();
-    if(!cc&&fade>0)for(const t of tr){const back=(t.h2.p[0]-(fx-30))/t.d2[0];if(back>0)h+=L(t.h2.p[0],t.h2.p[1],t.h2.p[0]-t.d2[0]*back,t.h2.p[1]-t.d2[1]*back,{stroke:'#ffe8a5',w:1.3,dash:'6 6',op:.6*fade});}
+    if(!cc&&fade>0)for(const t of tr){const back=(t.h2.p[0]-fx)/t.d2[0];if(back>0)h+=L(t.h2.p[0],t.h2.p[1],t.h2.p[0]-t.d2[0]*back,t.h2.p[1]-t.d2[1]*back,{stroke:'#ffe8a5',w:1.3,dash:'6 6',op:.6*fade});}
     if((single||s.wnorm)&&s.on)for(const t of tr)for(const g of[t.h1,t.h2])h+=L(g.p[0]-g.N[0]*48,g.p[1]-g.N[1]*48,g.p[0]+g.N[0]*48,g.p[1]+g.N[1]*48,{stroke:D.muted,w:1.4,dash:'4 4',op:.85});
     if(s.prisms&&fade>0)h+=T(cx,58,cc?'每一塊三稜鏡，較厚的一邊（底）都朝向主軸':'每一塊三稜鏡，較厚的一邊（底）都朝外',{size:16,fill:D.ink,anchor:'middle',weight:700})+T(cx,cy+H+42,'中間那一塊是長方體 → 光直直穿過',{size:14,fill:D.muted,anchor:'middle'});
     const dev=t=>Math.abs(deg(Math.atan2(t.d2[1],t.d2[0])));
@@ -1178,7 +1183,7 @@ lens:{group:2,n:'4-4',name:'透鏡成像',subtitle:'透鏡靠折射讓光偏折�
     else reads=[['透鏡的形狀',cc?'中間厚、邊緣薄':'中間薄、邊緣厚'],['平行光通過後',cc?'會聚':'發散'],['焦點',`${cc?'實焦點，在透鏡後方':'虛焦點，在透鏡前方'}，約 ${num(Math.abs(fx-cx)/10,0)} cm`]];
     const note=single?`光在透鏡的<b>兩個表面各折射一次</b>（就是 4-3 的折射）：進入玻璃時偏向法線，離開玻璃時偏離法線，兩次都把光推向<b>較厚的一邊</b>。拖動左邊的圓圈換高度。`
       :s.prisms?(cc?'把凸透鏡切成一疊<b>三稜鏡</b>：中間是長方體，光直直穿過；越外側的三稜鏡越斜，光偏折越多 → 全部偏向中間，<b>會聚</b>在焦點附近。':'凹透鏡也像一疊三稜鏡，只是較厚的一邊朝外 → 光都往外偏 → <b>發散</b>。')
-      :(cc?'凸透鏡<b>中間厚、邊緣薄</b> → 光都偏向中間（主軸）→ <b>會聚</b>。透鏡越彎，偏折越多，焦點越近。（最外側的光會稍微偏離焦點，課本只看靠近主軸的光。）':'凹透鏡<b>中間薄、邊緣厚</b> → 光都偏向外側 → <b>發散</b>；反向延長線交在透鏡前方的<b>虛焦點</b>。');
+      :(cc?'凸透鏡<b>中間厚、邊緣薄</b> → 光都偏向中間（主軸）→ <b>會聚</b>。透鏡越彎，偏折越多，焦點越近。看白點：每條光在<b>進入、離開</b>透鏡時各轉折一次。':'凹透鏡<b>中間薄、邊緣厚</b> → 光都偏向外側 → <b>發散</b>；反向延長線交在透鏡前方的<b>虛焦點</b>。');
     return {svg:`<g clip-path="url(#stage-clip)">${h}</g>`,reads,note};},
   /* 焦點與焦距：理想薄透鏡 */
   focus(s){
@@ -2039,5 +2044,5 @@ window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';fitStage();};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>4-4、4-5 的頁面：上方的編號分頁是各個小實驗，下面一行「試試看」告訴學生這一步要觀察什麼；每改一個條件，圖上會用大字顯示「改了什麼 → 變成什麼」，右側對應的控制項也會閃一下。不常用的開關收在「更多選項」。</p><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備；溫度與熱先做 5-1 溫度與溫度計、5-2 熱量（尚未教比熱，熱量只算水：H ＝ m × ΔT）。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>「透鏡成像 → 為什麼會偏折」在透鏡兩個球面各算一次折射，最外側的光會略偏離焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」用真實球面計算，邊緣光線會略偏離焦點（球面像差）；課本以近軸光線簡化。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>4-4、4-5 的頁面：上方的編號分頁是各個小實驗，下面一行「試試看」告訴學生這一步要觀察什麼；每改一個條件，圖上會用大字顯示「改了什麼 → 變成什麼」，右側對應的控制項也會閃一下。不常用的開關收在「更多選項」。</p><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備；溫度與熱先做 5-1 溫度與溫度計、5-2 熱量（尚未教比熱，熱量只算水：H ＝ m × ΔT）。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>光路圖以「看得清楚」為先，不一定完全照真實比例：「透鏡成像 → 為什麼會偏折」把透鏡畫得比較厚，光在兩個表面各轉折一次（白點標出轉折處），每條平行光都畫成正好經過焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」和課本一樣理想化：平行光反射後都正好經過焦點 F（凸面鏡是反向延長線）。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');
