@@ -2234,6 +2234,2386 @@ heat:{group:3,n:'5-2',keep:['mode'],steps:'mode',
       note:`熱由高溫傳到低溫，直到<b>溫度相同（熱平衡）</b>。不計散熱：<b>放出的熱量 ＝ 吸收的熱量</b><br>${hot[1]} × (${hot[2]} − T) ＝ ${hot[4]} × (T − ${hot[5]})　→　T ＝ ${tnum(tf)}°C`
         +(s.loss?`<br>考慮散熱：已有 ${num(Math.abs(lost),0)} cal ${lost>=0?'散到空氣中，所以溫度比計算值低':'從空氣傳進來，所以溫度比計算值高'}，之後會慢慢趨近室溫 25°C。`:'')};}}
 };
+/* ===== 5-3 比熱 ===== */
+/* ===== 5-3 比熱 ===== */
+/* 比熱（cal/g·°C）採國中課本常見數值；k：l 液體、p 粉粒、b 塊狀；bp：1 大氣壓下的沸點 */
+const SPEC_R=1000;
+const SPEC_S={
+  water:{n:'水',s:1,k:'l',bp:100,c:[76,133,187]},
+  alc:{n:'酒精',s:.58,k:'l',bp:78,c:[150,196,214]},
+  ice:{n:'冰',s:.55,k:'b',c:[196,224,240]},
+  x:{n:'液體 X',s:.5,k:'l',c:[156,132,204]},
+  oil:{n:'沙拉油',s:.47,k:'l',c:[228,184,62]},
+  al:{n:'鋁',s:.217,k:'b',c:[196,203,210]},
+  glass:{n:'玻璃',s:.2,k:'b',c:[178,216,214]},
+  sand:{n:'砂',s:.19,k:'p',c:[216,186,132]},
+  fe:{n:'鐵',s:.113,k:'b',c:[124,132,140]},
+  cu:{n:'銅',s:.093,k:'b',c:[198,124,76]},
+  ag:{n:'銀',s:.056,k:'b',c:[214,216,220]},
+  hg:{n:'水銀',s:.033,k:'l',c:[160,168,178]},
+  pb:{n:'鉛',s:.031,k:'b',c:[112,118,132]},
+  ma:{n:'金屬甲',s:.1,k:'b',c:[150,150,160]},
+  mb:{n:'金屬乙',s:.2,k:'b',c:[186,170,140]}};
+const SPEC_CHART=['water','alc','ice','oil','al','glass','sand','fe','cu','ag','hg','pb'];
+const SPEC_M=[1,2,5,10,20,50,100,200,300,400,500];
+const specS=v=>v.toFixed(3).replace(/0$/,'');
+const specN=v=>String(+v.toFixed(3));
+const specMix=(a,b,f)=>a.map((v,i)=>v+(b[i]-v)*f);
+const specRGB=c=>`rgb(${c.map(v=>Math.round(clamp(v,0,255))).join(',')})`;
+/* 有白邊的字：壓在圖線上也看得清楚 */
+const specT=(x,y,t,o={})=>{const{size=15,fill=P.ink,anchor='start',weight=700,bg='#fffdf8'}=o;return `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}" paint-order="stroke" stroke="${bg}" stroke-width="4.5" stroke-linejoin="round">${t}</text>`;};
+const specGrad=(id,c)=>`<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${specRGB(specMix(c,[0,0,0],.3))}"/><stop offset=".28" stop-color="${specRGB(specMix(c,[255,255,255],.5))}"/><stop offset=".6" stop-color="${specRGB(c)}"/><stop offset="1" stop-color="${specRGB(specMix(c,[0,0,0],.38))}"/></linearGradient>`;
+/* 液體顏色：水沿用 WARM；其他液體由本色漸漸偏紅（示意） */
+const specLiqCol=(key,T,cap)=>key==='water'?WARM(T):specRGB(specMix(SPEC_S[key].c,[222,84,52],clamp((T-20)/(cap-20),0,1)*.7));
+/* 燒杯（玻璃反光、杯口外翻）與杯內液體 */
+const specCup=(x1,x2,yT,yb)=>`<path d="M${x1-5} ${yT}Q${x1} ${yT} ${x1} ${yT+8}V${yb-8}Q${x1} ${yb} ${x1+8} ${yb}H${x2-8}Q${x2} ${yb} ${x2} ${yb-8}V${yT+8}Q${x2} ${yT} ${x2+5} ${yT}" fill="#e6f2f4" fill-opacity=".28" stroke="#83999d" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>`
+  +`<path d="M${x1+9} ${yT+20}V${yb-24}" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".75"/><path d="M${x2-9} ${yT+30}V${yb-60}" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".5"/>`;
+const specFill=(x1,x2,top,yb,col,op=.55)=>`<path d="M${x1+2} ${top}V${yb-8}Q${x1+2} ${yb-2} ${x1+8} ${yb-2}H${x2-8}Q${x2-2} ${yb-2} ${x2-2} ${yb-8}V${top}Z" fill="${col}" fill-opacity="${op}"/>`;
+const specSurface=(x1,x2,top,col)=>`<path d="M${x1+2} ${top}H${x2-2}" stroke="${col}" stroke-width="3"/><path d="M${x1+22} ${top+5}H${(x1+22+(x2-x1)*.28).toFixed(1)}" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".45"/>`;
+function specSand(x1,x2,top,yb,col,seed){let d=`M${x1+2} ${yb-8}V${top}`;const n=Math.round((x2-x1)/16);for(let i=1;i<=n;i++){const x=x1+2+(x2-x1-4)*i/n;d+=`L${x.toFixed(1)} ${(top+(i<n?(rnd(i+seed)-.5)*5:0)).toFixed(1)}`;}
+  d+=`V${yb-8}Q${x2-2} ${yb-2} ${x2-8} ${yb-2}H${x1+8}Q${x1+2} ${yb-2} ${x1+2} ${yb-8}Z`;let h=`<path d="${d}" fill="${col}"/>`;
+  const k=Math.round((yb-top)*(x2-x1)/260);for(let i=0;i<k;i++)h+=`<circle cx="${(x1+8+rnd(i*3+seed)*(x2-x1-16)).toFixed(1)}" cy="${(top+6+rnd(i*3+1+seed)*(yb-top-12)).toFixed(1)}" r="${(1+rnd(i*3+2+seed)).toFixed(1)}" fill="${i%3?'#8f7448':'#f6e7c6'}" opacity=".55"/>`;return h;}
+/* 金屬塊（圓柱）：gid 漸層、glow 0~1 受熱泛紅、hx 有值時在頂面開一個插溫度計的孔 */
+function specBlock(cx,yb,bw,bh,gid,glow,hx){const x=cx-bw/2,y=yb-bh,ry=Math.min(7,bw*.09);
+  let h=`<path d="M${x} ${y+ry}V${yb-ry}A${bw/2} ${ry} 0 0 0 ${x+bw} ${yb-ry}V${y+ry}Z" fill="url(#${gid})" stroke="#5d676d" stroke-width="1.5"/>`;
+  if(glow>0)h+=`<path d="M${x} ${y+ry}V${yb-ry}A${bw/2} ${ry} 0 0 0 ${x+bw} ${yb-ry}V${y+ry}Z" fill="#ff4a1c" opacity="${(glow*.38).toFixed(2)}"/>`;
+  h+=`<ellipse cx="${cx}" cy="${y+ry}" rx="${bw/2}" ry="${ry}" fill="url(#${gid})" stroke="#5d676d" stroke-width="1.5"/><ellipse cx="${cx}" cy="${y+ry}" rx="${bw/2}" ry="${ry}" fill="#fff" opacity=".28"/>`;
+  if(hx!==undefined)h+=`<ellipse cx="${hx}" cy="${y+ry}" rx="10" ry="${Math.min(4,ry*.6)}" fill="#39434a"/>`;return h;}
+/* 酒精燈與三腳架 */
+function specBurner(cx,on,ph,id){let h=L(cx-84,382,cx-97,462,{stroke:'#7d8a90',w:4})+L(cx+84,382,cx+97,462,{stroke:'#7d8a90',w:4})+`<rect x="${cx-94}" y="376" width="188" height="6" rx="3" fill="#6f7c83"/><path d="M${cx-70} 379H${cx+70}" stroke="#aab4b9" stroke-width="2" stroke-dasharray="3 3"/>`;
+  h+=`<path d="M${cx-36} 462Q${cx-44} 438 ${cx-13} 431H${cx+13}Q${cx+44} 438 ${cx+36} 462Z" fill="#eaf4f6" stroke="#8fa3a8" stroke-width="2"/><path d="M${cx-34} 460Q${cx-38} 448 ${cx-27} 443H${cx+27}Q${cx+38} 448 ${cx+34} 460Z" fill="#8fc1e4" opacity=".7"/><rect x="${cx-9}" y="423" width="18" height="9" rx="2" fill="#a9825a"/><rect x="${cx-2.5}" y="415" width="5" height="9" rx="1.5" fill="#f2efe6" stroke="#b7b0a0"/>`;
+  if(on){const w=Math.sin(ph*9+id*2)*2.2,t=Math.sin(ph*13+id)*2.5;
+    h+=`<path d="M${cx} ${(387+t).toFixed(1)}C${(cx+14+w).toFixed(1)} 400 ${cx+11} 414 ${cx} 420C${cx-11} 414 ${(cx-14+w).toFixed(1)} 400 ${cx} ${(387+t).toFixed(1)}Z" fill="#ff8f3a" opacity=".88"/><path d="M${cx} ${(398+t*.6).toFixed(1)}C${(cx+7+w*.5).toFixed(1)} 406 ${cx+6} 415 ${cx} 419C${cx-6} 415 ${(cx-7+w*.5).toFixed(1)} 406 ${cx} ${(398+t*.6).toFixed(1)}Z" fill="#ffe28a"/><ellipse cx="${cx}" cy="417" rx="4" ry="3" fill="#7fb4ff" opacity=".8"/>`;}
+  return h;}
+/* 座標軸：t 由 ta 到 tm、溫度 Ta 到 Tb */
+function specAxes(o){const{x0,x1,y0,y1,ta=0,tm,Ta,Tb,dx,dy,xl,yl,xf=v=>v}=o,X=t=>x0+(t-ta)/(tm-ta)*(x1-x0),Y=v=>y0-(v-Ta)/(Tb-Ta)*(y0-y1);let h='';
+  for(let v=Ta;v<=Tb+1e-9;v+=dy)h+=(v>Ta?L(x0,Y(v),x1,Y(v),{stroke:P.faint,w:1,dash:'3 5'}):'')+T(x0-9,Y(v)+5,v,{size:15,anchor:'end',fill:P.muted});
+  for(let t=ta;t<=tm+1e-9;t+=dx)h+=L(X(t),y0,X(t),y0+6,{stroke:P.muted,w:1.5})+T(X(t),y0+24,xf(t),{size:15,anchor:'middle',fill:P.muted});
+  h+=L(x0,y0,x1+6,y0,{stroke:P.muted,w:1.5})+L(x0,y0,x0,y1-10,{stroke:P.muted,w:1.5})+T(x0+7,y1-12,yl,{size:15,fill:P.muted})+T(x1+6,y0+46,xl,{size:15,anchor:'end',fill:P.muted});
+  return {h,X,Y};}
+const specHM=h=>{const m=Math.round(h*60)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
+const specLand=h=>26.2+9*Math.cos(2*Math.PI*(h-13)/24),specSea=h=>26+1.5*Math.cos(2*Math.PI*(h-15)/24);
+/* 加熱：同一熱源每分鐘 1000 cal，初溫 20°C；到沸點或上限 cap 就不再畫 */
+function specHeat(key,m,t,top){const S=SPEC_S[key],rate=SPEC_R/(m*S.s),cap=S.bp&&S.bp<top?S.bp:top,tc=(cap-20)/rate,done=t>=tc-1e-9;
+  return {S,rate,cap,tc,done,boil:done&&!!S.bp&&cap===S.bp,T:done?cap:20+rate*t,ms:m*S.s};}
+/* 熱平衡（進階）：金屬塊在前 0.2 分鐘放入水中，之後金屬與水的溫度以同一條衰減曲線趨近平衡溫度（快慢為示意），任何時刻放熱都等於吸熱 */
+function specMixModel(s){const M=SPEC_S[s.xmet],C1=s.xm1*M.s,C2=s.xm2,Tf=(C1*s.xt1+C2*s.xt2)/(C1+C2),tau=.5+C1*C2/(C1+C2)/100,TM=8,D=.2,e8=Math.exp(-(TM-D)/tau),g=t=>t<=D?1:t>=TM?0:(Math.exp(-(t-D)/tau)-e8)/(1-e8);
+  return {M,C1,C2,Tf,g,T1:t=>Tf+(s.xt1-Tf)*g(t),T2:t=>Tf+(s.xt2-Tf)*g(t)};}
+const specToggle=(s,k,max)=>{if(s.play){s.play=false;s[k]=Math.round(s[k]*10)/10;return;}if(reduceMotion){s[k]=max;return;}if(s[k]>=max-1e-6)s[k]=0;s.play=true;};
+
+const SPEC_Q={
+  race:['做這個實驗時，怎樣才能確定水和沙拉油「吸收的熱量相同」？為什麼兩杯的質量也要相同？','用<b>相同的熱源</b>加熱<b>相同的時間</b>，兩杯吸收的熱量就相同（不計散熱）。升高的溫度同時受質量和物質種類影響，所以要讓<b>質量相同</b>（控制變因），只留下「物質種類」不同，升溫的差別才能說是物質造成的。結果：沙拉油升溫比水多，表示沙拉油的<b>比熱比水小</b>。'],
+  define:['水的比熱為什麼剛好是 1 cal/g·°C？100 g 的鐵和 200 g 的鐵，比熱一樣嗎？','<b>1 卡</b>的定義就是「使 1 g 的水升高 1°C 所需的熱量」，所以水的比熱剛好是 <b>1 cal/g·°C</b>。比熱是<b>物質的特性</b>，和質量無關：100 g 和 200 g 的鐵，比熱都是 0.113 cal/g·°C；只是 200 g 的鐵升高同樣的溫度，需要 2 倍的熱量。'],
+  graph:['同一個熱源加熱甲、乙兩物體，溫度–時間圖上甲的線比較陡。能不能說「甲的比熱比較小」？','<b>不一定</b>。線比較陡只表示甲升溫快，也就是甲的 <b>m × s 比較小</b>。要再知道質量：兩者<b>質量相同</b>時，才能說甲的比熱比較小。（按「不同物質卻重疊」：水 200 g 和液體 X 400 g 的線完全重疊，但兩者比熱不同）'],
+  life:['沿海地區和內陸地區，哪裡的日夜溫差比較大？冬天用的熱水袋為什麼裝水？','<b>內陸</b>的日夜溫差大。沿海有大量的海水，水的<b>比熱大</b>，白天吸收很多熱，溫度只升高一點；夜晚放出很多熱，溫度也只降低一點，所以氣溫變化小。熱水袋裝水也是同樣的道理：水的比熱大，降低同樣的溫度能<b>放出較多的熱</b>，而且<b>降溫慢</b>，可以保暖比較久。汽車引擎用水當冷卻劑，則是因為水吸收很多熱，溫度才升高一點。'],
+  mix:['熱的金屬塊放進冷水，達到熱平衡時，金屬降低的溫度和水升高的溫度一樣多嗎？','<b>通常不一樣</b>。不計散熱時相同的是<b>熱量</b>：金屬放出的熱量 ＝ 水吸收的熱量，也就是 m₁ s₁ × 金屬降低的溫度 ＝ m₂ s₂ × 水升高的溫度。金屬的比熱小，m × s 通常比水小，所以金屬溫度降很多，水只升高一點。熱平衡時兩者相同的是<b>溫度</b>。']};
+const SPEC_QUIZ=[
+  {q:'「鐵的比熱是 0.113 cal/g·°C」，意思是：',opts:['1 g 的鐵含有 0.113 cal 的熱量','使 1 g 的鐵升高 1°C，需要吸收 0.113 cal 的熱量','使 0.113 g 的鐵升高 1°C，需要 1 cal 的熱量','鐵每吸收 1 cal 的熱量，溫度升高 0.113°C'],ans:1,
+    sol:'<b>比熱</b>：使 <b>1 g</b> 的物質溫度升高 <b>1°C</b> 所需的熱量。熱量是傳遞的能量，不能說物體「含有」多少熱量。',go:s=>{s.mode='define';s.dsub='fe';s.dmi=0;s.ddt=1;s.play=false;},goLabel:'看 1 g 的鐵升高 1°C'},
+  {q:'用兩個相同的熱源，分別加熱質量相同、初溫相同的水和沙拉油，加熱時間相同（都沒有沸騰，不計散熱）。下列敘述何者正確？',opts:['水吸收的熱量較多，所以升溫較多','沙拉油吸收的熱量較多，所以升溫較多','兩者吸收的熱量相同，升高的溫度也相同','兩者吸收的熱量相同，沙拉油升高的溫度較多'],ans:3,
+    sol:'熱源相同、加熱時間相同 → 吸收的<b>熱量相同</b>。由 H ＝ m × s × ΔT，H 和 m 都相同時，比熱小的升溫多。沙拉油的比熱（0.47）比水（1）小，所以<b>沙拉油升溫較多</b>。',go:s=>{s.mode='race';s.rsub='oil';s.rm1=200;s.rm2=200;s.rt=4;s.play=false;},goLabel:'用加熱實驗驗證'},
+  {q:'鐵的比熱為 0.113 cal/g·°C。使 100 g 的鐵塊溫度升高 50°C，需要吸收多少熱量？',opts:['5.65 cal','56.5 cal','565 cal','5000 cal'],ans:2,
+    sol:'H ＝ m × s × ΔT ＝ 100 × 0.113 × 50 ＝ <b>565 cal</b>。同質量的水升高 50°C 需要 5000 cal，是鐵的將近 9 倍。',go:s=>{s.mode='define';s.dsub='fe';s.dmi=6;s.ddt=50;s.play=false;},goLabel:'用模擬驗證'},
+  {q:'某金屬塊 100 g，吸收 465 cal 的熱量後，溫度由 20°C 升高到 70°C。這個金屬的比熱是多少 cal/g·°C？',opts:['0.093','0.113','0.217','0.93'],ans:0,
+    sol:'ΔT ＝ 70 − 20 ＝ 50°C。s ＝ H ÷ (m × ΔT) ＝ 465 ÷ (100 × 50) ＝ <b>0.093</b> cal/g·°C，查表可知是銅。',go:s=>{s.mode='define';s.dsub='cu';s.dmi=6;s.ddt=50;s.play=false;},goLabel:'用銅驗證'},
+  {q:'用同一個穩定熱源加熱質量相同的甲、乙兩種液體。加熱 4 分鐘，甲由 20°C 升到 60°C，乙由 20°C 升到 40°C（都沒有沸騰）。甲、乙的比熱比是：',opts:['1：2','2：1','1：4','3：2'],ans:0,
+    sol:'同熱源、同時間 → 吸收的熱量相同；質量也相同，所以比熱和升高的溫度成<b>反比</b>。ΔT 甲：乙 ＝ 40：20 ＝ 2：1，比熱 甲：乙 ＝ <b>1：2</b>。（模擬中 A 是液體 X、B 是水，各 200 g）',go:s=>{s.mode='graph';s.ga='x';s.gma=200;s.gb='water';s.gmb=200;s.gt=4;s.play=false;},goLabel:'看溫度–時間圖'},
+  {q:'用同一個熱源加熱 200 g 的水和 400 g 的某液體，兩者的溫度–時間圖線完全重疊（都沒有沸騰）。這種液體的比熱是多少 cal/g·°C？',opts:['2','1','0.5','0.25'],ans:2,
+    sol:'圖線重疊 → 相同時間升高的溫度相同 → <b>m × s 相同</b>。200 × 1 ＝ 400 × s，s ＝ <b>0.5</b> cal/g·°C。斜率只能告訴我們 m × s，要再用質量才能求比熱。',go:s=>{s.mode='graph';s.ga='water';s.gma=200;s.gb='x';s.gmb=400;s.gt=4;s.play=false;},goLabel:'看重疊的圖線'},
+  {q:'用同一個熱源分別加熱 100 g 和 200 g 的水，畫出溫度–時間圖。下列何者正確？',opts:['200 g 的水圖線較陡，比熱較大','100 g 的水圖線較陡，比熱較小','100 g 的水圖線較陡，兩者比熱相同','兩條圖線重疊，比熱相同'],ans:2,
+    sol:'比熱是<b>物質的特性</b>，都是水，比熱相同（1 cal/g·°C）。質量小的升溫快，所以 100 g 的圖線較陡：每分鐘升高 10°C，是 200 g（每分鐘 5°C）的 2 倍。',go:s=>{s.mode='graph';s.ga='water';s.gma=100;s.gb='water';s.gmb=200;s.gt=4;s.play=false;},goLabel:'看溫度–時間圖'},
+  {q:'夏天晴朗的白天，海邊近地面的風通常怎麼吹？主要原因是什麼？',opts:['由陸地吹向海洋，因為陸地比熱大、升溫慢','由陸地吹向海洋，因為海水比熱小、升溫快','由海洋吹向陸地，因為海水比熱小、升溫快','由海洋吹向陸地，因為陸地（砂）比熱小、升溫快'],ans:3,
+    sol:'砂的<b>比熱小</b>，白天受日照後升溫比海水快。陸地上方的空氣受熱上升，海面上較冷的空氣流向陸地補充，形成<b>海風</b>。夜晚陸地降溫快，風向相反，是陸風。',go:s=>{s.mode='life';s.lh=14;s.play=false;},goLabel:'看白天的海邊'},
+  {q:'汽車引擎常用水當冷卻劑，主要是因為水：',opts:['比熱大，吸收很多熱量，溫度才升高一點','比熱小，容易升溫','沸點很低，容易汽化','密度比金屬小'],ans:0,
+    sol:'水的<b>比熱大</b>：同質量的物質吸收相同的熱量，水升高的溫度最少，所以能帶走大量的熱而自己升溫不多。熱水袋裝水也是利用水的比熱大，降溫時能放出較多的熱。'},
+  {q:'（進階）比熱 0.10 cal/g·°C 的金屬塊 200 g，加熱到 100°C 後放入 100 g、16°C 的水中。不計散熱，達到熱平衡時的溫度是：',opts:['24°C','30°C','44°C','58°C'],ans:1,
+    sol:'金屬放出的熱量 ＝ 水吸收的熱量：200 × 0.10 × (100 − T) ＝ 100 × 1 × (T − 16)，2000 − 20T ＝ 100T − 1600，T ＝ <b>30°C</b>。金屬降了 70°C，水只升高 14°C。',go:s=>{s.mode='mix';s.xmet='ma';s.xm1=200;s.xt1=100;s.xm2=100;s.xt2=16;s.xt=8;s.play=false;},goLabel:'用熱平衡實驗驗證'}];
+
+LABS.spec={group:4,n:'5-3',keep:['mode'],steps:'mode',
+  tasks:{race:'按「播放」：兩邊吸收的熱量一樣多，哪一邊溫度升得快？再換右邊的物質比較看看。',
+    define:'先把質量調成 1 g、升高 1°C，看需要多少熱量；再點右邊的長條換物質，比較哪一種最難升溫。',
+    graph:'依序按三個例子：哪一條線比較陡？線比較陡，一定是比熱比較小嗎？',
+    life:'按「播放」看一整天：陸地和海水哪一個溫度變化大？白天和夜晚，近地面的風各往哪邊吹？',
+    mix:'按「播放」：金屬降了幾度？水升了幾度？兩者放出和吸收的熱量一樣多嗎？'},
+  name:'比熱',subtitle:'比熱是使 1 g 的物質溫度升高 1°C 所需的熱量。H ＝ m × s × ΔT；質量相同的物質吸收相同的熱量時，比熱越小，溫度升高越多。',
+  q:s=>({html:qBlockHTML(SPEC_Q[s.mode])+quizHTML(s,SPEC_QUIZ)}),
+  qAction(s,v){quizAction(s,v,SPEC_QUIZ);},
+  state:{mode:'race',ph:0,play:false,rsub:'oil',rm1:200,rm2:200,rt:0,dsub:'fe',dmi:6,ddt:10,ga:'water',gma:200,gb:'oil',gmb:200,gt:4,lh:14,xmet:'ma',xm1:200,xt1:100,xm2:100,xt2:16,xt:0,qi:0,qp:null,qc:false,qs:false},
+  controls:[
+    {type:'seg',key:'mode',label:'實驗',options:[['race','誰升溫快'],['define','比熱的定義'],['graph','讀溫度–時間圖'],['life','生活中的比熱'],['mix','不同物質的熱平衡（進階）']],onChange:s=>{s.play=false;}},
+    {type:'seg',key:'rsub',label:'右邊的物質',options:[['oil','沙拉油'],['alc','酒精'],['sand','砂'],['al','鋁'],['fe','鐵'],['cu','銅']],show:s=>s.mode==='race'},
+    {type:'range',key:'rm1',label:'水的質量',min:100,max:500,step:50,unit:' g',show:s=>s.mode==='race'},
+    {type:'range',key:'rm2',label:'右邊物質的質量',min:100,max:500,step:50,unit:' g',show:s=>s.mode==='race'},
+    {type:'range',key:'rt',label:'加熱時間',min:0,max:10,step:.1,fmt:s=>s.rt.toFixed(1)+' 分鐘',show:s=>s.mode==='race'},
+    {type:'buttons',label:'加熱',items:[['▶ 播放／暫停',s=>specToggle(s,'rt',10)],['↺ 從頭開始',s=>{s.rt=0;s.play=false;}],['質量調成相同',s=>{s.rm2=s.rm1;}]],show:s=>s.mode==='race'},
+    {type:'seg',key:'dsub',label:'物質（也可以點圖上的長條）',options:[['water','水'],['alc','酒精'],['oil','沙拉油'],['al','鋁'],['fe','鐵'],['cu','銅']],show:s=>s.mode==='define'},
+    {type:'range',key:'dmi',label:'質量 m',min:0,max:SPEC_M.length-1,step:1,fmt:s=>SPEC_M[s.dmi]+' g',show:s=>s.mode==='define'},
+    {type:'range',key:'ddt',label:'升高的溫度 ΔT',min:1,max:50,step:1,unit:'°C',show:s=>s.mode==='define'},
+    {type:'buttons',label:'例子',items:[['1 g 升高 1°C',s=>{s.dmi=0;s.ddt=1;}],['100 g 升高 10°C',s=>{s.dmi=6;s.ddt=10;}]],show:s=>s.mode==='define'},
+    {type:'buttons',label:'例子',items:[['同質量、不同物質',s=>{s.ga='water';s.gma=200;s.gb='oil';s.gmb=200;s.gt=4;}],['同物質、不同質量',s=>{s.ga='water';s.gma=100;s.gb='water';s.gmb=200;s.gt=4;}],['不同物質卻重疊',s=>{s.ga='water';s.gma=200;s.gb='x';s.gmb=400;s.gt=4;}]],show:s=>s.mode==='graph'},
+    {type:'seg',key:'ga',label:'A 的物質',options:[['water','水'],['alc','酒精'],['x','液體 X'],['oil','沙拉油'],['al','鋁']],show:s=>s.mode==='graph'},
+    {type:'range',key:'gma',label:'A 的質量',min:50,max:500,step:50,unit:' g',show:s=>s.mode==='graph'},
+    {type:'seg',key:'gb',label:'B 的物質',options:[['water','水'],['alc','酒精'],['x','液體 X'],['oil','沙拉油'],['al','鋁']],show:s=>s.mode==='graph'},
+    {type:'range',key:'gmb',label:'B 的質量',min:50,max:500,step:50,unit:' g',show:s=>s.mode==='graph'},
+    {type:'range',key:'gt',label:'讀圖：加熱到第幾分鐘',min:1,max:8,step:.5,unit:' 分鐘',show:s=>s.mode==='graph'},
+    {type:'range',key:'lh',label:'時刻',min:0,max:24,step:.5,fmt:s=>specHM(s.lh),show:s=>s.mode==='life'},
+    {type:'buttons',label:'跳到',items:[['白天 14:00',s=>{s.lh=14;s.play=false;}],['夜晚 02:00',s=>{s.lh=2;s.play=false;}]],show:s=>s.mode==='life'},
+    {type:'buttons',label:'一整天',items:[['▶ 播放／暫停',s=>{if(s.play){s.play=false;s.lh=Math.round(s.lh*2)/2;}else if(!reduceMotion)s.play=true;}]],show:s=>s.mode==='life'},
+    {type:'buttons',label:'例子',items:[['甲 200 g → 水 100 g',s=>{s.xmet='ma';s.xm1=200;s.xt1=100;s.xm2=100;s.xt2=16;s.xt=0;s.play=false;}],['乙 250 g → 水 200 g',s=>{s.xmet='mb';s.xm1=250;s.xt1=100;s.xm2=200;s.xt2=20;s.xt=0;s.play=false;}],['甲 500 g → 水 450 g',s=>{s.xmet='ma';s.xm1=500;s.xt1=100;s.xm2=450;s.xt2=20;s.xt=0;s.play=false;}]],show:s=>s.mode==='mix'},
+    {type:'seg',key:'xmet',label:'金屬',options:[['ma','金屬甲（比熱 0.10）'],['mb','金屬乙（比熱 0.20）'],['al','鋁'],['fe','鐵'],['cu','銅']],show:s=>s.mode==='mix'},
+    {type:'range',key:'xm1',label:'金屬的質量',min:50,max:500,step:50,unit:' g',show:s=>s.mode==='mix'},
+    {type:'range',key:'xt1',label:'金屬的初溫',min:50,max:100,step:1,unit:'°C',show:s=>s.mode==='mix'},
+    {type:'range',key:'xm2',label:'水的質量',min:50,max:500,step:50,unit:' g',show:s=>s.mode==='mix'},
+    {type:'range',key:'xt2',label:'水的初溫',min:0,max:40,step:1,unit:'°C',adv:true,show:s=>s.mode==='mix'},
+    {type:'range',key:'xt',label:'經過時間',min:0,max:8,step:.1,fmt:s=>s.xt.toFixed(1)+' 分鐘',show:s=>s.mode==='mix'},
+    {type:'buttons',label:'操作',items:[['▶ 播放／暫停',s=>specToggle(s,'xt',8)],['直接到熱平衡',s=>{s.xt=8;s.play=false;}],['↺ 從頭開始',s=>{s.xt=0;s.play=false;}]],show:s=>s.mode==='mix'}],
+  tick(s,dt){s.ph=(s.ph+dt)%3600;if(!s.play)return;
+    if(s.mode==='race'){s.rt=Math.min(10,s.rt+dt*.7);if(s.rt>=10)s.play=false;}
+    else if(s.mode==='mix'){s.xt=Math.min(8,s.xt+dt*.6);if(s.xt>=8)s.play=false;}
+    else if(s.mode==='life'){s.lh=(s.lh+dt*1.6)%24;}
+    else s.play=false;},
+  tap(s,id){if(id.startsWith('sub:')&&SPEC_S[id.slice(4)])s.dsub=id.slice(4);},
+  render(s){const m=s.mode;return m==='define'?this.define(s):m==='graph'?this.graph(s):m==='life'?this.life(s):m==='mix'?this.mix(s):this.race(s);},
+
+  /* ---- 1 誰升溫快 ---- */
+  station(cx,key,m,r,ph,on,id,col){const S=r.S,x1=cx-75,x2=cx+75,yb=372,yT=190,tx=cx+28,Yt=v=>330-v*.95,over=r.done&&!r.boil;let h=specBurner(cx,on,ph,id);
+    const therm=()=>{let t=glassTherm(tx,350,132,Yt(r.T),{br:8,w:4});for(let v=0;v<=200;v+=20)t+=L(tx+9,Yt(v),tx+(v%100?13:17),Yt(v),{stroke:'#7d8a90',w:v%100?1:1.8});return t;};
+    if(S.k==='l'){const top=yb-(40+m*.2),lc=specLiqCol(key,r.T,r.cap);h+=specFill(x1,x2,top,yb,lc)+therm();
+      if(r.boil||(on&&r.T>r.cap-12)){const n=r.boil?9:3;for(let i=0;i<n;i++){const p=(ph*(.5+rnd(i+id*20)*.5)+rnd(i+7+id*20))%1;h+=`<circle cx="${(x1+14+rnd(i+31+id*20)*110).toFixed(1)}" cy="${(yb-8-p*(yb-top-12)).toFixed(1)}" r="${(1.8+rnd(i+3)*2.6).toFixed(1)}" fill="#fff" fill-opacity=".35" stroke="#fff" stroke-width="1.2" opacity="${(.9-p*.4).toFixed(2)}"/>`;}}
+      h+=specSurface(x1,x2,top,lc);}
+    else if(S.k==='p'){const top=yb-(34+m*.17);h+=specSand(x1,x2,top,yb,specRGB(specMix(S.c,[214,110,70],clamp((r.T-20)/180,0,1)*.45)),5)+therm();}
+    else{const bh=34+m*.085;h+=specBlock(cx,yb-3,84,bh,'spec-mg',clamp((r.T-20)/180,0,1),tx)+`<clipPath id="spec-tc${id}"><rect x="${cx-80}" y="100" width="160" height="${yb-3-bh+7-100}"/></clipPath><g clip-path="url(#spec-tc${id})">${therm()}</g>`;}
+    h+=specCup(x1,x2,yT,yb);
+    h+=T(cx,46,`${S.n} ${m} g`,{size:20,anchor:'middle',weight:700})+T(cx,82,over?'超過 200°C':tnum(r.T)+'°C',{size:28,anchor:'middle',weight:700,fill:col})
+      +T(cx,108,over?'超出溫度計的範圍':r.boil?`升高 ${tnum(r.T-20)}°C（已沸騰）`:`升高 ${tnum(r.T-20)}°C`,{size:16,anchor:'middle',fill:r.done?P.red:P.muted,weight:r.done?700:400});
+    return h;},
+  race(s){const t=s.rt,on=t>0||s.play,A=specHeat('water',s.rm1,t,200),B=specHeat(s.rsub,s.rm2,t,200),H=Math.round(SPEC_R*t),cA=P.blue,cB=P.red;
+    let h=`<defs>${specGrad('spec-mg',B.S.c)}</defs>`+L(24,462,466,462,{stroke:P.faint,w:2});
+    h+=this.station(130,'water',s.rm1,A,s.ph,on,0,cA)+this.station(350,s.rsub,s.rm2,B,s.ph,on,1,cB);
+    h+=T(240,486,'兩邊熱源相同：每分鐘各供熱 1000 cal（不計散熱）',{size:15,anchor:'middle',fill:P.muted});
+    const g=specAxes({x0:545,x1:865,y0:430,y1:110,tm:10,Ta:0,Tb:200,dx:2,dy:50,xl:'加熱時間（分鐘）',yl:'溫度（°C）'});h+=g.h;
+    h+=L(548,46,578,46,{stroke:cA,w:4})+T(586,51,`水（比熱 1.00）`,{size:15,fill:cA,weight:700})+L(548,70,578,70,{stroke:cB,w:4})+T(586,75,`${B.S.n}（比熱 ${specS(B.S.s)}）`,{size:15,fill:cB,weight:700});
+    if(t>0)h+=L(g.X(t),430,g.X(t),112,{stroke:P.muted,w:1,dash:'4 5'});
+    const line=(r,c,up)=>{const te=Math.min(10,r.tc),tn=Math.min(t,te),xe=g.X(te),ye=g.Y(20+r.rate*te);
+      let o=`<path d="M${g.X(0)} ${g.Y(20)}L${xe.toFixed(1)} ${ye.toFixed(1)}" stroke="${c}" stroke-width="2" opacity=".28" fill="none"/><path d="M${g.X(0)} ${g.Y(20)}L${g.X(tn).toFixed(1)} ${g.Y(20+r.rate*tn).toFixed(1)}" stroke="${c}" stroke-width="4" stroke-linecap="round" fill="none"/>`;
+      if(r.tc<10){const txt=r.S.bp&&r.cap===r.S.bp?`${r.cap}°C 沸騰`:'超過 200°C',top=r.cap===200,right=xe<740;o+=`<circle cx="${xe.toFixed(1)}" cy="${ye.toFixed(1)}" r="4.5" fill="#fffdf8" stroke="${c}" stroke-width="2.5"/>`+(top?specT(right?xe+10:xe-14,ye+(right?20:6),txt,{size:15,fill:c,anchor:right?'start':'end'}):specT(clamp(xe,600,815),ye-14,txt,{size:15,fill:c,anchor:'middle'}));}
+      return o+`<circle cx="${g.X(tn).toFixed(1)}" cy="${g.Y(20+r.rate*tn).toFixed(1)}" r="7" fill="${c}" stroke="#fff" stroke-width="2"/>`;};
+    h+=line(A,cA,A.cap>=B.cap)+line(B,cB,B.cap>A.cap);
+    const dA=A.T-20,dB=B.T-20,same=s.rm1===s.rm2,n=B.S.n;let note;
+    if(t<=0)note=`兩邊用<b>相同的熱源</b>加熱：加熱時間相同，吸收的熱量就相同。按「播放」，比較哪一邊溫度升得快。（初溫都是 20°C，不計散熱與容器吸熱）`;
+    else{note=`熱源相同、加熱時間相同 → 兩邊吸收的<b>熱量相同</b>（各 ${specN(H)} cal）。`;
+      if(A.done||B.done)note+=`<br>${[A,B].filter(r=>r.done).map(r=>r.boil?`${r.S.n}到 ${r.cap}°C 就沸騰，溫度不再上升`:`${r.S.n}已超過 200°C，超出溫度計的範圍`).join('；')}，這時不能再用 H ＝ m × s × ΔT 比較。把加熱時間調短一點再比。`;
+      else if(same)note+=`質量也相同時，<b>比熱小的升溫多</b>：<br>水（比熱 1）升高 ${tnum(dA)}°C；${n}（比熱 ${specS(B.S.s)}）升高 ${tnum(dB)}°C，是水的 ${num(dB/dA,1)} 倍。`;
+      else note+=`<br>現在兩邊<b>質量不同</b>，不能只看升溫多少就比比熱：ΔT ＝ H ÷ (m × s)，水的 m × s ＝ ${specN(A.ms)}，${n}的 m × s ＝ ${specN(B.ms)}。想比比熱，先把質量調成相同。`;}
+    return {svg:h,reads:[['加熱時間',t.toFixed(1)+' 分鐘'],['各吸收熱量 H',specN(H)+' cal'],['水升高 ΔT',tnum(dA)+'°C'+(A.boil?'（沸騰）':'')],[`${n}升高 ΔT`,B.done&&!B.boil?'超過 180°C':tnum(dB)+'°C'+(B.boil?'（沸騰）':'')]],note};},
+
+  /* ---- 2 比熱的定義 ---- */
+  define(s){const key=SPEC_S[s.dsub]?s.dsub:'fe',S=SPEC_S[key],m=SPEC_M[clamp(Math.round(s.dmi),0,SPEC_M.length-1)],dT=s.ddt,H=m*S.s*dT,HW=m*dT,f=Math.log10(m)/Math.log10(500),cx=178,yb=292;
+    let h=`<defs>${specGrad('spec-mg',S.c)}</defs>`+T(30,46,`${m} g 的${S.n}，溫度升高 ${dT}°C，需要吸收多少熱量？`,{size:20,weight:700});
+    const tx=S.k==='b'?cx:cx+30,y0=yb-74,yl=y0-dT*2.3,therm=glassTherm(tx,yb-24,yl-22,yl,{br:8,w:4});
+    h+=L(cx-110,yb+2,cx+120,yb+2,{stroke:P.faint,w:3});
+    if(S.k==='b'){const bw=46+f*64,bh=34+f*26;h+=specBlock(cx,yb,bw,bh,'spec-mg',clamp(dT/50,0,1)*.6,tx)+`<clipPath id="spec-dc"><rect x="${cx-60}" y="40" width="120" height="${yb-bh+7-40}"/></clipPath><g clip-path="url(#spec-dc)">${therm}</g>`;}
+    else{const x1=cx-58,x2=cx+58,top=yb-(24+f*34);h+=(S.k==='p'?specSand(x1,x2,top,yb,specRGB(S.c),3):specFill(x1,x2,top,yb,specRGB(specMix(S.c,[222,84,52],dT/50*.5))))+therm+(S.k==='p'?'':specSurface(x1,x2,top,specRGB(specMix(S.c,[222,84,52],dT/50*.5))))+specCup(x1,x2,yb-96,yb);}
+    /* 溫度計旁：原來的液面與升高的量 */
+    const bx=tx+18;h+=L(tx-12,y0,bx+8,y0,{stroke:P.muted,w:1.5,dash:'3 3'})+L(bx,y0,bx,yl,{stroke:P.red,w:2.5})+L(bx-5,yl,bx+5,yl,{stroke:P.red,w:2.5})+L(bx-5,y0,bx+5,y0,{stroke:P.red,w:2.5})
+      +T(bx+12,Math.min((y0+yl)/2+5,y0-8),`升高 ${dT}°C`,{size:16,fill:P.red,weight:700})+T(bx+12,y0+17,'原來的溫度',{size:14,fill:P.muted});
+    /* 熱量流入 */
+    [0,1,2].forEach(i=>{h+=L(28,yb-22-i*20,84,yb-22-i*20,{stroke:P.red,w:4,arrow:true});});
+    h+=T(60,yb-96,'吸收熱量',{size:15,anchor:'middle',fill:P.red})+T(60,yb-74,specN(H)+' cal',{size:16,anchor:'middle',fill:P.red,weight:700});
+    /* 算式 */
+    h+=T(336,112,'H ＝ m × s × ΔT',{size:22,weight:700})+T(336,148,`＝ ${m} × ${specS(S.s)} × ${dT}`,{size:21})+T(336,194,`＝ ${specN(H)} cal`,{size:30,weight:700,fill:P.red})
+      +T(336,236,`${S.n}的比熱 ${specS(S.s)} cal/g·°C：`,{size:15,fill:P.muted})+T(336,260,`1 g 升高 1°C 需要 ${specS(S.s)} cal`,{size:16,weight:700,fill:P.accent});
+    /* 和同質量的水比較 */
+    const bar=(y,w,c,lab,val)=>{let o=T(30,y-8,lab,{size:15,fill:P.ink})+`<rect x="30" y="${y}" width="430" height="24" rx="5" fill="#ece7da"/><rect x="30" y="${y}" width="${Math.max(3,w).toFixed(1)}" height="24" rx="${w<10?1.5:5}" fill="${c}"/>`;
+      for(let i=1;i<10;i++)o+=L(30+i*43,y+1,30+i*43,y+23,{stroke:'#fffdf8',w:1.5,op:.8});return o+specT(Math.max(3,w)>330?450:36+Math.max(3,w),y+18,val,{size:16,fill:Math.max(3,w)>330?'#fff':P.ink,anchor:Math.max(3,w)>330?'end':'start',bg:Math.max(3,w)>330?c:'#ece7da'});};
+    h+=bar(340,S.s*430,P.red,`${S.n} ${m} g 升高 ${dT}°C 需要的熱量`,specN(H)+' cal');
+    if(key==='water')h+=T(30,408,'水的比熱是 1 cal/g·°C：',{size:15,fill:P.muted})+T(30,432,'1 卡就是「使 1 g 的水升高 1°C 所需的熱量」。',{size:16,weight:700,fill:P.blue})+T(30,462,'右表中，水的比熱最大，最不容易升溫，也最不容易降溫。',{size:15,fill:P.muted});
+    else h+=bar(406,430,P.blue,`同質量的水 ${m} g 升高 ${dT}°C 需要的熱量`,specN(HW)+' cal')+T(30,462,`質量、升高的溫度都相同時，${S.n}需要的熱量是水的 ${specS(S.s)} 倍。`,{size:15,fill:P.muted});
+    /* 比熱長條圖（可點選） */
+    h+=T(562,46,'常見物質的比熱（cal/g·°C）',{size:16,weight:700});
+    SPEC_CHART.forEach((k,i)=>{const C=SPEC_S[k],y=62+i*32.5,on=k===key,w=C.s*196;
+      h+=`<g data-tap="sub:${k}" tabindex="0" role="button" aria-label="${C.n}" style="cursor:pointer"><rect x="558" y="${y}" width="326" height="29" rx="7" fill="${on?'#e4f1ee':'transparent'}" stroke="${on?P.accent:'transparent'}" stroke-width="1.5"/>`
+        +T(616,y+20,C.n,{size:15,anchor:'end',weight:on?700:400,fill:on?P.accent:P.ink})+`<rect x="624" y="${y+6}" width="${Math.max(3,w).toFixed(1)}" height="17" rx="3" fill="${on?P.accent:k==='water'?P.blue:'#b9c2bf'}"/>`
+        +T(632+Math.max(3,w),y+20,specS(C.s),{size:15,weight:on?700:400,fill:on?P.accent:P.muted})+`</g>`;});
+    h+=T(721,474,'點長條可以換物質',{size:14,anchor:'middle',fill:P.muted});
+    return {svg:h,reads:[['物質的比熱 s',specS(S.s)+' cal/g·°C'],['質量 m',m+' g'],['升高溫度 ΔT',dT+'°C'],['所需熱量 H',specN(H)+' cal']],
+      note:`<b>比熱 s</b>：使 1 g 的物質溫度升高 1°C 所需的熱量，單位是 cal/g·°C。比熱是物質的特性，和質量多少無關。<br><b>H ＝ m × s × ΔT</b> ＝ ${m} × ${specS(S.s)} × ${dT} ＝ ${specN(H)} cal`+(key==='water'?'（水的 s ＝ 1，就是 5-2 的 H ＝ m × ΔT）':`；比熱越大，升高同樣的溫度要吸收越多熱，降溫時也放出越多熱。`)};},
+
+  /* ---- 3 讀溫度–時間圖 ---- */
+  graph(s){const TOP=120,TM=10.5,A=specHeat(s.ga,s.gma,s.gt,TOP),B=specHeat(s.gb,s.gmb,s.gt,TOP),cA=P.red,cB=P.blue;
+    const g=specAxes({x0:78,x1:572,y0:440,y1:60,tm:TM,Ta:0,Tb:120,dx:1,dy:20,xl:'加熱時間（分鐘）',yl:'溫度（°C）'});let h=g.h;
+    const same=Math.abs(A.ms-B.ms)<1e-9,twin=same&&A.cap===B.cap,x0=g.X(0),yS=g.Y(20);
+    const end=r=>{const te=Math.min(TM,r.tc);return [g.X(te),g.Y(20+r.rate*te)];},rd=r=>{const te=Math.min(s.gt,r.tc);return {te,x:g.X(te),y:g.Y(20+r.rate*te),dT:r.rate*te,cut:te<s.gt-1e-9};};
+    const line=(r,c,dash)=>{const[xe,ye]=end(r);return `<path d="M${x0} ${yS}L${xe.toFixed(1)} ${ye.toFixed(1)}" stroke="${c}" stroke-width="4" stroke-linecap="round" fill="none"${dash?' stroke-dasharray="10 12"':''}/>`;};
+    /* 讀圖三角形：底邊 Δt、直立邊 ΔT */
+    const tri=(r,c)=>{const q=rd(r);return `<path d="M${x0} ${yS}H${q.x.toFixed(1)}V${q.y.toFixed(1)}" fill="${c}" fill-opacity=".07" stroke="${c}" stroke-width="1.6" stroke-dasharray="5 4"/>`;};
+    h+=tri(A,cA)+tri(B,cB)+line(A,cA)+line(B,cB,same);
+    /* 線的終點：沸騰、超出圖的上緣，或畫到右端 */
+    const hiA=A.rate>=B.rate,[xa]=end(A),[xb]=end(B);
+    const tag=(r,c,nm,upper,shift)=>{const[xe,ye]=end(r);
+      if(r.tc>=TM)return specT(xe-4,upper?ye-12:ye+25,nm,{size:17,fill:c,anchor:'end'});
+      const o=`<circle cx="${xe.toFixed(1)}" cy="${ye.toFixed(1)}" r="4.5" fill="#fffdf8" stroke="${c}" stroke-width="2.5"/>`;
+      if(r.cap===TOP)return o+(xe<176?specT(xe+12+shift,ye+17,nm,{size:17,fill:c}):specT(xe+shift,ye-11,nm,{size:17,fill:c,anchor:'middle'}));
+      return o+specT(clamp(xe,160,500),ye-13,`${nm}：${r.cap}°C 沸騰`,{size:15,fill:c,anchor:'middle'});};
+    if(twin)h+=tag(A,P.ink,'A、B',true,0);
+    else{const near=A.tc<TM&&B.tc<TM&&A.cap===TOP&&B.cap===TOP&&Math.abs(xa-xb)<24;h+=tag(A,cA,'A',hiA,0)+tag(B,cB,'B',!hiA,near?(xb>=xa?24-(xb-xa):-24-(xb-xa)):0);}
+    /* 讀數：寫在 20°C 線的下方，不會壓到圖線 */
+    const qa=rd(A),qb=rd(B),cut=qa.cut||qb.cut,W=cut?262:150,bx=Math.min(g.X(s.gt)+12,604-W),rl=(q,nm)=>`${nm}：ΔT ＝ ${tnum(q.dT)}°C`+(q.cut?`（到 ${tnum(q.te)} 分鐘為止）`:'');
+    h+=`<circle cx="${qa.x.toFixed(1)}" cy="${qa.y.toFixed(1)}" r="7" fill="${cA}" stroke="#fff" stroke-width="2"/><circle cx="${qb.x.toFixed(1)}" cy="${qb.y.toFixed(1)}" r="${same&&!qa.cut&&!qb.cut?4:7}" fill="${cB}" stroke="#fff" stroke-width="2"/>`;
+    h+=specT(bx,yS+17,`Δt ＝ ${tnum(s.gt)} 分鐘`,{size:15,fill:P.muted})+(same&&!cut?specT(bx,yS+36,rl(qa,'A、B'),{size:15,fill:P.ink}):specT(bx,yS+36,rl(qa,'A'),{size:15,fill:cA})+specT(bx,yS+55,rl(qb,'B'),{size:15,fill:cB}));
+    /* 右側資料卡：由斜率求 m × s，再除以質量得比熱 */
+    const card=(y,r,c,nm,mm)=>{const ex=Math.abs(r.rate*10-Math.round(r.rate*10))<1e-9;return `<rect x="606" y="${y}" width="280" height="150" rx="14" fill="#fffdf8" stroke="${c}" stroke-width="2"/><rect x="606" y="${y}" width="10" height="150" rx="5" fill="${c}"/>`
+      +T(630,y+30,`${nm}：${r.S.n} ${mm} g`,{size:19,weight:700,fill:c})+T(630,y+60,ex?`每分鐘升高 ${tnum(r.rate)}°C`:`每分鐘升高約 ${r.rate.toFixed(1)}°C`,{size:16})+T(630,y+86,ex?`m × s ＝ 1000 ÷ ${tnum(r.rate)} ＝ ${specN(r.ms)}`:`m × s ＝ 1000 ÷ ${r.rate.toFixed(2)} ≈ ${specN(r.ms)}`,{size:16})
+      +T(630,y+112,`比熱 s ＝ ${specN(r.ms)} ÷ ${mm}`,{size:16})+T(630,y+137,`＝ ${specS(r.S.s)} cal/g·°C`,{size:16,weight:700,fill:c});};
+    h+=card(40,A,cA,'A',s.gma)+card(204,B,cB,'B',s.gmb);
+    const steep=hiA?'A':'B';
+    h+=T(612,386,'圖線越陡 → 升溫越快 → m × s 越小',{size:16,weight:700})+T(612,416,same?'現在兩條線重疊：m × s 相同':`現在 ${steep} 比較陡：${steep} 的 m × s 較小`,{size:16,fill:P.accent,weight:700})+T(612,446,'只看斜率，還不能比較比熱；',{size:15,fill:P.muted})+T(612,468,'要再用質量算。',{size:15,fill:P.muted});
+    let tail;
+    if(s.ga===s.gb)tail=s.gma===s.gmb?'兩者物質相同、質量也相同，所以圖線重疊。':`A、B 是<b>同一種物質</b>，比熱相同（${specS(A.S.s)}）；質量大的 m × s 大，升溫慢、圖線較平。`;
+    else if(same)tail=`兩條線<b>重疊</b>只表示 m × s 相同（都是 ${specN(A.ms)}）。B 的質量是 A 的 ${specN(s.gmb/s.gma)} 倍，所以 B 的比熱是 A 的 ${specN(s.gma/s.gmb)} 倍，兩者比熱並不相同。`;
+    else if(s.gma===s.gmb)tail=`兩者<b>質量相同</b>，所以比較陡的 ${steep}（${(hiA?A:B).S.n}）比熱較小。`;
+    else tail=`兩者質量不同，<b>不能只看斜率比比熱</b>：先由斜率求出 m × s，再除以質量。A 的比熱 ${specS(A.S.s)}，B 的比熱 ${specS(B.S.s)}。`;
+    const rr=r=>(Math.abs(r.rate*10-Math.round(r.rate*10))<1e-9?'':'約 ')+tnum(r.rate)+'°C';
+    return {svg:h,reads:[['A 每分鐘升高',rr(A)],['B 每分鐘升高',rr(B)],['A 的 m × s',specN(A.ms)+' cal/°C'],['B 的 m × s',specN(B.ms)+' cal/°C']],
+      note:`同一個熱源每分鐘供熱 1000 cal：每分鐘升高的溫度（圖線的斜率 ΔT ÷ Δt）＝ 1000 ÷ (m × s)。<b>圖線越陡，m × s 越小</b>。<br>${tail}`};},
+
+  /* ---- 4 生活中的比熱：海風與陸風 ---- */
+  life(s){const hr=s.lh%24,TL=specLand(hr),TS=specSea(hr),el=-Math.cos(2*Math.PI*hr/24),d=clamp((el+.12)/.3,0,1),nt=1-d,dusk=clamp(1-Math.abs(el)/.3,0,1)*.6,HY=300,ph=s.ph;
+    const top=specMix([20,30,62],[118,180,232],d),bot=specMix(specMix([46,62,104],[208,234,247],d),[247,180,122],dusk),day=hr>=6&&hr<18,ink=d>.5?'#1f4257':'#e6f0fb',halo=d>.5?'#e9f5fb':'#1c2a4c';
+    const landC=specMix([228,202,150],[74,78,98],nt*.72),seaC=specMix([78,150,200],[26,44,84],nt*.75);
+    let h=`<defs><linearGradient id="spec-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${specRGB(top)}"/><stop offset="1" stop-color="${specRGB(bot)}"/></linearGradient><linearGradient id="spec-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${specRGB(specMix(seaC,[255,255,255],.18))}"/><stop offset="1" stop-color="${specRGB(specMix(seaC,[0,0,0],.25))}"/></linearGradient><clipPath id="spec-scene"><rect x="20" y="20" width="545" height="432" rx="14"/></clipPath></defs><g clip-path="url(#spec-scene)"><rect x="20" y="20" width="545" height="432" fill="url(#spec-sky)"/>`;
+    if(nt>.1)for(let i=0;i<28;i++)h+=`<circle cx="${(30+rnd(i+50)*525).toFixed(1)}" cy="${(28+rnd(i+90)*230).toFixed(1)}" r="${(.8+rnd(i+130)*1.2).toFixed(1)}" fill="#fff" opacity="${(nt*(.5+.5*Math.sin(ph*1.5+i))*.6+nt*.3).toFixed(2)}"/>`;
+    /* 太陽與月亮 */
+    {const a=Math.PI*(hr-6)/12,sx=292-250*Math.cos(a),sy=HY-212*Math.sin(a);if(el>-.2)h+=`<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="34" fill="#ffe9a0" opacity=".35"/><circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="22" fill="#ffd257" stroke="#ffb53d" stroke-width="2"/>`;
+      const a2=Math.PI*(((hr+6)%24))/12,mx=292-250*Math.cos(a2),my=HY-212*Math.sin(a2);if(el<.2)h+=`<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="27" fill="#f4f1dc" opacity=".18"/><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="17" fill="#f4f1dc"/><circle cx="${(mx-5).toFixed(1)}" cy="${(my-4).toFixed(1)}" r="4" fill="#dcd8c0"/><circle cx="${(mx+6).toFixed(1)}" cy="${(my+5).toFixed(1)}" r="3" fill="#dcd8c0"/>`;}
+    /* 雲 */
+    [[120,84,1],[400,60,.8]].forEach(([x,y,k],i)=>{const cx=20+((x+ph*4*(i+1))%600)-30;h+=`<g opacity="${(.25+d*.6).toFixed(2)}" fill="${d>.5?'#ffffff':'#8c9bbd'}"><ellipse cx="${cx.toFixed(1)}" cy="${y}" rx="${34*k}" ry="${12*k}"/><ellipse cx="${(cx+22*k).toFixed(1)}" cy="${y-9*k}" rx="${22*k}" ry="${13*k}"/><ellipse cx="${(cx-20*k).toFixed(1)}" cy="${y-5*k}" rx="${18*k}" ry="${10*k}"/></g>`;});
+    /* 陸地（剖面，沙灘向海裡傾斜）與海水 */
+    h+=`<path d="M20 452V276C110 266 190 276 250 296C278 305 302 318 330 338C352 354 368 402 382 452Z" fill="${specRGB(landC)}"/><path d="M20 276C110 266 190 276 250 296" fill="none" stroke="${specRGB(specMix(landC,[255,255,255],.35))}" stroke-width="3"/>`;
+    for(let i=0;i<46;i++){const x=28+rnd(i+200)*300,yy=290+rnd(i+260)*155,lim=x<250?276+(x-20)*.09:296+(x-250)*1.1;if(yy>lim+6&&x<330+(yy-338)*.45)h+=`<circle cx="${x.toFixed(1)}" cy="${yy.toFixed(1)}" r="${(1+rnd(i+300)*1.2).toFixed(1)}" fill="${specRGB(specMix(landC,[120,90,50],.35))}" opacity=".6"/>`;}
+    h+=`<path d="M252 ${HY}H565V452H382C368 402 352 354 330 338C302 318 278 305 252 ${HY}Z" fill="url(#spec-sea)" opacity=".93"/>`;
+    for(let k=0;k<3;k++){const y=HY+16+k*30,o=((ph*(10+k*5))%44),x0=300+k*26-o;let dd='';for(let x=x0;x<560;x+=44)if(x>270+k*30)dd+=`M${x.toFixed(1)} ${y}q11 -6 22 0`;h+=`<path d="${dd||'M0 0'}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity="${(.2+d*.35).toFixed(2)}"/>`;}
+    h+=`<path d="M252 ${HY}H565" stroke="${specRGB(specMix(seaC,[255,255,255],.5))}" stroke-width="2.5"/>`;
+    /* 小屋、椰子樹、旗子（旗子指向下風處） */
+    const dk=c=>specRGB(specMix(c,[40,46,70],nt*.6)),diff=TL-TS,wv=clamp(Math.abs(diff)/7,0,1),dir=diff>0?-1:1,calm=Math.abs(diff)<1;
+    h+=`<rect x="36" y="246" width="46" height="27" fill="${dk([246,238,222])}" stroke="${dk([150,130,100])}" stroke-width="1.5"/><path d="M30 248L59 226L88 248Z" fill="${dk([200,104,74])}"/><rect x="52" y="256" width="13" height="17" fill="${nt>.5?'#ffd76a':dk([150,120,90])}"/>`;
+    h+=`<path d="M112 273Q110 254 118 238" fill="none" stroke="${dk([140,104,66])}" stroke-width="5" stroke-linecap="round"/>`+[[-26,-2],[-19,-17],[4,-22],[22,-12],[26,4]].map(([dx,dy])=>`<path d="M118 238Q${118+dx*.6} ${238+dy-8} ${118+dx} ${238+dy+6}" fill="none" stroke="${dk([70,140,84])}" stroke-width="4.5" stroke-linecap="round"/>`).join('');
+    {const fx=200,fy=206,len=calm?10:16+wv*26,wob=calm?0:Math.sin(ph*7)*3*wv;h+=L(fx,283,fx,fy-4,{stroke:dk([110,110,116]),w:3})+(calm?`<path d="M${fx} ${fy}L${fx+5} ${fy+22}L${fx-5} ${fy+22}Z" fill="${dk([223,124,68])}"/>`:`<path d="M${fx} ${fy}Q${fx+dir*len*.5} ${(fy+2+wob).toFixed(1)} ${fx+dir*len} ${(fy+7-wob).toFixed(1)}L${fx} ${fy+15}Z" fill="${dk([223,124,68])}"/>`);}
+    /* 空氣的流動：近地面的風粗、其餘細 */
+    if(!calm){const XL=150,XR=456,YT=134,YB=262,r=26,op=(.35+.65*wv).toFixed(2),off=(-(ph*46*wv)%24).toFixed(1);
+      const loop=dir<0?`M${XR-r} ${YB}H${XL+r}Q${XL} ${YB} ${XL} ${YB-r}V${YT+r}Q${XL} ${YT} ${XL+r} ${YT}H${XR-r}Q${XR} ${YT} ${XR} ${YT+r}V${YB-r}Q${XR} ${YB} ${XR-r} ${YB}`:`M${XL+r} ${YB}H${XR-r}Q${XR} ${YB} ${XR} ${YB-r}V${YT+r}Q${XR} ${YT} ${XR-r} ${YT}H${XL+r}Q${XL} ${YT} ${XL} ${YT+r}V${YB-r}Q${XL} ${YB} ${XL+r} ${YB}`;
+      const head=(x,y,a,z)=>`<path d="M${-z} ${-z*.8}L${z} 0L${-z} ${z*.8}Z" transform="translate(${x} ${y}) rotate(${a})" fill="${ink}"/>`,up=dir<0?XL:XR,dn=dir<0?XR:XL;
+      h+=`<g opacity="${op}"><path d="${loop}" fill="none" stroke="${ink}" stroke-width="3" stroke-dasharray="14 10" stroke-dashoffset="${off}" stroke-linecap="round"/>`
+        +L(XL+r+10,YB,XR-r-10,YB,{stroke:ink,w:8})+head(dir<0?XL+r+6:XR-r-6,YB,dir<0?180:0,15)+head(up,(YT+YB)/2,-90,9)+head(dn,(YT+YB)/2,90,9)+head((XL+XR)/2,YT,dir<0?0:180,9)+`</g>`;
+      h+=specT(up+(dir<0?-12:12),YT+38,'較熱',{size:15,fill:ink,bg:halo,anchor:dir<0?'end':'start'})+specT(up+(dir<0?-12:12),YT+58,'上升',{size:15,fill:ink,bg:halo,anchor:dir<0?'end':'start'})
+        +specT(dn+(dir<0?12:-12),YT+38,'較冷',{size:15,fill:ink,bg:halo,anchor:dir<0?'start':'end'})+specT(dn+(dir<0?12:-12),YT+58,'下沉',{size:15,fill:ink,bg:halo,anchor:dir<0?'start':'end'});}
+    const wname=calm?'很弱':dir<0?'海風':'陸風';
+    h+=`<rect x="${calm?188:206}" y="216" width="${calm?230:194}" height="34" rx="17" fill="#fffdf8" fill-opacity=".94" stroke="${P.accent}" stroke-width="2"/>`+T(303,239,calm?'海、陸溫度相近，風很弱':dir<0?'海風：由海吹向陸地':'陸風：由陸地吹向海',{size:17,anchor:'middle',weight:700,fill:P.accent});
+    /* 溫度標籤 */
+    const tag=(x,y,w,a,b,c)=>`<rect x="${x}" y="${y}" width="${w}" height="58" rx="12" fill="#fffdf8" fill-opacity=".95" stroke="${c}" stroke-width="2"/>`+T(x+w/2,y+22,a,{size:15,anchor:'middle',fill:P.ink})+T(x+w/2,y+48,b,{size:22,anchor:'middle',weight:700,fill:c});
+    h+=tag(34,378,186,'陸地（砂，比熱小）',TL.toFixed(1)+'°C',P.red)+tag(394,378,158,'海水（比熱大）',TS.toFixed(1)+'°C',P.blue);
+    h+=`<rect x="32" y="32" width="150" height="34" rx="17" fill="#fffdf8" fill-opacity=".94"/>`+T(107,55,`${specHM(hr)}　${day?'白天':'夜晚'}`,{size:17,anchor:'middle',weight:700})+`</g><rect x="20" y="20" width="545" height="432" rx="14" fill="none" stroke="#c9c2b2" stroke-width="1.5"/>`;
+    h+=T(292,476,'海邊的剖面示意：左邊是陸地，右邊是海',{size:14,anchor:'middle',fill:P.muted});
+    /* 24 小時溫度曲線 */
+    const g=specAxes({x0:628,x1:868,y0:380,y1:130,tm:24,Ta:15,Tb:40,dx:6,dy:5,xl:'時刻（時）',yl:'溫度（°C）'});
+    h+=`<rect x="${g.X(0)}" y="130" width="${g.X(6)-g.X(0)}" height="250" fill="#27364d" opacity=".09"/><rect x="${g.X(18)}" y="130" width="${g.X(24)-g.X(18)}" height="250" fill="#27364d" opacity=".09"/>`+g.h;
+    const curve=f=>{let dd='';for(let i=0;i<=96;i++)dd+=(i?'L':'M')+g.X(i/4).toFixed(1)+' '+g.Y(f(i/4)).toFixed(1);return dd;};
+    h+=`<path d="${curve(specLand)}" fill="none" stroke="${P.red}" stroke-width="3.5"/><path d="${curve(specSea)}" fill="none" stroke="${P.blue}" stroke-width="3.5"/>`+L(g.X(hr),380,g.X(hr),132,{stroke:P.ink,w:1.5,dash:'4 4'})
+      +`<circle cx="${g.X(hr).toFixed(1)}" cy="${g.Y(TL).toFixed(1)}" r="6.5" fill="${P.red}" stroke="#fff" stroke-width="2"/><circle cx="${g.X(hr).toFixed(1)}" cy="${g.Y(TS).toFixed(1)}" r="6.5" fill="${P.blue}" stroke="#fff" stroke-width="2"/>`;
+    h+=L(600,40,626,40,{stroke:P.red,w:4})+T(634,45,'陸地（砂）：日夜溫差 18°C',{size:15,fill:P.red,weight:700})+L(600,66,626,66,{stroke:P.blue,w:4})+T(634,71,'海水：日夜溫差 3°C',{size:15,fill:P.blue,weight:700});
+    h+=T(600,452,'比熱小：升溫快，降溫也快',{size:15,fill:P.red,weight:700})+T(600,476,'比熱大：溫度變化小',{size:15,fill:P.blue,weight:700});
+    return {svg:h,reads:[['時刻',specHM(hr)+(day?'（白天）':'（夜晚）')],['陸地（砂）',TL.toFixed(1)+'°C'],['海水',TS.toFixed(1)+'°C'],['近地面的風',calm?'很弱':dir<0?'海風（海 → 陸）':'陸風（陸 → 海）']],
+      note:`砂的<b>比熱小</b>，白天受日照升溫快，夜晚降溫也快；水的<b>比熱大</b>，吸收或放出同樣多的熱，溫度變化小。所以沿海地區日夜溫差小，內陸大。<br>`
+        +(calm?'現在陸地和海水的溫度差不多，風很弱；接下來風向會反過來。':dir<0?'現在陸地比海水熱：陸地上方的空氣受熱上升，海面上較冷的空氣流向陸地補充，形成<b>海風</b>。':'現在陸地比海水冷：海面上方的空氣較暖而上升，陸地上較冷的空氣流向海面補充，形成<b>陸風</b>。')+'（空氣的對流在 5-5 說明；溫度曲線為示意）'};},
+
+  /* ---- 5 不同物質的熱平衡（進階） ---- */
+  mix(s){const md=specMixModel(s),t=s.xt,a=md.T1(t),b=md.T2(t),eq=t>=8||Math.abs(a-b)<.05,M=md.M,q1=md.C1*(s.xt1-a),q2=md.C2*(b-s.xt2),p=clamp(t/.2,0,1),pe=p*p*(3-2*p),bh=30+s.xm1*.09,bx=292,bw=56;
+    const bt=112+(420-bh-112)*pe,hw=55+s.xm2*.25+pe*(4+s.xm1*.016),wy=428-hw,wc=WARM(b);
+    let h=`<defs>${specGrad('spec-mg',M.c)}</defs>`+L(24,447,492,447,{stroke:P.faint,w:2});
+    h+=T(250,46,eq?'溫度相同：達到熱平衡':t>=.2?'熱由高溫的金屬傳到低溫的水':'把熱的金屬塊放進冷水',{size:22,anchor:'middle',weight:700,fill:eq?P.accent:t>=.2?P.red:P.ink});
+    /* 鐵架與細線 */
+    h+=`<rect x="428" y="440" width="58" height="7" rx="2" fill="#6f7c83"/>`+L(457,440,457,72,{stroke:'#7d8a90',w:5})+L(292,72,457,72,{stroke:'#7d8a90',w:5})+`<circle cx="292" cy="72" r="5" fill="#6f7c83"/>`+L(bx,76,bx,bt+4,{stroke:'#8a8172',w:1.5});
+    /* 保麗龍杯（剖面） */
+    h+=`<path d="M150 200H166V420Q166 428 174 428H386Q394 428 394 420V200H410V432Q410 446 396 446H164Q150 446 150 432Z" fill="#f4f0e6" stroke="#b9b2a2" stroke-width="2" stroke-linejoin="round"/>`;
+    for(let i=0;i<40;i++){const side=i%3,x=side===0?153+rnd(i+400)*10:side===1?397+rnd(i+400)*10:160+rnd(i+400)*240,y=side===2?431+rnd(i+440)*12:206+rnd(i+440)*225;h+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.6" fill="#d9d3c4"/>`;}
+    h+=specBlock(bx,bt+bh,bw,bh,'spec-mg',clamp((a-20)/80,0,1));
+    h+=`<path d="M166 ${wy.toFixed(1)}V420Q166 428 174 428H386Q394 428 394 420V${wy.toFixed(1)}Z" fill="${wc}" fill-opacity=".5"/>`;
+    {const Yt=v=>392-v*2.8;h+=glassTherm(368,408,104,Yt(b),{br:8,w:4});for(let v=0;v<=100;v+=10)h+=L(377,Yt(v),v%50?382:386,Yt(v),{stroke:'#7d8a90',w:v%50?1:1.8});}
+    h+=`<path d="M166 ${wy.toFixed(1)}H394" stroke="${wc}" stroke-width="3"/>`;
+    if(pe>=1&&!eq){const cy=bt+bh/2,op=(.35+.65*md.g(t)).toFixed(2);h+=`<g opacity="${op}">`+L(bx+bw/2+4,cy,bx+bw/2+26,cy,{stroke:P.red,w:3.5,arrow:true})+L(bx,bt-4,bx,bt-26,{stroke:P.red,w:3.5,arrow:true})+`</g>`;}
+    h+=specT(214,398,`水 ${s.xm2} g`,{size:16,anchor:'middle',bg:'#eef3f6'})+specT(214,422,tnum(b)+'°C',{size:22,anchor:'middle',fill:eq?P.accent:P.blue,bg:'#eef3f6'});
+    h+=specBlock(78,222,34,24,'spec-mg',0)+T(78,250,`${M.n} ${s.xm1} g`,{size:16,anchor:'middle',weight:700})+T(78,272,`比熱 ${specS(M.s)}`,{size:15,anchor:'middle',fill:P.muted})+T(78,304,tnum(a)+'°C',{size:24,anchor:'middle',weight:700,fill:eq?P.accent:P.red});
+    h+=T(280,474,'保麗龍杯：不計散熱與杯子吸熱',{size:14,anchor:'middle',fill:P.muted});
+    /* 溫度–時間圖 */
+    const g=specAxes({x0:545,x1:865,y0:430,y1:110,tm:8,Ta:0,Tb:100,dx:2,dy:20,xl:'經過時間（分鐘）',yl:'溫度（°C）'});h+=g.h;
+    const path=(f,te)=>{let dd='';const n=Math.max(1,Math.round(te*20));for(let i=0;i<=n;i++){const tt=te*i/n;dd+=(i?'L':'M')+g.X(tt).toFixed(1)+' '+g.Y(f(tt)).toFixed(1);}return dd;};
+    h+=L(545,g.Y(md.Tf),865,g.Y(md.Tf),{stroke:P.accent,w:1.5,dash:true});
+    h+=`<path d="${path(md.T1,8)}" fill="none" stroke="${P.red}" stroke-width="2" opacity=".25"/><path d="${path(md.T2,8)}" fill="none" stroke="${P.blue}" stroke-width="2" opacity=".25"/><path d="${path(md.T1,t)}" fill="none" stroke="${P.red}" stroke-width="4" stroke-linecap="round"/><path d="${path(md.T2,t)}" fill="none" stroke="${P.blue}" stroke-width="4" stroke-linecap="round"/>`;
+    h+=specT(861,g.Y(md.Tf)+(md.Tf<12?-10:21),`熱平衡 ${tnum(md.Tf)}°C`,{size:15,anchor:'end',fill:P.accent});
+    h+=`<circle cx="${g.X(t).toFixed(1)}" cy="${g.Y(a).toFixed(1)}" r="6.5" fill="${P.red}" stroke="#fff" stroke-width="2"/><circle cx="${g.X(t).toFixed(1)}" cy="${g.Y(b).toFixed(1)}" r="6.5" fill="${P.blue}" stroke="#fff" stroke-width="2"/>`;
+    h+=L(548,46,578,46,{stroke:P.red,w:4})+T(586,51,`${M.n}（比熱 ${specS(M.s)}）`,{size:15,fill:P.red,weight:700})+L(548,70,578,70,{stroke:P.blue,w:4})+T(586,75,'水（比熱 1.00）',{size:15,fill:P.blue,weight:700});
+    return {svg:h,reads:[[`${M.n}的溫度`,tnum(a)+'°C'],['水的溫度',tnum(b)+'°C'],[`${M.n}放出熱量`,num(q1,0)+' cal'],['水吸收熱量',num(q2,0)+' cal']],
+      note:`不計散熱：<b>金屬放出的熱量 ＝ 水吸收的熱量</b>，m₁ s₁ (T₁ − T) ＝ m₂ s₂ (T − T₂)<br>${s.xm1} × ${specS(M.s)} × (${s.xt1} − T) ＝ ${s.xm2} × 1 × (T − ${s.xt2})　→　T ＝ ${tnum(md.Tf)}°C`
+        +`<br>到熱平衡時金屬降了 ${tnum(s.xt1-md.Tf)}°C，水升高 ${tnum(md.Tf-s.xt2)}°C。m × s 較小的一方溫度變化較大（${M.n} ${specN(md.C1)}、水 ${specN(md.C2)}）。圖中降溫的快慢為示意。`};}
+};
+
+/* ===== 5-4 熱對物質的影響 ===== */
+/* ---------- 5-4 熱對物質的影響：熱脹冷縮、水的特殊性質、加熱曲線、三態變化、吸熱與放熱的變化 ---------- */
+const PHASE_f=v=>+v.toFixed(1);
+const PHASE_lerp=(a,b,t)=>a+(b-a)*t;
+const PHASE_ease=t=>t*t*(3-2*t);
+const PHASE_rgb=(a,b,t)=>`rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*clamp(t,0,1))).join(',')})`;
+const PHASE_tri=(u,W)=>{u=((u%(2*W))+2*W)%(2*W);return u<W?u:2*W-u;};
+/* 水的密度（g/cm³，0～100°C 的近似式）：4°C 最大 */
+const PHASE_RHO=t=>1-(t-3.98)**2*(t+283)/(503570*(t+67.26));
+const PHASE_sg=(v,d=1)=>(v>=0?'＋':'−')+Math.abs(v).toFixed(d);
+const PHASE_mn=v=>String(v).replace('-','−');
+const PHASE_DEFS=`<defs><radialGradient id="ph-ball" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#f6f8fa"/><stop offset=".45" stop-color="#aab4bd"/><stop offset="1" stop-color="#5d6871"/></radialGradient>`
+  +`<linearGradient id="ph-metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dde3e8"/><stop offset=".5" stop-color="#9aa5ae"/><stop offset="1" stop-color="#6c7780"/></linearGradient>`
+  +`<linearGradient id="ph-flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#4a98e6"/><stop offset=".3" stop-color="#ffc35a"/><stop offset="1" stop-color="#ff6a3d" stop-opacity=".9"/></linearGradient>`
+  +`<linearGradient id="ph-ice" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#e3f1f8"/><stop offset="1" stop-color="#c3deec"/></linearGradient>`
+  +`<linearGradient id="ph-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dbe9f3"/><stop offset="1" stop-color="#f3f7f8"/></linearGradient>`
+  +`<linearGradient id="ph-co" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="rgb(59,127,196)"/><stop offset="1" stop-color="rgb(232,140,175)"/></linearGradient>`
+  +`<radialGradient id="ph-balloon" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffd0a8"/><stop offset=".5" stop-color="#f08a4b"/><stop offset="1" stop-color="#c9602a"/></radialGradient>`
+  +`<clipPath id="ph-lake"><path d="M60 160H560L512 445H108Z"/></clipPath></defs>`;
+const PHASE_TW=(x,y,s,o={})=>{const{size=15,fill=P.ink,anchor='start',weight=400}=o;return `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}" paint-order="stroke" stroke="#fff" stroke-opacity=".85" stroke-width="4" stroke-linejoin="round">${s}</text>`;};
+const PHASE_panel=(x,y,w,h,o={})=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="${o.fill||'#fffdf8'}" stroke="${o.stroke||'#ddd7c9'}" stroke-width="${o.sw||1.5}"/>`;
+const PHASE_pill=(x,y,t,c,o={})=>{const{w=64,h=28,size=16,on=true}=o;return `<rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="${on?c:'#fffdf8'}" stroke="${c}" stroke-width="2"/>`+T(x,y+size*.36,t,{size,fill:on?'#fff':c,anchor:'middle',weight:700});};
+function PHASE_flame(x,y,h,ck,i=0){const k=1+.07*Math.sin(ck*9+i*2),w=h*.3,hh=h*k,sx=2.2*Math.sin(ck*6+i),f=PHASE_f;
+  const d=(w,hh)=>`M${f(x-w)} ${y}C${f(x-w*1.35)} ${f(y-hh*.45)} ${f(x-w*.25+sx)} ${f(y-hh*.7)} ${f(x+sx)} ${f(y-hh)}C${f(x+w*.25+sx)} ${f(y-hh*.7)} ${f(x+w*1.35)} ${f(y-hh*.45)} ${f(x+w)} ${y}Z`;
+  return `<path d="${d(w,hh)}" fill="url(#ph-flame)"/><path d="${d(w*.5,hh*.5)}" fill="#fff3c4" fill-opacity=".85"/>`;}
+/* 酒精燈：yb 是底部，火焰頂端約在 yb − 66 − h */
+function PHASE_lamp(x,yb,ck,h=58){return `<path d="M${x-36} ${yb}Q${x-48} ${yb-30} ${x-14} ${yb-52}H${x+14}Q${x+48} ${yb-30} ${x+36} ${yb}Z" fill="#eef6f8" stroke="#83999d" stroke-width="2.5" stroke-linejoin="round"/>`
+  +`<path d="M${x-35} ${yb-3}Q${x-41} ${yb-20} ${x-29} ${yb-32}H${x+29}Q${x+41} ${yb-20} ${x+35} ${yb-3}Z" fill="#9cc7e8" fill-opacity=".6"/>`
+  +`<rect x="${x-12}" y="${yb-63}" width="24" height="13" rx="3" fill="url(#ph-metal)" stroke="#6c7780" stroke-width="1.5"/><rect x="${x-3}" y="${yb-71}" width="6" height="9" fill="#f3efe2" stroke="#b8b09a"/>`+PHASE_flame(x,yb-67,h,ck);}
+/* 加熱板／冷卻板 */
+function PHASE_plate(x1,x2,y,mode){const c=mode==='heat'?'#ff7b4a':mode==='cool'?'#8fd0ff':'#7c8a92';let h=`<rect x="${x1}" y="${y}" width="${x2-x1}" height="26" rx="6" fill="${mode==='cool'?'#3d5f7d':'#4a5860'}"/>`;
+  const n=Math.floor((x2-x1-30)/36);for(let i=0;i<n;i++){const x=x1+(x2-x1-n*36)/2+i*36+8;h+=`<path d="M${x} ${y+9}q10 10 20 0" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round"/>`;}return h;}
+const PHASE_flaskD=(cx,cy,r,nw,top)=>{const yj=PHASE_f(cy-Math.sqrt(r*r-nw*nw));return `M${cx-nw} ${top}V${yj}A${r} ${r} 0 1 0 ${cx+nw} ${yj}V${top}`;};
+const PHASE_flask=(cx,cy,r,nw,top)=>`<path d="${PHASE_flaskD(cx,cy,r,nw,top)}" fill="none" stroke="#83999d" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/><path d="M${cx-r*.72} ${cy-r*.2}A${r*.76} ${r*.76} 0 0 1 ${cx-r*.3} ${cy-r*.68}" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".8"/>`;
+const PHASE_dots=(pts,r,c)=>pts.map(([x,y])=>`<circle cx="${PHASE_f(x)}" cy="${PHASE_f(y)}" r="${r}" fill="${c}" stroke="#16323f" stroke-opacity=".4"/>`).join('');
+/* 粒子位置：kind = s 固態（整齊排列、原處振動）、l 液態（靠得近、沿著環形路線滑動）、g 氣態（距離遠、到處飛） */
+function PHASE_pos(kind,i,ph,b,o={}){const r=o.r||6;let x,y;
+  if(kind==='s'){const C=o.cols||6,a=o.a||20,amp=o.amp===undefined?1.6:o.amp;
+    x=b.x+b.w/2+(i%C-(C-1)/2)*a+amp*Math.sin(ph*9+i*2.4);y=b.y+b.h-r-4-Math.floor(i/C)*a+amp*Math.cos(ph*8.3+i*1.7);}
+  else if(kind==='l'){const C=o.lcols||6,sp=o.sp||22,lp=Math.floor(i/(2*C)),q=(((i%(2*C))+ph*.45*(lp%2?-1:1))%(2*C)+2*C)%(2*C);let c,rw;
+    if(q<C-1){c=q;rw=0;}else if(q<C){c=C-1;rw=q-(C-1);}else if(q<2*C-1){c=C-1-(q-C);rw=1;}else{c=0;rw=1-(q-(2*C-1));}
+    x=b.x+b.w/2+(c-(C-1)/2)*sp+2.5*Math.sin(ph*2.1+i*1.9);y=b.y+b.h-r-5-(lp*2+rw)*(sp-2)+2.5*Math.cos(ph*1.7+i*2.3);}
+  else{const W=b.w-2*r-4,H=b.h-2*r-4;
+    x=b.x+r+2+PHASE_tri(rnd(i+11)*W*2+ph*(26+rnd(i+21)*30)*(i%2?1:-1),W);y=b.y+r+2+PHASE_tri(rnd(i+31)*H*2+ph*(22+rnd(i+41)*30),H);}
+  return [clamp(x,b.x+r+1,b.x+b.w-r-1),clamp(y,b.y+r+1,b.y+b.h-r-1)];}
+/* 加熱曲線的物質：比熱 cal/g·°C；lf 熔化熱、lv 汽化熱（cal/g，延伸，只用來決定平台長短）；bv 畫到汽化多少熱量為止 */
+const PHASE_SUB={
+  water:{name:'水',solid:'冰',liq:'水',gas:'水蒸氣',sn:'冰',ln:'水',drop:'小水滴',t0:-20,mp:0,bp:100,cs:.5,cl:1,lf:80,lv:540,bv:60,ymin:-40,ymax:120,ys:20},
+  alc:{name:'酒精',solid:'固態酒精',liq:'液態酒精',gas:'酒精蒸氣',sn:'固體',ln:'液體',drop:'小液滴',t0:-130,mp:-114,bp:78,cs:.5,cl:.58,lf:26,lv:204,bv:60,ymin:-140,ymax:100,ys:40},
+  nap:{name:'萘',solid:'固態萘',liq:'液態萘',gas:'萘蒸氣',sn:'固體',ln:'液體',drop:'小顆粒',t0:20,mp:80,bp:218,cs:.31,cl:.41,lf:35,lv:81,bv:30,ymin:0,ymax:240,ys:40}};
+const PHASE_seg=S=>{const a=S.cs*(S.mp-S.t0),b=a+S.lf,c=b+S.cl*(S.bp-S.mp);return [a,b,c,c+S.bv];};
+function PHASE_at(S,h){const H=PHASE_seg(S);h=clamp(h,0,H[3]);
+  if(h<H[0])return{k:0,T:S.t0+h/S.cs,f:0};if(h<H[1])return{k:1,T:S.mp,f:(h-H[0])/S.lf};if(h<H[2])return{k:2,T:S.mp+(h-H[1])/S.cl,f:0};return{k:3,T:S.bp,f:(h-H[2])/S.lv};}
+const PHASE_tmax=s=>PHASE_seg(PHASE_SUB[s.sub])[3]*s.cm/1000;
+const PHASE_AR={melt:['熔化','S','L',1,'粒子吸收熱，離開固定位置，可以到處移動',['冰塊在室溫下熔化成水','蠟燭點燃後，蠟熔化成蠟油']],
+  freeze:['凝固','L','S',0,'粒子放出熱，回到固定位置，排列整齊',['水在冷凍庫裡結成冰','蠟油冷卻後凝固']],
+  vap:['汽化','L','G',1,'粒子吸收熱，彼此遠離，自由運動',['晒衣服：水慢慢蒸發','水燒開：沸騰','汗水蒸發吸熱，所以覺得涼']],
+  cond:['凝結','G','L',0,'粒子放出熱，互相靠近，聚成液體',['冷飲杯外壁的小水滴、露','燒開水的「白煙」是小水滴','（水蒸氣本身看不見）']],
+  sub:['昇華','S','G',1,'粒子吸收熱，直接離開固定位置而遠離',['乾冰直接變成二氧化碳氣體','衣櫃裡的樟腦丸越放越小']],
+  dep:['凝華','G','S',0,'粒子放出熱，直接排列成固體',['寒冷清晨葉面上的霜','冷凍庫內壁結的霜']]};
+const PHASE_NODE={S:[96,396,'固態','s'],L:[444,396,'液態','l'],G:[270,112,'氣態','g']};
+const PHASE_Q={
+  expand:['鋪鐵軌時，兩段鐵軌之間為什麼要留一小段空隙？夏天和冬天，哪個時候空隙比較大？','鐵軌受熱會<b>膨脹</b>變長。留空隙（伸縮縫）是讓鐵軌在夏天有伸長的空間，才不會互相擠壓而彎曲變形。<b>冬天</b>鐵軌遇冷收縮，空隙比較<b>大</b>；夏天空隙比較小。橋樑的伸縮縫、電線夏天比較鬆，也是同樣的道理。'],
+  water4:['寒冷地區的湖面結了厚厚的冰，湖裡的魚為什麼還能活？','水在 <b>4°C 時密度最大</b>，會沉到湖底；0～4°C 的水密度較小，留在上層，所以湖是<b>從水面開始結冰</b>。冰的密度比水小，浮在水面上，還能隔開冷空氣，湖底的水可以維持在約 <b>4°C</b>，魚就能在湖底過冬。'],
+  curve:['冰熔化的過程一直在吸熱，溫度卻停在 0°C。吸收的熱到哪裡去了？','熔化時吸收的熱用來<b>改變狀態</b>（讓粒子離開固定的位置），不是用來升高溫度，所以冰完全熔化以前，冰水混合物的溫度一直是 <b>0°C</b>。沸騰也一樣：1 大氣壓下，純水沸騰時溫度維持 <b>100°C</b>，火開得再大也不會更高，只是汽化得比較快。'],
+  states:['燒開水時壺嘴冒出的「白煙」是水蒸氣嗎？','<b>不是</b>。水蒸氣是氣體，<b>看不見</b>。壺嘴噴出的水蒸氣遇到較冷的空氣，<b>凝結</b>成許多小水滴，我們看到的白煙是這些<b>小水滴</b>（液態）。壺嘴口附近有一小段是透明的，那裡才是水蒸氣。冰棒冒的白煙，也是空氣中的水蒸氣遇冷凝結成的小水滴。'],
+  chem:['怎麼檢驗一種無色液體裡有沒有水？','可以用<b>白色的硫酸銅粉末</b>：遇到水會變成<b>藍色</b>；或用<b>藍色的氯化亞鈷試紙</b>：遇到水會變成<b>粉紅色</b>。兩種方法都是利用物質遇水後顏色改變來檢驗。']};
+const PHASE_QUIZ=[
+  {q:'室溫下恰好能通過鐵環的鐵球，加熱後就卡在鐵環上。主要原因是：',opts:['鐵球的粒子本身變大','鐵球粒子間的距離變大，球的體積變大','鐵球的粒子數目變多','鐵球的質量變大'],ans:1,
+    sol:'受熱時粒子運動變快、<b>粒子間的距離變大</b>，所以體積膨脹。粒子本身的大小、粒子的數目和球的質量都<b>沒有改變</b>。',go:s=>{s.mode='expand';s.ek='solid';s.et=100;},goLabel:'把鐵球加熱到 100°C'},
+  {q:'體積相同的鐵塊、水和空氣，都由 20°C 升高到 100°C（壓力不變）。體積增加量由大到小排列是：',opts:['鐵 ＞ 水 ＞ 空氣','水 ＞ 空氣 ＞ 鐵','水 ＞ 鐵 ＞ 空氣','空氣 ＞ 水 ＞ 鐵'],ans:3,
+    sol:'升高相同的溫度時，膨脹的程度通常是<b>氣體 ＞ 液體 ＞ 固體</b>。模擬中 1000 cm³ 的空氣約增加 273 cm³，水約 42 cm³，鐵只有約 3 cm³。',go:s=>{s.mode='expand';s.ek='gas';s.et=100;},goLabel:'比較三種的體積變化'},
+  {q:'把一杯水由 0°C 慢慢加熱到 10°C，水的體積怎麼變化？',opts:['一直變大','一直變小','先變小，後變大','先變大，後變小'],ans:2,
+    sol:'0～4°C 之間，水溫升高體積反而<b>變小</b>；<b>4°C 時體積最小、密度最大</b>；超過 4°C 才和一般物質一樣熱脹冷縮。',go:s=>{s.mode='water4';s.wv='curve';s.wt=4;s.wd=false;},goLabel:'看 0～10°C 的體積曲線'},
+  {q:'冬天湖面結冰，氣溫 −10°C。湖底的水溫最接近：',opts:['−10°C','4°C','0°C','10°C'],ans:1,
+    sol:'4°C 的水<b>密度最大</b>，沉在湖底。緊貼冰層的水是 0°C，越往下越接近 <b>4°C</b>。',go:s=>{s.mode='water4';s.wv='lake';s.air=-10;},goLabel:'看冬天的湖'},
+  {q:'用穩定的熱源加熱 200 g、−20°C 的冰，溫度與時間的關係圖中，第 2 分鐘到第 18 分鐘溫度維持 0°C。這段時間燒杯內是：',opts:['只有冰','只有水','冰和水同時存在','水和水蒸氣同時存在'],ans:2,
+    sol:'溫度維持在<b>熔點 0°C</b> 的這一段，冰正在<b>熔化</b>，吸收的熱用來改變狀態，溫度不變，燒杯內<b>冰和水共存</b>（固液共存）。',go:s=>{s.mode='curve';s.sub='water';s.cool=false;s.cm=200;s.ct=10;s.play=false;},goLabel:'看第 10 分鐘的燒杯'},
+  {q:'在 1 大氣壓下，一鍋純水已經沸騰，把火再開大繼續加熱，水溫會：',opts:['維持 100°C','繼續升高','先升高再降低','降低'],ans:0,
+    sol:'沸騰時吸收的熱用來<b>汽化</b>，溫度維持在<b>沸點 100°C</b>。火開大只會讓水汽化得更快。',go:s=>{s.mode='curve';s.sub='water';s.cool=false;s.cm=200;s.ct=45;s.play=false;},goLabel:'看沸騰的那一段'},
+  {q:'用每分鐘供熱 1000 cal 的熱源，把 200 g、0°C 的水加熱到 100°C，需要多久？（水的比熱 1 cal/g·°C，不計散熱）',opts:['10 分鐘','20 分鐘','100 分鐘','200 分鐘'],ans:1,
+    sol:'H ＝ m × s × ΔT ＝ 200 × 1 × 100 ＝ 20000 cal。20000 ÷ 1000 ＝ <b>20 分鐘</b>。模擬中冰在第 18 分鐘完全熔化，第 38 分鐘到達 100°C，正好相差 20 分鐘。',go:s=>{s.mode='curve';s.sub='water';s.cool=false;s.cm=200;s.ct=38;s.play=false;},goLabel:'看第 18～38 分鐘這一段'},
+  {q:'某純物質由固態開始加熱，溫度與時間的關係圖在 80°C 和 218°C 各有一段水平線。這種物質在 100°C 時是：',opts:['固態','固態和液態共存','液態','氣態'],ans:2,
+    sol:'第一段水平線是熔化（<b>熔點 80°C</b>），第二段是沸騰（<b>沸點 218°C</b>）。100°C 介於熔點和沸點之間，所以是<b>液態</b>。純物質有固定的熔點和沸點，不同物質各不相同。',go:s=>{s.mode='curve';s.sub='nap';s.cool=false;s.cm=200;s.ct=12.25;s.play=false;},goLabel:'換成萘看看'},
+  {q:'舞台上常用乾冰製造煙霧。乾冰（固態二氧化碳）在室溫下直接變成氣體，這種變化是：',opts:['熔化，吸熱','凝華，放熱','汽化，吸熱','昇華，吸熱'],ans:3,
+    sol:'固態<b>直接</b>變成氣態是<b>昇華</b>，需要<b>吸熱</b>。乾冰吸熱使周圍變冷，空氣中的水蒸氣凝結成小水滴，就是看到的白霧。',go:s=>{s.mode='states';s.sv='tri';s.arrow='sub';s.a0=s.clock;},goLabel:'看昇華的粒子'},
+  {q:'把水滴在白色的硫酸銅粉末上，會觀察到：',opts:['粉末變成藍色，溫度升高','粉末變成藍色，溫度降低','粉末變成粉紅色，溫度升高','粉末顏色不變，溫度降低'],ans:0,
+    sol:'白色硫酸銅粉末遇水變回<b>藍色</b>，同時<b>放熱</b>，所以溫度升高。這個顏色變化可以用來檢驗水。變粉紅色的是氯化亞鈷試紙。',go:s=>{s.mode='chem';s.ck='cu';s.cs='drop';s.cp=100;},goLabel:'在白色粉末上滴水'}];
+
+LABS.phase={group:4,n:'5-4',keep:['mode'],steps:'mode',
+  tasks:{expand:'把溫度由 20°C 慢慢拉到 100°C：鐵球還過得去嗎？細管的液面和氣球怎麼變？三種的體積誰增加最多？',
+    water4:'把水溫由 0°C 慢慢拉到 10°C：液面先降還是先升？最低點在幾度？再換到「冬天的湖」，看湖底的水溫。',
+    curve:'按「播放」：哪兩段時間溫度沒有上升？那時候燒杯裡有哪些狀態？',
+    states:'點圖上的箭頭：哪三種變化要吸熱？粒子的排列怎麼改變？',
+    chem:'拉動「進行程度」：硫酸銅的顏色怎麼變？哪一個過程吸熱、哪一個放熱？'},
+  name:'熱對物質的影響',subtitle:'物體受熱，體積會改變（熱脹冷縮），狀態會改變（熔化、汽化…），有時還會變成不同的物質。狀態改變時要吸熱或放熱，但溫度不變。',
+  q:s=>({html:qBlockHTML(PHASE_Q[s.mode])+quizHTML(s,PHASE_QUIZ)}),
+  qAction(s,v){quizAction(s,v,PHASE_QUIZ);},
+  state:{mode:'expand',ek:'solid',et:20,wv:'curve',wt:0,wd:false,air:-10,wf:0,sub:'water',cm:200,ct:0,play:false,cool:false,cx:false,sv:'tri',arrow:'melt',a0:0,ck:'cu',cs:'heat',cp:0,cw:0,cl:'warm',lt:0,clock:0,ph:0,qi:0,qp:null,qc:false,qs:false},
+  controls:[
+    {type:'seg',key:'mode',label:'主題',options:[['expand','熱脹冷縮'],['water4','水的特殊性質'],['curve','加熱曲線'],['states','三態變化'],['chem','吸熱與放熱的變化']]},
+    {type:'range',key:'et',label:'溫度',min:0,max:100,step:1,unit:'°C',show:s=>s.mode==='expand'},
+    {type:'buttons',label:'常用溫度',items:[['0°C',s=>{s.et=0;}],['20°C',s=>{s.et=20;}],['60°C',s=>{s.et=60;}],['100°C',s=>{s.et=100;}]],show:s=>s.mode==='expand'},
+    {type:'seg',key:'ek',label:'右邊看哪一種的粒子',options:[['solid','固體'],['liquid','液體'],['gas','氣體']],show:s=>s.mode==='expand'},
+    {type:'seg',key:'wv',label:'內容',options:[['curve','0～10°C 的水'],['lake','冬天的湖'],['ice','水結成冰']],show:s=>s.mode==='water4'},
+    {type:'range',key:'wt',label:'水溫',min:0,max:10,step:.5,unit:'°C',show:s=>s.mode==='water4'&&s.wv==='curve'},
+    {type:'toggle',key:'wd',label:'縱軸改看密度',show:s=>s.mode==='water4'&&s.wv==='curve'},
+    {type:'range',key:'air',label:'氣溫',min:-20,max:4,step:1,unit:'°C',fmt:s=>PHASE_mn(s.air)+'°C',show:s=>s.mode==='water4'&&s.wv==='lake'},
+    {type:'range',key:'wf',label:'已結冰的比例',min:0,max:100,step:5,unit:'%',show:s=>s.mode==='water4'&&s.wv==='ice'},
+    {type:'buttons',label:'時間',primary:true,items:[['▶ 播放',s=>{if(s.ct>=PHASE_tmax(s)-1e-6)s.ct=0;s.play=true;}],['⏸ 暫停',s=>{s.play=false;}],['↺ 從頭',s=>{s.ct=0;s.play=false;}]],show:s=>s.mode==='curve'},
+    {type:'range',key:'ct',label:'經過時間',min:0,max:50,step:.25,fmt:s=>Math.min(s.ct,PHASE_tmax(s)).toFixed(1)+' 分鐘',show:s=>s.mode==='curve'},
+    {type:'range',key:'cm',label:'質量',min:100,max:200,step:25,unit:' g',show:s=>s.mode==='curve'},
+    {type:'toggle',key:'cool',label:'冷卻（反過來看）',onChange:s=>{s.ct=0;s.play=false;},show:s=>s.mode==='curve'},
+    {type:'seg',key:'sub',adv:true,label:'換一種純物質',options:[['water','水'],['alc','酒精'],['nap','萘']],onChange:s=>{s.ct=0;s.play=false;},show:s=>s.mode==='curve'},
+    {type:'toggle',key:'cx',adv:true,label:'（延伸）顯示熔化熱、汽化熱',show:s=>s.mode==='curve'},
+    {type:'seg',key:'sv',label:'內容',options:[['tri','三態變化'],['evap','蒸發和沸騰的比較']],show:s=>s.mode==='states'},
+    {type:'seg',key:'arrow',label:'變化',options:[['melt','熔化'],['freeze','凝固'],['vap','汽化'],['cond','凝結'],['sub','昇華'],['dep','凝華']],onChange:s=>{s.a0=s.clock;},show:s=>s.mode==='states'&&s.sv==='tri'},
+    {type:'seg',key:'ck',label:'例子',options:[['cu','硫酸銅'],['co','氯化亞鈷試紙'],['life','生活中的例子']],show:s=>s.mode==='chem'},
+    {type:'seg',key:'cs',label:'實驗',options:[['heat','加熱藍色晶體'],['drop','白色粉末滴水']],onChange:s=>{s.cp=0;},show:s=>s.mode==='chem'&&s.ck==='cu'},
+    {type:'range',key:'cp',label:'進行程度',min:0,max:100,step:5,unit:'%',show:s=>s.mode==='chem'&&s.ck==='cu'},
+    {type:'range',key:'cw',label:'試紙的含水程度',min:0,max:100,step:5,unit:'%',show:s=>s.mode==='chem'&&s.ck==='co'},
+    {type:'seg',key:'cl',label:'例子',options:[['warm','暖暖包'],['cold','硝酸銨溶於水']],onChange:s=>{s.lt=0;},show:s=>s.mode==='chem'&&s.ck==='life'},
+    {type:'range',key:'lt',label:'經過時間',min:0,max:10,step:.5,unit:' 分鐘',show:s=>s.mode==='chem'&&s.ck==='life'}],
+  tick(s,dt){
+    if(!reduceMotion){s.clock+=dt;
+      let v=1;if(s.mode==='expand')v=.35+s.et/100*1.3;else if(s.mode==='curve'){const S=PHASE_SUB[s.sub],H=PHASE_seg(S),hq=1000*Math.min(s.ct,PHASE_tmax(s))/s.cm;v=.35+1.3*(s.cool?H[3]-hq:hq)/H[3];}
+      s.ph+=dt*v;}
+    if(s.mode==='curve'){const tm=PHASE_tmax(s);if(s.play){s.ct+=dt*2;if(s.ct>=tm)s.play=false;}if(s.ct>tm)s.ct=tm;}},
+  tap(s,id){const[k,v]=id.split(':');if(k==='ek')s.ek=v;else if(k==='ar'&&PHASE_AR[v]){s.arrow=v;s.a0=s.clock;}},
+  render(s){const m=s.mode,o=m==='water4'?this['w_'+s.wv](s):m==='curve'?this.curve(s):m==='states'?(s.sv==='evap'?this.evap(s):this.tri(s)):m==='chem'?this['c_'+s.ck](s):this.expand(s);o.svg=PHASE_DEFS+o.svg;return o;},
+
+  /* ---- 1 熱脹冷縮 ---- */
+  expand(s){const Tc=s.et,dT=Tc-20,ck=s.clock,f=PHASE_f,k=s.ek;
+    const dFe=1000*3.6e-5*dT,dW=1000*(PHASE_RHO(20)/PHASE_RHO(Tc)-1),dA=1000*dT/293,dia=25*(1+1.2e-5*dT),pass=Tc<60;
+    const cols=[['solid','固體：鐵球與鐵環','1000 cm³ 的鐵',dFe],['liquid','液體：水','1000 cm³ 的水',dW],['gas','氣體：空氣','1000 cm³ 的空氣',dA]];
+    let h=T(310,38,Tc===20?'現在是 20°C（比較的基準）。拉動溫度，看體積怎麼改變。':`由 20°C 變成 ${Tc}°C，體積改變多少？（圖為示意，已放大）`,{size:16,anchor:'middle',fill:P.muted});
+    cols.forEach(([id,title,lab,dv],i)=>{const x=22+196*i,cx=x+94,on=k===id,c=dv>=0?P.red:P.blue;
+      h+=`<g data-tap="ek:${id}" tabindex="0" role="button" aria-label="${title}" style="cursor:pointer">`+PHASE_panel(x,52,188,334,on?{stroke:P.accent,sw:3}:{})+`</g>`+T(cx,78,title,{size:16,anchor:'middle',weight:700,fill:on?P.accent:P.ink});
+      h+=T(cx,410,lab,{size:14,anchor:'middle',fill:P.muted})+T(cx,436,`${PHASE_sg(dv)} cm³`,{size:20,anchor:'middle',weight:700,fill:Math.abs(dv)<.05?P.muted:c});
+      h+=`<rect x="${cx-86}" y="448" width="172" height="12" rx="6" fill="#ece7da"/>`+(Math.abs(dv)>=.05?`<rect x="${cx-86}" y="448" width="${f(clamp(Math.abs(dv)/273.1*172,3,172))}" height="12" rx="6" fill="${c}"/>`:'');});
+    h+=T(310,482,'長條：1000 cm³ 的物質體積改變了多少（壓力不變）',{size:14,anchor:'middle',fill:P.muted});
+    /* 固體：鐵球與鐵環 */
+    {const x=106,r=40*(1+.0025*dT),yTop=190,yBot=pass?312:250-Math.sqrt(Math.max(0,r*r-44*44))-2,u=(ck/6)%1;
+      const p=reduceMotion?1:u<.3?PHASE_ease(u/.3):u<.55?1:u<.85?1-PHASE_ease((u-.55)/.3):0,y=PHASE_lerp(yTop,yBot,p),tint=dT>=0?'#ff6a2a':'#4c85bb';
+      h+=`<rect x="148" y="344" width="58" height="9" rx="3" fill="url(#ph-metal)" stroke="#6c7780"/><rect x="184" y="112" width="8" height="234" rx="3" fill="url(#ph-metal)" stroke="#6c7780"/><rect x="160" y="246" width="30" height="8" fill="url(#ph-metal)" stroke="#6c7780"/>`;
+      h+=`<path d="M${x-51} 250A51 12 0 0 1 ${x+51} 250" fill="none" stroke="#7d8891" stroke-width="14"/>`;
+      h+=L(x,f(y-r-46),x,f(y-r+2),{stroke:'#8b959c',w:2.5})+`<rect x="${x-18}" y="${f(y-r-54)}" width="36" height="9" rx="4" fill="#b98a5a" stroke="#8a6238"/>`;
+      h+=`<circle cx="${x}" cy="${f(y)}" r="${f(r)}" fill="url(#ph-ball)" stroke="#4d575f" stroke-width="1.5"/><circle cx="${x}" cy="${f(y)}" r="${f(r)}" fill="${tint}" fill-opacity="${f(Math.min(.5,Math.abs(dT)/80*.5))}"/>`;
+      h+=`<path d="M${x-51} 250A51 12 0 0 0 ${x+51} 250" fill="none" stroke="url(#ph-metal)" stroke-width="14"/><path d="M${x-51} 250A51 12 0 0 0 ${x+51} 250" fill="none" stroke="#5d6871" stroke-width="1" transform="translate(0 7)"/>`;
+      h+=T(162,104,pass?'✓ 通過':'✗ 卡住',{size:16,anchor:'middle',weight:700,fill:pass?P.accent:P.red});
+      h+=T(116,374,`球 ${dia.toFixed(3)}／環 25.012 mm`,{size:13,anchor:'middle',fill:P.muted});}
+    /* 液體：燒瓶＋細管 */
+    {const cx=312,cy=300,yl=clamp(196-dW/41.6*96,96,204);
+      h+=`<circle cx="${cx}" cy="${cy}" r="48.5" fill="#f3b3a8"/><rect x="${cx-12.5}" y="224" width="25" height="40" fill="#f3b3a8"/>`+PHASE_flask(cx,cy,50,14,212);
+      h+=`<path d="M${cx-18} 202H${cx+18}L${cx+14} 228H${cx-14}Z" fill="#b5835a" stroke="#8a6238" stroke-width="1.5"/>`;
+      h+=`<rect x="${cx-5.5}" y="90" width="11" height="162" rx="2" fill="#fbfdff" stroke="#8fa3a8" stroke-width="1.5"/><rect x="${cx-3}" y="${f(yl)}" width="6" height="${f(251-yl)}" fill="${ALC}"/>`;
+      for(let y=100;y<=196;y+=16)h+=L(cx+7,y,cx+(y%32===4?15:12),y,{stroke:P.muted,w:1});
+      h+=L(cx-24,196,cx-8,196,{stroke:P.muted,w:1.5,dash:'3 3'})+T(cx-28,201,'20°C',{size:13,anchor:'end',fill:P.muted});
+      h+=`<path d="M${cx+20} ${f(yl)}l9 -5v10z" fill="${P.red}"/>`+T(cx+33,f(yl+5),'液面',{size:14,fill:P.red,weight:700});
+      h+=T(cx,374,'水（染紅）裝滿燒瓶',{size:13,anchor:'middle',fill:P.muted});}
+    /* 氣體：燒瓶＋氣球 */
+    {const cx=508,cy=300,fr=clamp((dA+68.3)/341.3,0,1),R=13+33*Math.pow(fr,.7);
+      h+=`<ellipse cx="${cx}" cy="${f(210-R*1.05)}" rx="${f(R)}" ry="${f(R*1.08)}" fill="url(#ph-balloon)" stroke="#a84f20" stroke-width="1.5"/><path d="M${cx-16} 226L${cx-13} 206Q${cx} 200 ${cx+13} 206L${cx+16} 226Z" fill="#e07a3c" stroke="#a84f20" stroke-width="1.5"/>`;
+      h+=`<circle cx="${cx}" cy="${cy}" r="48.5" fill="#eef5f7"/>`+PHASE_flask(cx,cy,50,14,214);
+      h+=T(cx,306,'空氣',{size:15,anchor:'middle',fill:P.muted})+T(cx,374,'瓶口套上氣球',{size:13,anchor:'middle',fill:P.muted});}
+    /* 粒子 */
+    {const nm={solid:'固體',liquid:'液體',gas:'氣體'}[k],b={x:632,y:92,w:230,h:190},pc='#3f7fb5';
+      h+=PHASE_panel(616,52,262,426)+T(747,78,`${nm}的粒子（示意）`,{size:16,anchor:'middle',weight:700})+`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="8" fill="#f6f3ea" stroke="#ddd7c9"/>`;
+      const dash=(x,y,w,hh)=>`<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(hh)}" rx="6" fill="none" stroke="${P.muted}" stroke-width="1.5" stroke-dasharray="5 4"/>`;let pts=[];
+      if(k==='solid'){const a=22*(1+dT*.0016);for(let i=0;i<30;i++)pts.push(PHASE_pos('s',i,s.ph,b,{cols:6,a,amp:.5+Tc/100*1.6,r:7}));h+=dash(747-65,b.y+b.h-11-88-10,130,108);}
+      else if(k==='liquid'){const sp=23*(1+dT*.0022);for(let i=0;i<30;i++)pts.push(PHASE_pos('l',i,s.ph,b,{lcols:8,sp,r:7}));h+=dash(747-91,b.y+b.h-12-63-10,182,84);}
+      else{const sc=1+dT*.004,gb={x:747-75*sc,y:187-60*sc,w:150*sc,h:120*sc};for(let i=0;i<12;i++)pts.push(PHASE_pos('g',i,s.ph,gb,{r:7}));
+        h+=`<rect x="${f(gb.x)}" y="${f(gb.y)}" width="${f(gb.w)}" height="${f(gb.h)}" rx="6" fill="#fffdf8" stroke="#b9b3a4" stroke-width="1.5"/>`+dash(672,127,150,120);}
+      h+=PHASE_dots(pts,7,pc);
+      const up=Tc>=20;h+=T(632,310,up?'溫度升高：粒子運動變快，':'溫度降低：粒子運動變慢，',{size:15})+T(632,333,up?'粒子間的距離變大。':'粒子間的距離變小。',{size:15});
+      h+=T(632,364,'粒子本身的大小沒有改變。',{size:16,weight:700,fill:P.accent});
+      h+=T(632,396,{solid:'固體粒子排列整齊，在原處振動。',liquid:'液體粒子靠得近，可以互相滑動。',gas:'氣體粒子距離很遠，膨脹最明顯。'}[k],{size:15,fill:P.muted});
+      h+=L(632,424,662,424,{stroke:P.muted,w:1.5,dash:'5 4'})+T(670,429,'20°C 時的範圍',{size:14,fill:P.muted})+T(632,456,'點左邊的圖可以換一種看',{size:14,fill:P.muted});}
+    return {svg:h,reads:[['溫度',Tc+'°C'],['鐵 1000 cm³ →',(1000+dFe).toFixed(1)+' cm³'],['水 1000 cm³ →',(1000+dW).toFixed(1)+' cm³'],['空氣 1000 cm³ →',(1000+dA).toFixed(1)+' cm³']],
+      note:`大部分物質受熱膨脹、遇冷收縮（<b>熱脹冷縮</b>）。升降相同的溫度，體積變化通常是 <b>氣體 ＞ 液體 ＞ 固體</b>：這裡是 ${PHASE_sg(dA)}、${PHASE_sg(dW)}、${PHASE_sg(dFe)} cm³。<br>鐵球（只加熱球，鐵環維持 20°C）現在${pass?'<b>過得去</b>':'<b>卡住</b>，要等它冷卻收縮才過得去'}。生活例子：鐵軌和橋樑的伸縮縫、夏天電線比較鬆、液體溫度計；5-1 的雙金屬片也是利用膨脹程度不同。`};},
+
+  /* ---- 2 水的特殊性質 ---- */
+  w_curve(s){const Tc=s.wt,rho=PHASE_RHO(Tc),v=1/rho,f=PHASE_f,cx=200,cy=372,yl=clamp(262-(v-1)/.00027*150,104,262),wc='#a9d3ee';
+    let h=T(200,44,'燒瓶裝滿水，插上細管（示意，已放大）',{size:15,anchor:'middle',fill:P.muted});
+    h+=`<circle cx="${cx}" cy="${cy}" r="76.5" fill="${wc}"/><rect x="${cx-7.5}" y="${f(yl)}" width="15" height="${f(cy-70-yl)}" fill="${wc}"/>`+L(cx-7.5,f(yl),cx+7.5,f(yl),{stroke:'#4c85bb',w:2.5})+PHASE_flask(cx,cy,78,9,92);
+    for(let y=112;y<=262;y+=15)h+=L(cx-11,y,cx-(y%30===22?20:16),y,{stroke:P.muted,w:1});
+    h+=L(cx+12,262,cx+84,262,{stroke:P.accent,w:1.5,dash:'4 4'})+T(cx+16,281,'4°C 時的液面（最低）',{size:14,fill:P.accent});
+    h+=`<path d="M${cx-24} ${f(yl)}l-10 -6v12z" fill="${P.red}"/>`+T(cx-38,f(yl+6),tnum(Tc)+'°C',{size:20,anchor:'end',weight:700,fill:P.red});
+    const reg=Tc<4?0:Tc===4?1:2;[['0～4°C：溫度升高，','體積反而變小'],['4°C：體積最小，','密度最大'],['4°C 以上：溫度升高，','體積變大']].forEach(([a,b],i)=>{const on=i===reg,y=120+i*0;
+      if(on)h+=PHASE_panel(300,104,176,70,{stroke:P.accent,sw:2})+T(312,132,a,{size:15,weight:700})+T(312,157,b,{size:16,weight:700,fill:P.accent});});
+    h+=T(cx,476,'水',{size:15,anchor:'middle',fill:P.muted});
+    h+=PHASE_panel(300,300,176,150)+T(312,328,'1 g 水的體積',{size:14,fill:P.muted})+T(312,356,v.toFixed(5)+' cm³',{size:19,weight:700,fill:s.wd?P.ink:P.blue})+T(312,394,'密度',{size:14,fill:P.muted})+T(312,422,rho.toFixed(5)+' g/cm³',{size:19,weight:700,fill:s.wd?P.blue:P.ink});
+    /* 圖 */
+    const X=t=>540+t*32,Y=s.wd?(t=>140+(1-PHASE_RHO(t))/.0003*280):(t=>400-(1/PHASE_RHO(t)-1)/.0003*280);
+    h+=PHASE_panel(480,60,400,426);
+    for(let i=0;i<4;i++){const y=s.wd?140+i*93.33:400-i*93.33;h+=L(540,f(y),860,f(y),{stroke:P.faint,w:1,dash:'3 5'})+T(532,f(y+5),s.wd?(1-i*.0001).toFixed(4):(1+i*.0001).toFixed(4),{size:14,anchor:'end',fill:P.muted});}
+    for(let t=0;t<=10;t+=2)h+=L(X(t),420,X(t),426,{stroke:P.muted})+T(X(t),446,t,{size:15,anchor:'middle',fill:P.muted});
+    h+=L(540,420,866,420,{stroke:P.muted,w:1.5})+L(540,420,540,100,{stroke:P.muted,w:1.5})+T(548,94,s.wd?'水的密度（g/cm³）':'1 g 水的體積（cm³）',{size:15,fill:P.ink,weight:700})+T(860,472,'溫度（°C）',{size:15,anchor:'end',fill:P.muted});
+    let d='';for(let t=0;t<=10.001;t+=.25)d+=(d?'L':'M')+f(X(t))+' '+f(Y(t));
+    h+=L(X(4),420,X(4),f(Y(4)),{stroke:P.accent,w:1.5,dash:'4 4'})+`<path d="${d}" fill="none" stroke="${P.blue}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    h+=PHASE_TW(X(4),s.wd?f(Y(4)+72):f(Y(4)-58),s.wd?'4°C：密度最大':'4°C：體積最小',{size:15,anchor:'middle',fill:P.accent,weight:700});
+    h+=L(X(Tc),420,X(Tc),f(Y(Tc)),{stroke:P.red,w:1.5,dash:'3 4'})+`<circle cx="${X(Tc)}" cy="${f(Y(Tc))}" r="7" fill="${P.red}" stroke="#fff" stroke-width="2"/>`;
+    return {svg:h,reads:[['水溫',tnum(Tc)+'°C'],['1 g 水的體積',v.toFixed(5)+' cm³'],['密度',rho.toFixed(5)+' g/cm³']],
+      note:(Tc<4?`0～4°C 之間，水溫升高時體積反而<b>變小</b>（和一般物質相反）。現在 ${tnum(Tc)}°C，再升溫液面還會下降。`:Tc===4?'<b>4°C 的水體積最小、密度最大</b>（約 1 g/cm³）。不管升溫或降溫，體積都會變大。':`超過 4°C 以後，水和一般物質一樣<b>熱脹冷縮</b>。現在 ${tnum(Tc)}°C，體積比 4°C 時大。`)
+        +'<br>質量不變，體積越小密度越大，所以體積最小時密度最大。圖的縱軸已放大：0～10°C 之間體積只差約萬分之三。'};},
+  w_lake(s){const air=s.air,ck=s.clock,f=PHASE_f,th=air<0?8+(-air)*3.2:0,Ts=air<0?0:air,yT=160+th,yM=yT+(445-yT)*.62,Tat=y=>Ts+(4-Ts)*clamp((y-yT)/(yM-yT),0,1);
+    let h=`<rect x="20" y="20" width="580" height="462" rx="12" fill="url(#ph-sky)"/><path d="M20 152H60L108 445H512L560 152H600V470Q600 482 588 482H32Q20 482 20 470Z" fill="#b89b78"/><path d="M20 152H62L64 164H20ZM600 152H558L556 164H600Z" fill="${air<0?'#fbfdff':'#8fae7a'}"/>`;
+    h+=`<g clip-path="url(#ph-lake)">`;for(let i=0;i<19;i++){const y=160+i*15;h+=`<rect x="56" y="${y}" width="508" height="15.6" fill="${PHASE_rgb([196,228,244],[72,138,190],Tat(y+7)/4)}"/>`;}
+    for(let i=0;i<5;i++){const x=150+i*82;h+=`<path d="M${x} 445q-10 -22 2 -40q8 -16 -2 -30" fill="none" stroke="#4f8a5b" stroke-width="4" stroke-linecap="round" opacity=".7"/>`;}
+    if(th>0){h+=`<rect x="56" y="160" width="508" height="${f(th)}" fill="url(#ph-ice)"/>`+L(56,f(yT),564,f(yT),{stroke:'#9fc3d6',w:2});for(let i=0;i<6;i++){const x=110+i*78+rnd(i)*30;h+=`<path d="M${f(x)} 162l${f(6+rnd(i+2)*8)} ${f(th*.5)}l${f(-10+rnd(i+4)*8)} ${f(th*.4)}" fill="none" stroke="#b7d3e2" stroke-width="1.5"/>`;}}
+    else h+=L(56,160,564,160,{stroke:'#6fa7cf',w:2.5});
+    h+=`</g><path d="M60 160L108 445H512L560 160" fill="none" stroke="#8a6f50" stroke-width="3" stroke-linejoin="round"/>`;
+    /* 魚 */
+    for(let i=0;i<3;i++){const ph=ck*.35+i*2.1,x=230+i*90+46*Math.sin(ph),y=398+i*13+3*Math.sin(ck*.9+i),dr=Math.cos(ph)>=0?1:-1;
+      h+=`<g transform="translate(${f(x)} ${f(y)}) scale(${dr} 1)"><path d="M-14 0L-26 -8V8Z" fill="#e58a3c"/><ellipse cx="0" cy="0" rx="16" ry="7.5" fill="#f2a44e" stroke="#c9742a" stroke-width="1.2"/><circle cx="9" cy="-2" r="1.8" fill="#1b2a33"/></g>`;}
+    /* 溫度標示 */
+    if(Ts>=4)h+=PHASE_TW(310,300,'整個湖的水約 4°C',{size:18,anchor:'middle',weight:700});
+    else{for(let t=Math.ceil(Ts);t<4;t++){const y=yT+(t-Ts)/(4-Ts)*(yM-yT)+(t===Ts?16:5);h+=L(118,f(y-5),136,f(y-5),{stroke:'#fff',w:2})+PHASE_TW(142,f(y),t+'°C'+(t===0&&th>0?'（緊貼冰層的水）':t===Ts?'（水面）':''),{size:16,weight:700});}
+      h+=PHASE_TW(310,f(Math.max(yM+6,378)),'4°C：密度最大，沉在湖底',{size:17,anchor:'middle',weight:700,fill:'#0c4a6e'});}
+    if(th>=26)h+=T(310,f(160+th/2+6),'冰（密度比水小，浮在水面）',{size:15,anchor:'middle',weight:700,fill:'#4a7890'});
+    else if(th>0)h+=T(310,146,'薄冰',{size:15,anchor:'middle',weight:700,fill:'#4a7890'});
+    h+=T(40,58,`氣溫 ${PHASE_mn(air)}°C`,{size:24,weight:700})+T(40,84,air<0?'湖水從水面開始結冰':air<4?'水面的水比 4°C 冷，密度較小，留在上層':'4°C 的水密度最大',{size:15,fill:P.muted});
+    if(air<0&&!reduceMotion)for(let i=0;i<16;i++){const x=40+rnd(i)*540,y=24+((rnd(i+7)*126+ck*16*(.6+rnd(i+3)))%126);if(y<96&&x<340)continue;h+=`<circle cx="${f(x)}" cy="${f(y)}" r="2.4" fill="#fff" stroke="#b9c9d6"/>`;}
+    /* 溫度—深度 */
+    const X=t=>650+(t+20)*8.4;h+=PHASE_panel(616,20,262,462)+T(747,50,'溫度隨深度的變化',{size:16,anchor:'middle',weight:700})+T(747,72,'（示意）',{size:14,anchor:'middle',fill:P.muted});
+    h+=`<rect x="${X(-20)}" y="160" width="${f(X(5)-X(-20))}" height="285" fill="#eaf4fa" stroke="#c9d6dc"/>`+(th>0?`<rect x="${X(-20)}" y="160" width="${f(X(5)-X(-20))}" height="${f(th)}" fill="#fff" stroke="#c9d6dc"/>`+T(X(-20)+8,f(Math.min(160+th-6,160+th/2+5)),th>=20?'冰':'',{size:14,fill:'#4a7890',weight:700}):'');
+    [-20,-10,0,4].forEach(t=>{h+=L(X(t),152,X(t),445,{stroke:t===4?P.accent:P.faint,w:1,dash:'3 4'})+T(X(t),142,PHASE_mn(t),{size:14,anchor:'middle',fill:t===4?P.accent:P.muted,weight:t===4?700:400});});
+    h+=T(747,112,'溫度（°C）',{size:14,anchor:'middle',fill:P.muted})+T(X(-20)+8,436,'湖底',{size:14,fill:P.muted})+T(X(-20)+8,f(Math.max(yT+22,200)),'水',{size:14,fill:'#3c6f96',weight:700});
+    const pp=(th>0?[[air,160],[0,yT]]:[[Ts,160]]).concat([[4,yM],[4,445]]);
+    h+=`<path d="${pp.map(([t,y],i)=>(i?'L':'M')+f(X(t))+' '+f(y)).join('')}" fill="none" stroke="${P.red}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`+T(747,470,'湖底的水維持約 4°C',{size:14,anchor:'middle',fill:P.accent,weight:700});
+    return {svg:h,reads:[['氣溫',PHASE_mn(air)+'°C'],['冰層',th>0?`約 ${Math.round(th*.5)} cm（示意）`:'沒有結冰'],[th>0?'緊貼冰層的水':'水面的水',Ts+'°C'],['湖底的水','4°C']],
+      note:`<b>4°C 的水密度最大</b>，會沉到湖底；0～4°C 的水密度較小，留在上層，所以湖是<b>從水面往下</b>結冰。${th>0?'冰的密度比水小，浮在水面，還能隔開冷空氣，':''}湖底的水維持約 4°C，魚可以在湖底過冬。<br>冰層厚度和水溫分布是示意；實際結冰快慢還和時間、風、湖的深淺有關。`};},
+  w_ice(s){const fr=s.wf/100,V=100*(1-fr)+100/.917*fr,f=PHASE_f,ck=s.clock,wc='#a9d3ee';
+    let h='';[['水結成冰：體積變大',150],['裝滿水的玻璃瓶放進冷凍庫',450],['冰的密度比水小：浮在水面',750]].forEach(([t,x])=>{h+=PHASE_panel(x-138,30,276,452)+T(x,62,t,{size:16,anchor:'middle',weight:700});});
+    /* 量杯 */
+    {const x1=92,x2=208,bot=400,hw=140,top=bot-hw*V/100,ih=hw*(100/.917)/100*fr;
+      h+=`<rect x="${x1+2}" y="${f(top)}" width="${x2-x1-4}" height="${f(bot-top)}" fill="${wc}"/>`+(fr>0?`<rect x="${x1+2}" y="${f(top)}" width="${x2-x1-4}" height="${f(ih)}" fill="url(#ph-ice)" stroke="#9fc3d6" stroke-width="1.5"/>`:'')+L(x1+2,f(top),x2-2,f(top),{stroke:'#4c85bb',w:2.5})+beakerPath(x1,x2,190,bot+2);
+      for(let v=20;v<=120;v+=20)h+=L(x2-18,bot-v*1.4,x2-4,bot-v*1.4,{stroke:P.muted,w:1.2})+(v%40===20?T(x2-22,bot-v*1.4+5,v,{size:13,anchor:'end',fill:P.muted}):'');
+      h+=L(x1-14,bot-hw,x2+14,bot-hw,{stroke:P.red,w:1.5,dash:'5 4'})+L(100,108,128,108,{stroke:P.red,w:1.5,dash:'5 4'})+T(136,113,'原來的水面',{size:14,fill:P.red})+T(150,150,'100 g 的水，慢慢結冰',{size:15,anchor:'middle',fill:P.muted});
+      if(fr>0)h+=T(150,f(top+Math.max(18,ih/2+5)),'冰',{size:15,anchor:'middle',weight:700,fill:'#4a7890'});if(fr<.86)h+=T(150,388,'水',{size:15,anchor:'middle',fill:'#2f6b99'});
+      h+=T(150,434,`體積 ${V.toFixed(1)} cm³`,{size:18,anchor:'middle',weight:700,fill:P.red})+T(150,460,'質量 100 g（不變）',{size:15,anchor:'middle',fill:P.muted});}
+    /* 玻璃瓶 */
+    {const x=450,brk=clamp((fr-.3)/.25,0,1),bd=`M${x-16} 176V214Q${x-52} 232 ${x-52} 262V398Q${x-52} 410 ${x-40} 410H${x+40}Q${x+52} 410 ${x+52} 398V262Q${x+52} 232 ${x+16} 214V176Z`,ih=234*fr;
+      h+=T(x,90,'冷凍庫 −18°C',{size:14,anchor:'middle',fill:P.blue})+`<clipPath id="ph-bot"><path d="${bd}"/></clipPath><g clip-path="url(#ph-bot)"><rect x="${x-56}" y="170" width="112" height="244" fill="${wc}"/><rect x="${x-56}" y="170" width="112" height="${f(ih)}" fill="url(#ph-ice)"/>${fr>0&&fr<1?L(x-56,f(176+ih),x+56,f(176+ih),{stroke:'#9fc3d6',w:1.5}):''}</g>`;
+      h+=`<path d="${bd}" fill="none" stroke="#83999d" stroke-width="3.5" stroke-linejoin="round"/><rect x="${x-20}" y="162" width="40" height="15" rx="4" fill="url(#ph-metal)" stroke="#6c7780" stroke-width="1.5"/><path d="M${x-42} 270V380" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".7"/>`;
+      if(brk>0)h+=`<path d="M${x+52} 268l-22 26l14 22l-26 30l12 28M${x-52} 300l20 18l-10 30l18 22M${x+8} 240l-12 30l16 20" fill="none" stroke="${P.red}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" opacity="${f(brk)}"/>`;
+      h+=T(x,434,brk>0?'冰把玻璃瓶撐裂':'瓶子裝滿、蓋緊',{size:18,anchor:'middle',weight:700,fill:brk>0?P.red:P.ink})+T(x,460,brk>0?'結冰時體積變大，瓶內沒有空間':'水沒有膨脹的空間',{size:15,anchor:'middle',fill:P.muted});}
+    /* 浮冰 */
+    {const x=750,bob=reduceMotion?0:1.5*Math.sin(ck*1.4),top=262+bob;
+      h+=`<rect x="${x-58}" y="270" width="116" height="138" fill="${wc}"/>`+`<rect x="${x-30}" y="${f(top)}" width="60" height="60" rx="7" fill="url(#ph-ice)" stroke="#9fc3d6" stroke-width="2"/><rect x="${x-29}" y="270" width="58" height="${f(top+59-270)}" rx="6" fill="${wc}" fill-opacity=".45"/>`+L(x-58,270,x-31,270,{stroke:'#4c85bb',w:2.5})+L(x+31,270,x+58,270,{stroke:'#4c85bb',w:2.5})+beakerPath(x-60,x+60,190,410);
+      h+=T(x,f(top+34),'冰',{size:15,anchor:'middle',weight:700,fill:'#4a7890'})+T(x,150,'冰：約 0.92 g/cm³',{size:15,anchor:'middle',fill:'#4a7890',weight:700})+T(x,172,'水：1.00 g/cm³',{size:15,anchor:'middle',fill:'#2f6b99',weight:700});
+      h+=T(x,434,'約九成在水面下',{size:18,anchor:'middle',weight:700})+T(x,460,'密度小的浮在上面',{size:15,anchor:'middle',fill:P.muted});}
+    return {svg:h,reads:[['已結冰',s.wf+'%'],['質量','100 g（不變）'],['體積',V.toFixed(1)+' cm³'],['平均密度',(100/V).toFixed(3)+' g/cm³']],
+      note:`水結成冰時<b>質量不變、體積變大</b>（100 g 的水約 100 cm³，全部結冰後約 109 cm³），所以冰的<b>密度比水小</b>，會浮在水面。<br>裝滿水的玻璃瓶不要放進冷凍庫，水結冰膨脹會把瓶子撐裂；寒流時水管凍裂也是同樣的原因。（瓶子在結冰多少時裂開是示意）`};},
+
+  /* ---- 3 加熱曲線 ---- */
+  curve(s){const S=PHASE_SUB[s.sub],m=s.cm,H=PHASE_seg(S),tmax=H[3]*m/1000,t=clamp(s.ct,0,tmax),hq=1000*t/m,hc=s.cool?H[3]-hq:hq,st=PHASE_at(S,hc),k=st.k,Tc=st.T,ck=s.clock,f=PHASE_f,cool=s.cool;
+    const col=['#4c85bb',P.accent,'#d98a2b',P.red],nm=cool?[S.sn+'降溫','凝固',S.ln+'降溫','凝結']:[S.sn+'升溫','熔化',S.ln+'升溫','沸騰'],flat=k===1||k===3;
+    const ban=flat?`${nm[k]}（${PHASE_mn(k===1?S.mp:S.bp)}°C）：${cool?'狀態改變時放熱':'吸收的熱用來改變狀態'}，溫度不變`:`${nm[k]}：${cool?'放出熱，溫度下降':'吸收的熱使溫度上升'}`;
+    let h=`<rect x="150" y="14" width="600" height="38" rx="19" fill="${flat?'#e2f2ef':'#fffdf8'}" stroke="${flat?P.accent:'#ddd7c9'}" stroke-width="2"/>`+T(450,40,ban,{size:20,anchor:'middle',weight:700,fill:flat?P.accent:P.ink});
+    /* 燒杯 */
+    const x1=62,x2=228,W=x2-x1,bot=378,hw=50+m*.5,wcol=WARM((Tc-S.mp)/(S.bp-S.mp)*100);let lev=0;
+    h+=T(22,74,'溫度計讀數',{size:13,fill:P.muted})+T(22,102,PHASE_mn(tnum(Tc))+'°C',{size:26,weight:700,fill:col[k]});
+    if(k>=1){const fr=k===1?st.f:1;let wi=0,hi=0;if(k===1){wi=150*Math.sqrt(1-fr);hi=1.206*hw*Math.sqrt(1-fr);}
+      lev=k===1?Math.min(hw,fr*hw*W/(W-wi)):k===3?hw*(1-st.f):hw;
+      h+=`<rect x="${x1}" y="${f(bot-lev)}" width="${W}" height="${f(lev)}" fill="${wcol}" fill-opacity=".42"/>`;
+      if(k===1&&wi>3){const yb=Math.min(bot,bot-lev+.917*hi);h+=`<rect x="${f(140-wi/2)}" y="${f(yb-hi)}" width="${f(wi)}" height="${f(hi)}" rx="${f(Math.min(12,hi/3,wi/3))}" fill="url(#ph-ice)" stroke="#9fc3d6" stroke-width="2"/><rect x="${f(140-wi/2+1)}" y="${f(Math.max(yb-hi,bot-lev))}" width="${f(Math.max(0,wi-2))}" height="${f(Math.max(0,Math.min(hi,yb-(bot-lev))))}" rx="4" fill="${wcol}" fill-opacity=".2"/>`;}
+      h+=L(x1,f(bot-lev),x2,f(bot-lev),{stroke:wcol,w:3});
+      if(k===3&&!cool&&!reduceMotion)for(let i=0;i<10;i++){const lf=(ck*(.5+rnd(i+5)*.5)+rnd(i+9))%1;h+=`<circle cx="${f(74+rnd(i)*120+3*Math.sin(ck*5+i))}" cy="${f(bot-5-lf*(lev-10))}" r="${f(2+lf*3.5)}" fill="#fff" fill-opacity=".75" stroke="#7fa6c4"/>`;}
+      if(k===3&&cool)for(let i=0;i<8;i++){const y=178+rnd(i+2)*Math.max(4,bot-lev-196)+(reduceMotion?0:(ck*6*(.5+rnd(i))%10));h+=`<ellipse cx="${i%2?x2-6:x1+6}" cy="${f(y)}" rx="3" ry="4.5" fill="#8cc4ea" stroke="#3f7fb5"/>`;}}
+    else{const hi=1.206*hw;h+=`<rect x="65" y="${f(bot-hi)}" width="150" height="${f(hi)}" rx="12" fill="url(#ph-ice)" stroke="#9fc3d6" stroke-width="2"/><path d="M82 ${f(bot-hi+16)}l22 14M96 ${f(bot-hi*.5)}l30 -12M150 ${f(bot-22)}l26 -16" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>`;}
+    if(k===3&&!cool){if(s.sub==='water'){if(!reduceMotion)for(let i=0;i<5;i++){const lf=(ck*.22+i/5)%1;h+=`<ellipse cx="${f(158+(rnd(i+2)-.5)*40+5*Math.sin(ck+i))}" cy="${f(146-lf*62)}" rx="${f(13+lf*10)}" ry="${f(7+lf*5)}" fill="#fff" stroke="#b9c6cc" opacity="${f(Math.sin(Math.PI*lf)*.85)}"/>`;}
+      else h+=`<ellipse cx="158" cy="110" rx="20" ry="10" fill="#fff" stroke="#b9c6cc"/>`;
+      h+=L(240,99,190,106,{stroke:P.muted,w:1})+T(244,104,'白煙：小水滴',{size:14,fill:P.muted});}
+      h+=L(240,151,196,160,{stroke:P.muted,w:1})+T(244,156,`${S.gas}（看不見）`,{size:14,fill:P.muted});}
+    else if(k===3)h+=L(240,151,226,186,{stroke:P.muted,w:1})+T(244,156,`${S.gas}凝結成${S.liq}`,{size:14,fill:P.muted});
+    h+=beakerPath(x1-2,x2+2,168,bot+2)+`<path d="M70 190V340" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".6"/>`;
+    h+=glassTherm(212,bot-18,116,(bot-40)-(Tc-S.ymin)/(S.ymax-S.ymin)*200,{c:ALC,br:8,w:4});
+    h+=PHASE_plate(54,236,386,cool?'cool':'heat')+T(145,436,cool?'冷卻：每分鐘放出 1000 cal':'熱源：每分鐘供熱 1000 cal',{size:14,anchor:'middle',fill:P.muted})+T(145,458,`${S.name} ${m} g（1 大氣壓，不計散熱）`,{size:13,anchor:'middle',fill:P.muted});
+    h+=cool?vArrow(36,330,372,P.blue,{w:4})+T(36,318,'放熱',{size:14,anchor:'middle',fill:P.blue,weight:700}):vArrow(36,372,330,P.red,{w:4})+T(36,318,'吸熱',{size:14,anchor:'middle',fill:P.red,weight:700});
+    /* 粒子 */
+    {const b={x:272,y:228,w:158,h:150},N=24,C=6,pts=[];h+=PHASE_panel(262,196,178,250)+T(351,218,'粒子（示意）',{size:14,anchor:'middle',weight:700,fill:P.muted})+`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="8" fill="#f6f3ea" stroke="#ddd7c9"/>`;
+      const amp=.8+1.6*clamp((Tc-S.t0)/(S.mp-S.t0),0,1);
+      for(let i=0;i<N;i++){const c=i%C,rw=Math.floor(i/C),dd=Math.abs(c-2.5)+Math.abs(rw-1.5)*1.01;let rk=0;for(let j=0;j<N;j++){const d2=Math.abs(j%C-2.5)+Math.abs(Math.floor(j/C)-1.5)*1.01;if(d2>dd+1e-9||(Math.abs(d2-dd)<1e-9&&j<i))rk++;}
+        const wl=k===0?0:k===1?PHASE_ease(clamp(st.f*N-rk,0,1)):1,wg=k===3?PHASE_ease(clamp(st.f*N-(N-1-i),0,1)):0;
+        let p=PHASE_pos('s',i,s.ph,b,{cols:C,a:19,amp});if(wl>0){const q=PHASE_pos('l',i,s.ph,b,{lcols:6,sp:22});p=[PHASE_lerp(p[0],q[0],wl),PHASE_lerp(p[1],q[1],wl)];}
+        if(wg>0){const q=PHASE_pos('g',i,s.ph,b);p=[PHASE_lerp(p[0],q[0],wg),PHASE_lerp(p[1],q[1],wg)];}pts.push(p);}
+      h+=PHASE_dots(pts,6,'#3f7fb5')+T(351,404,['固態','固態＋液態','液態','液態＋氣態'][k],{size:16,anchor:'middle',weight:700,fill:col[k]})+T(351,428,['排列整齊，在原處振動','有些粒子離開固定位置','靠得近，但可以到處移動','有些粒子遠離、快速運動'][k],{size:13,anchor:'middle',fill:P.muted});}
+    /* 圖 */
+    const X=v=>492+v*7.5,Y=v=>390-(v-S.ymin)/(S.ymax-S.ymin)*300,tau=hh=>(cool?H[3]-hh:hh)*m/1000;
+    for(let v=S.ymin;v<=S.ymax;v+=S.ys)h+=L(492,f(Y(v)),867,f(Y(v)),{stroke:P.faint,w:1,dash:'3 5'})+T(484,f(Y(v)+5),PHASE_mn(v),{size:14,anchor:'end',fill:P.muted});
+    for(let v=0;v<=50;v+=10)h+=L(X(v),390,X(v),396,{stroke:P.muted})+T(X(v),414,v,{size:14,anchor:'middle',fill:P.muted});
+    h+=L(492,390,872,390,{stroke:P.muted,w:1.5})+L(492,390,492,84,{stroke:P.muted,w:1.5})+T(498,80,'溫度（°C）',{size:14,fill:P.muted})+T(867,434,cool?'冷卻時間（分鐘）':'加熱時間（分鐘）',{size:14,anchor:'end',fill:P.muted});
+    h+=L(492,f(Y(S.mp)),867,f(Y(S.mp)),{stroke:col[1],w:1.5,dash:'5 4',op:.7})+L(492,f(Y(S.bp)),867,f(Y(S.bp)),{stroke:col[3],w:1.5,dash:'5 4',op:.7});
+    h+=(cool?PHASE_TW(498,f(Y(S.mp)+19),`凝固點 ${PHASE_mn(S.mp)}°C`,{size:14,fill:col[1],weight:700}):PHASE_TW(864,f(Y(S.mp)+19),`熔點 ${PHASE_mn(S.mp)}°C`,{size:14,anchor:'end',fill:col[1],weight:700}))+PHASE_TW(864,f(Y(S.bp)+19),`沸點 ${PHASE_mn(S.bp)}°C`,{size:14,anchor:'end',fill:col[3],weight:700});
+    const hp=[0,H[0],H[1],H[2],H[3]],Th=v=>PHASE_at(S,v).T,ln=(a,b,c,w,op)=>`<path d="M${f(X(tau(a)))} ${f(Y(Th(a)))}L${f(X(tau(b)))} ${f(Y(b>=H[3]?S.bp:Th(b-1e-7)))}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`;
+    for(let i=0;i<4;i++)h+=ln(hp[i],hp[i+1],col[i],3,.28);
+    for(let i=0;i<4;i++){const a=cool?Math.max(hp[i],hc):hp[i],b=cool?hp[i+1]:Math.min(hp[i+1],hc);if(b>a+1e-6)h+=ln(a,b,col[i],5,1);}
+    h+=L(X(t),390,X(t),f(Y(Tc)),{stroke:col[k],w:1.5,dash:'3 4'})+`<circle cx="${f(X(t))}" cy="${f(Y(Tc))}" r="7" fill="${col[k]}" stroke="#fff" stroke-width="2.5"/>`;
+    (cool?[3,2,1,0]:[0,1,2,3]).forEach((i,j)=>{h+=PHASE_pill(537+j*95,460,'①②③④'[j]+' '+nm[i],col[i],{w:90,h:28,size:14,on:i===k});});
+    const stn=[S.solid,`${S.solid}＋${S.liq}（固液共存）`,S.liq,`${S.liq}＋${S.gas}`][k];
+    const note=(k===1?`<b>${nm[1]}</b>：溫度停在${cool?'凝固點':'熔點'} <b>${PHASE_mn(S.mp)}°C</b>，${S.solid}和${S.liq}同時存在（<b>固液共存</b>）。${cool?'凝固時放熱':'吸收的熱用來改變狀態'}，溫度不變，已${cool?'凝固':'熔化'} ${Math.round((cool?1-st.f:st.f)*100)}%。`
+      :k===3?`<b>${nm[3]}</b>：溫度停在沸點 <b>${PHASE_mn(S.bp)}°C</b>。${cool?S.gas+'凝結成'+S.liq+'時放熱':'吸收的熱用來把'+S.liq+'變成'+S.gas}，溫度不變。${s.sub==='water'?'水蒸氣看不見，看得到的白煙是凝結成的小水滴。':''}`
+      :`<b>${nm[k]}</b>：只有一種狀態（${stn}）時，${cool?'放熱使溫度下降':'吸收的熱使溫度上升'}。${s.sub==='water'&&k===0?'冰的比熱約是水的一半，所以同樣的熱源下冰升降溫比水快。':''}`)
+      +`<br>在 1 大氣壓下，純物質有固定的熔點和沸點，而且<b>熔點 ＝ 凝固點</b>（${S.name}：${PHASE_mn(S.mp)}°C、沸點 ${PHASE_mn(S.bp)}°C）。質量越大，各段需要的時間越長，但熔點、沸點不變。`
+      +(s.cx?`<br>延伸（國中不計算）：1 g 的${S.solid}完全熔化約吸收 ${S.lf} cal（熔化熱），1 g 的${S.liq}完全汽化約吸收 ${S.lv} cal（汽化熱），所以沸騰那一段比熔化長很多，圖只畫到一部分汽化為止。`:'');
+    return {svg:h,reads:[[cool?'冷卻時間':'加熱時間',t.toFixed(1)+' 分鐘'],['溫度',PHASE_mn(tnum(Tc))+'°C'],['狀態',stn],[cool?'已放出熱量':'已吸收熱量',Math.round(1000*t)+' cal']],note};},
+
+  /* ---- 4 三態變化 ---- */
+  tri(s){const ck=s.clock,f=PHASE_f,A=PHASE_AR[s.arrow]||PHASE_AR.melt,cc=a=>a?P.red:P.blue;
+    let h=L(26,36,66,36,{stroke:P.red,w:4,arrow:true})+T(76,42,'吸熱',{size:16,fill:P.red,weight:700})+L(26,64,66,64,{stroke:P.blue,w:4,arrow:true})+T(76,70,'放熱',{size:16,fill:P.blue,weight:700})+T(516,42,'點箭頭看粒子的變化',{size:14,anchor:'end',fill:P.muted});
+    for(const id of Object.keys(PHASE_AR)){const[nm,a,b,ab]=PHASE_AR[id],Pa=PHASE_NODE[a],Pb=PHASE_NODE[b],dx=Pb[0]-Pa[0],dy=Pb[1]-Pa[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len,nx=-uy,ny=ux,on=id===s.arrow,c=cc(ab);
+      h+=`<g data-tap="ar:${id}" tabindex="0" role="button" aria-label="${nm}" style="cursor:pointer">`+L(f(Pa[0]+ux*62+nx*11),f(Pa[1]+uy*62+ny*11),f(Pb[0]-ux*68+nx*11),f(Pb[1]-uy*68+ny*11),{stroke:c,w:on?6:4,arrow:true,op:on?1:.75})
+        +PHASE_pill(f((Pa[0]+Pb[0])/2+nx*39),f((Pa[1]+Pb[1])/2+ny*39),nm,c,{w:78,h:34,size:18,on})+`</g>`;}
+    for(const key of ['S','L','G']){const[x,y,nm,kd]=PHASE_NODE[key],b={x:x-33,y:y-33,w:66,h:66},pts=[];h+=`<circle cx="${x}" cy="${y}" r="50" fill="#fffdf8" stroke="${P.ink}" stroke-width="2.5"/>`;
+      for(let i=0;i<(kd==='g'?4:9);i++)pts.push(PHASE_pos(kd,i,ck*(kd==='g'?.8:1),b,{cols:3,a:15,lcols:3,sp:17,amp:1.2,r:5}));
+      h+=PHASE_dots(pts,5,'#3f7fb5')+T(x,key==='G'?48:474,nm,{size:21,anchor:'middle',weight:700});}
+    /* 右側：粒子變化 */
+    const[nm,a,b,ab,desc,ex]=A,c=cc(ab),bx={x:560,y:78,w:300,h:176},N=20,u=reduceMotion?1:clamp(((ck-s.a0)%6+6)%6/3.4,0,1),pts=[],ka=PHASE_NODE[a][3],kb=PHASE_NODE[b][3],o={cols:5,a:22,lcols:6,sp:24,amp:1.6,r:7};
+    h+=PHASE_panel(540,16,340,468)+T(560,56,nm,{size:28,weight:700,fill:c})+T(630,54,`${PHASE_NODE[a][2]} → ${PHASE_NODE[b][2]}`,{size:19,weight:700})+PHASE_pill(826,46,ab?'吸熱':'放熱',c,{w:68,h:30,size:16});
+    h+=`<rect x="${bx.x}" y="${bx.y}" width="${bx.w}" height="${bx.h}" rx="8" fill="#f6f3ea" stroke="#ddd7c9"/>`;
+    for(let i=0;i<N;i++){const w=PHASE_ease(clamp(u*1.5-(N-1-i)/N*.5,0,1)),p=PHASE_pos(ka,i,ck,bx,o),q=PHASE_pos(kb,i,ck,bx,o);pts.push([PHASE_lerp(p[0],q[0],w),PHASE_lerp(p[1],q[1],w)]);}
+    h+=PHASE_dots(pts,7,'#3f7fb5')+`<rect x="560" y="262" width="300" height="5" rx="2.5" fill="#ece7da"/><rect x="560" y="262" width="${f(300*u)}" height="5" rx="2.5" fill="${c}"/>`;
+    h+=T(560,292,desc,{size:15,fill:P.ink})+T(560,326,'生活例子',{size:15,weight:700,fill:P.muted});ex.forEach((e,i)=>{h+=T(560,352+i*26,(e[0]==='（'?'':'・')+e,{size:16});});
+    h+=L(560,434,860,434,{stroke:P.faint,w:1})+T(560,460,'狀態改變時質量不變，體積和密度會改變。',{size:15,weight:700,fill:P.accent});
+    return {svg:h,reads:[['變化',`${nm}：${PHASE_NODE[a][2]} → ${PHASE_NODE[b][2]}`],['熱',ab?'吸熱':'放熱'],['質量','不變'],['體積、密度','改變']],
+      note:`<b>吸熱</b>的變化：熔化、汽化、昇華（粒子變得比較分散）；<b>放熱</b>的變化：凝固、凝結、凝華（粒子變得比較靠近）。<br>狀態改變只是粒子的排列和距離改變，粒子的種類和數目不變，所以<b>質量不變</b>。${s.arrow==='cond'?'水蒸氣看不見，看得到的「白煙」是凝結成的小水滴。':s.arrow==='vap'?'汽化有蒸發和沸騰兩種方式，可以換到「蒸發和沸騰的比較」。':''}`};},
+  evap(s){const ck=s.clock,f=PHASE_f,mv=!reduceMotion;
+    let h=PHASE_panel(40,20,400,330)+PHASE_panel(460,20,400,330);
+    [[240,'蒸發','室溫 25°C 的水',25],[660,'沸騰','100°C 的水（1 大氣壓）',100]].forEach(([x,nm,sub,Tc],j)=>{const bot=j?286:312,lev=bot-98;
+      h+=T(x,58,nm,{size:26,anchor:'middle',weight:700,fill:j?P.red:P.blue})+T(x,84,sub,{size:15,anchor:'middle',fill:P.muted});
+      h+=`<rect x="${x-78}" y="${lev}" width="156" height="98" fill="${WARM(Tc)}" fill-opacity=".4"/>`+L(x-78,lev,x+78,lev,{stroke:WARM(Tc),w:3});
+      if(j&&mv)for(let i=0;i<11;i++){const lf=(ck*(.5+rnd(i+5)*.5)+rnd(i+9))%1;h+=`<circle cx="${f(x-64+rnd(i)*128+3*Math.sin(ck*5+i))}" cy="${f(bot-5-lf*88)}" r="${f(2+lf*4)}" fill="#fff" fill-opacity=".8" stroke="#7fa6c4"/>`;}
+      const n=j?12:4;for(let i=0;i<n;i++){const lf=mv?(ck*(j?.45:.16)*(.7+rnd(i+3)*.6)+i/n)%1:(i+.5)/n;h+=`<circle cx="${f(x-62+rnd(i+13)*124+8*Math.sin(ck*.8+i))}" cy="${f(lev-6-lf*72)}" r="4.5" fill="#3f7fb5" opacity="${f(1-lf*.9)}"/>`;}
+      h+=beakerPath(x-80,x+80,bot-150,bot+2);
+      if(j)h+=PHASE_plate(x-90,x+90,bot+8,'heat');else h+=L(x-110,bot+6,x+110,bot+6,{stroke:'#b9b3a4',w:3});});
+    h+=T(334,212,'只有表面的',{size:14,fill:P.blue,weight:700})+T(334,231,'粒子離開',{size:14,fill:P.blue,weight:700})+T(566,226,'內部也汽化',{size:14,anchor:'end',fill:P.red,weight:700})+T(566,245,'（冒出氣泡）',{size:14,anchor:'end',fill:P.red,weight:700});
+    h+=PHASE_panel(40,362,820,96);[['發生的溫度','任何溫度都會發生','到達沸點才發生'],['發生的位置','只在液體表面','液體內部和表面同時'],['劇烈程度','緩慢','劇烈，產生大量氣泡']].forEach(([a,b,c],i)=>{const y=388+i*28;
+      if(i)h+=L(60,y-19,840,y-19,{stroke:P.faint,w:1});h+=T(450,y,a,{size:15,anchor:'middle',fill:P.muted,weight:700})+T(240,y,b,{size:17,anchor:'middle',weight:700,fill:P.blue})+T(660,y,c,{size:17,anchor:'middle',weight:700,fill:P.red});});
+    h+=T(450,482,'相同的地方：都是汽化（液態 → 氣態），都要吸熱。',{size:16,anchor:'middle',weight:700,fill:P.accent});
+    return {svg:h,reads:[['蒸發','任何溫度、只在表面'],['沸騰','到達沸點、內部和表面'],['相同','都是汽化，都吸熱']],
+      note:'<b>蒸發</b>：任何溫度都會發生，只在液體<b>表面</b>，比較緩慢；溫度高、表面積大、通風時蒸發較快。<b>沸騰</b>：到達<b>沸點</b>才發生，液體<b>內部和表面同時</b>汽化，很劇烈；沸騰時溫度不變。<br>兩種都要<b>吸熱</b>：流汗後汗水蒸發帶走熱，所以覺得涼；擦酒精覺得涼也是一樣。'};},
+
+  /* ---- 5 吸熱與放熱的變化 ---- */
+  side(title,rows,tag,c,extra){let h=PHASE_panel(580,30,300,450)+T(600,66,title,{size:19,weight:700});
+    rows.forEach(([col,t,arrow],i)=>{const y=112+i*92;h+=`<circle cx="622" cy="${y}" r="20" fill="${col}" stroke="#8a949b" stroke-width="1.5"/>`+T(652,y+6,t,{size:16,weight:700});if(arrow)h+=L(622,y+28,622,y+62,{stroke:c,w:3,arrow:true})+T(640,y+52,arrow,{size:15,fill:c,weight:700});});
+    extra.forEach((e,i)=>{h+=T(600,306+i*27,e,{size:15,fill:i?P.ink:P.accent,weight:i?400:700});});
+    return h+PHASE_pill(650,440,tag,c,{w:100,h:34,size:18});},
+  dropper(x,y,ck,on){const f=PHASE_f;let h=`<path d="M${x-7} ${y-78}H${x+7}V${y-18}L${x+2.5} ${y}H${x-2.5}L${x-7} ${y-18}Z" fill="#f4fafc" stroke="#83999d" stroke-width="2" stroke-linejoin="round"/><rect x="${x-5}" y="${y-52}" width="10" height="38" fill="#a9d3ee"/><ellipse cx="${x}" cy="${y-96}" rx="14" ry="22" fill="#c8553d" stroke="#8f3a29" stroke-width="1.5"/>`;
+    if(on){const lf=reduceMotion?.4:(ck*.9)%1;h+=`<path d="M${x} ${f(y+4+lf*lf*70)}q-6 9 0 13q6 -4 0 -13z" fill="#6fb1e0" stroke="#3f7fb5"/>`;}return h;},
+  c_cu(s){const p=s.cp/100,ck=s.clock,f=PHASE_f,BL=[47,127,214],WH=[241,239,231],heat=s.cs==='heat';let h='';
+    if(heat){const col=PHASE_rgb(BL,WH,p);
+      h+=T(290,62,'加熱藍色硫酸銅晶體',{size:20,anchor:'middle',weight:700});
+      h+=`<rect x="56" y="440" width="284" height="10" rx="4" fill="url(#ph-metal)" stroke="#6c7780"/><rect x="82" y="96" width="9" height="346" rx="3" fill="url(#ph-metal)" stroke="#6c7780"/>`;
+      h+=`<rect x="352" y="388" width="104" height="52" rx="4" fill="#c9a47a" stroke="#8a6238" stroke-width="1.5"/><path d="M360 404H448M360 422H448" stroke="#b08a5e" stroke-width="1.5"/>`+PHASE_lamp(404,388,ck,76)+`<g transform="rotate(-7 300 214)"><rect x="90" y="208" width="126" height="9" fill="url(#ph-metal)" stroke="#6c7780"/>`
+        +`<path d="M186 190H420Q444 190 444 214Q444 238 420 238H186" fill="#f7fbfc" fill-opacity=".85" stroke="#83999d" stroke-width="3.5" stroke-linecap="round"/><path d="M186 186V242" stroke="#83999d" stroke-width="3.5" stroke-linecap="round"/>`
+        +`<path d="M352 236Q356 222 372 218Q384 208 400 214Q414 206 428 218Q440 224 438 228Q432 237 420 236Z" fill="${col}" stroke="#7d8a92" stroke-width="1.2"/>`
+        +[0,1,2,3,4].map(i=>`<ellipse cx="${200+i*22+rnd(i)*8}" cy="${i%2?196:232}" rx="${f(2+p*3)}" ry="${f(1.6+p*2.4)}" fill="#8cc4ea" stroke="#3f7fb5" opacity="${f(clamp(p*1.6-i*.08,0,1))}"/>`).join('')
+        +`<rect x="210" y="184" width="16" height="60" rx="4" fill="url(#ph-metal)" stroke="#6c7780"/><path d="M210 200H400" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/></g>`;
+      if(p>.15)h+=T(232,176,'試管口附近出現小水滴',{size:15,anchor:'middle',fill:P.blue,weight:700});
+      h+=T(214,290,'試管口略向下傾斜',{size:14,anchor:'middle',fill:P.muted})+T(214,310,'（水才不會倒流回熱的地方）',{size:14,anchor:'middle',fill:P.muted});
+      h+=`<rect x="130" y="360" width="150" height="46" rx="10" fill="${col}" stroke="#8a949b" stroke-width="1.5"/>`+T(205,350,'現在的顏色',{size:14,anchor:'middle',fill:P.muted});
+      h+=this.side('硫酸銅晶體受熱',[['rgb(47,127,214)','藍色硫酸銅晶體','加熱'],['rgb(241,239,231)','白色硫酸銅粉末 ＋ 水']],'吸熱',P.red,['失去結晶水，顏色由藍變白。','要一直加熱（吸熱）才會進行。']);
+      return {svg:h,reads:[['進行程度',s.cp+'%'],['顏色',p<.15?'藍色':p>.85?'白色':'藍色 → 白色'],['熱','吸熱']],
+        note:'藍色的硫酸銅晶體含有<b>結晶水</b>。加熱時<b>吸熱</b>，失去結晶水，變成<b>白色</b>的硫酸銅粉末，試管口附近出現小水滴。<br>加熱後得到的白色粉末和原來的藍色晶體性質不同，這不只是狀態改變。'};}
+    const Tc=25+20*p;h+=T(290,62,'白色硫酸銅粉末滴水',{size:20,anchor:'middle',weight:700});
+    h+=L(70,402,510,402,{stroke:'#b9b3a4',w:3})+`<clipPath id="ph-mound"><path d="M190 372Q230 318 290 314Q350 318 390 372Z"/></clipPath><path d="M190 372Q230 318 290 314Q350 318 390 372Z" fill="rgb(241,239,231)" stroke="#a9a595" stroke-width="1.5"/>`;
+    if(p>0)h+=`<g clip-path="url(#ph-mound)"><ellipse cx="290" cy="322" rx="${f(18+140*Math.sqrt(p))}" ry="${f(10+62*Math.sqrt(p))}" fill="rgb(47,127,214)"/></g><path d="M190 372Q230 318 290 314Q350 318 390 372Z" fill="none" stroke="#7d8a92" stroke-width="1.5"/>`;
+    h+=`<path d="M150 356Q290 418 430 356" fill="#f4fafc" fill-opacity=".55" stroke="#83999d" stroke-width="3.5" stroke-linecap="round"/><path d="M172 370Q290 410 408 370" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".7"/>`;
+    h+=this.dropper(290,226,ck,s.cp>0&&s.cp<100)+T(264,150,'滴管（水）',{size:15,anchor:'end',fill:P.muted});
+    h+=glassTherm(384,352,130,330-(Tc-20)*5.5,{c:ALC,br:9,w:4})+thermTicks(396,20,50,5,10,v=>330-(v-20)*5.5,{size:14})+T(384,104,tnum(Tc)+'°C',{size:24,anchor:'middle',weight:700,fill:P.red})+T(440,436,'溫度上升（示意）',{size:15,anchor:'middle',fill:P.red,weight:700});
+    h+=T(150,436,p>0?'沾到水的地方變成藍色':'乾燥的白色粉末',{size:16,anchor:'middle',weight:700,fill:p>0?'rgb(47,127,214)':P.muted});
+    h+=this.side('白色硫酸銅粉末遇水',[['rgb(241,239,231)','白色硫酸銅粉末','滴水'],['rgb(47,127,214)','變回藍色']],'放熱',P.blue,['可以用來檢驗水。','滴水後摸起來溫溫的（放熱）。']);
+    return {svg:h,reads:[['進行程度',s.cp+'%'],['顏色',p<.05?'白色':p>.85?'藍色':'白色 → 藍色'],['溫度（示意）',tnum(Tc)+'°C'],['熱','放熱']],
+      note:'白色的硫酸銅粉末遇到水，會變回<b>藍色</b>，同時<b>放熱</b>，溫度升高。因為遇水就變色，所以可以用來<b>檢驗水</b>。<br>和「加熱藍色晶體」剛好相反：一個吸熱、一個放熱。溫度上升幾度是示意。'};},
+  c_co(s){const w=s.cw/100,ck=s.clock,f=PHASE_f,BL=[59,127,196],PK=[232,140,175],col=PHASE_rgb(BL,PK,w);
+    let h=T(290,62,'氯化亞鈷試紙',{size:20,anchor:'middle',weight:700});
+    h+=`<rect x="120" y="226" width="300" height="64" rx="5" fill="${col}" stroke="#7d8a92" stroke-width="1.5"/><path d="M128 234H412" stroke="#fff" stroke-width="3" opacity=".35" stroke-linecap="round"/>`;
+    h+=`<path d="M420 246L520 226M420 270L520 290" stroke="#8b959c" stroke-width="5" stroke-linecap="round"/><path d="M520 226Q540 258 520 290" fill="none" stroke="#8b959c" stroke-width="5" stroke-linecap="round"/>`;
+    h+=this.dropper(200,196,ck,s.cw>0&&s.cw<100)+T(228,120,'滴管（水）',{size:15,fill:P.muted});
+    h+=T(270,266,w<.15?'藍色':w>.7?'粉紅色':'',{size:20,anchor:'middle',weight:700,fill:'#fff'});
+    h+=`<rect x="120" y="356" width="300" height="18" rx="9" fill="url(#ph-co)" stroke="#8a949b"/><path d="M${f(120+300*w)} 352l-8 -14h16z" fill="${P.ink}"/>`+T(120,402,'乾燥：藍色',{size:16,weight:700,fill:'rgb(59,127,196)'})+T(420,402,'遇水：粉紅色',{size:16,anchor:'end',weight:700,fill:'rgb(205,95,140)'});
+    h+=T(270,446,'潮溼變粉紅的試紙，烘乾（加熱）後又變回藍色。',{size:15,anchor:'middle',fill:P.muted});
+    h+=this.side('氯化亞鈷試紙',[['rgb(59,127,196)','乾燥時：藍色','遇水'],['rgb(232,140,175)','變成粉紅色']],'檢驗水',P.accent,['可以用來檢驗水。','使用前要保持乾燥，','用鑷子夾，不要用手直接拿。']);
+    return {svg:h,reads:[['含水程度',s.cw+'%'],['試紙顏色',w<.15?'藍色':w>.7?'粉紅色':'藍紫色 → 粉紅色']],
+      note:'<b>氯化亞鈷試紙</b>乾燥時是<b>藍色</b>，遇到水變成<b>粉紅色</b>，可以用來檢驗水；烘乾後又變回藍色。<br>檢驗水的兩種方法：白色硫酸銅粉末（白 → 藍）、氯化亞鈷試紙（藍 → 粉紅）。手上的汗也會讓試紙變色，所以要用鑷子夾。'};},
+  c_life(s){const warm=s.cl==='warm',t=s.lt,ck=s.clock,f=PHASE_f,A=warm?30:-18,Tat=v=>25+A*(1-Math.exp(-v/2.5)),Tc=Tat(t),c=warm?P.red:P.blue,act=Math.exp(-t/2.5),yT=v=>388-v*4.4;
+    let h=T(250,62,warm?'暖暖包：鐵粉和空氣作用，放熱':'硝酸銨溶於水：吸熱（冷敷包的原理）',{size:19,anchor:'middle',weight:700});
+    if(warm){h+=`<rect x="90" y="232" width="230" height="150" rx="16" fill="#f3e3d1" stroke="#c9a784" stroke-width="2.5"/><rect x="102" y="244" width="206" height="126" rx="10" fill="none" stroke="#c9a784" stroke-width="1.5" stroke-dasharray="5 5"/>`+T(205,300,'暖暖包',{size:22,anchor:'middle',weight:700,fill:'#9a5a2b'})+T(205,328,'（鐵粉、活性碳、食鹽…）',{size:14,anchor:'middle',fill:'#9a5a2b'});
+      [[205,222,0,-1],[130,226,-.5,-1],[280,226,.5,-1],[80,306,-1,0],[205,392,0,1],[130,388,-.5,1]].forEach(([x,y,dx,dy],i)=>{const k=reduceMotion?0:3*Math.sin(ck*3+i);h+=L(f(x+dx*k),f(y+dy*k),f(x+dx*(30+k)),f(y+dy*(30+k)),{stroke:P.red,w:4,arrow:true,op:f(.3+.7*act)});});
+      h+=T(205,452,'放熱：周圍的溫度升高',{size:17,anchor:'middle',weight:700,fill:P.red});}
+    else{h+=`<rect x="102" y="262" width="206" height="120" fill="${WARM(Tc)}" fill-opacity=".4"/>`+L(102,262,308,262,{stroke:WARM(Tc),w:3});
+      for(let i=0;i<14;i++){const r=3.2*clamp(1-t/8+rnd(i)*.3,0,1);if(r>.4)h+=`<rect x="${f(124+rnd(i+3)*160)}" y="${f(374-rnd(i+8)*14-r)}" width="${f(r*2)}" height="${f(r*2)}" rx="1" fill="#fff" stroke="#a9a595"/>`;}
+      h+=beakerPath(100,310,196,384)+T(205,330,'水 ＋ 硝酸銨',{size:17,anchor:'middle',weight:700,fill:'#2f6b99'});
+      [[72,306,1,0],[72,350,1,0],[338,306,-1,0],[338,350,-1,0]].forEach(([x,y,dx],i)=>{const k=reduceMotion?0:3*Math.sin(ck*3+i);h+=L(f(x-dx*(30-k)),y,f(x+dx*k),y,{stroke:P.blue,w:4,arrow:true,op:f(.3+.7*act)});});
+      h+=T(205,452,'吸熱：周圍的溫度降低',{size:17,anchor:'middle',weight:700,fill:P.blue});}
+    h+=glassTherm(warm?356:286,warm?368:362,120,yT(Tc),{c:ALC,br:9,w:4})+thermTicks(warm?368:298,0,60,5,10,yT,{size:14})+T(warm?336:266,134,tnum(Tc)+'°C',{size:24,anchor:'end',weight:700,fill:c});
+    /* 圖 */
+    const X=v=>606+v*24,Y=v=>410-v*4.6;h+=PHASE_panel(540,30,340,450)+T(710,62,'溫度隨時間的變化（示意）',{size:16,anchor:'middle',weight:700});
+    for(let v=0;v<=60;v+=10)h+=L(606,f(Y(v)),846,f(Y(v)),{stroke:P.faint,w:1,dash:'3 5'})+T(598,f(Y(v)+5),v,{size:14,anchor:'end',fill:P.muted});
+    for(let v=0;v<=10;v+=2)h+=L(X(v),410,X(v),416,{stroke:P.muted})+T(X(v),434,v,{size:14,anchor:'middle',fill:P.muted});
+    h+=L(606,410,852,410,{stroke:P.muted,w:1.5})+L(606,410,606,112,{stroke:P.muted,w:1.5})+T(612,106,'溫度（°C）',{size:14,fill:P.muted})+T(846,460,'時間（分鐘）',{size:14,anchor:'end',fill:P.muted});
+    h+=L(606,f(Y(25)),846,f(Y(25)),{stroke:P.accent,w:1.5,dash:'5 4'})+T(842,f(Y(25)+(warm?19:-8)),'室溫 25°C',{size:14,anchor:'end',fill:P.accent});
+    const path=e=>{let d='';for(let v=0;v<=e+1e-6;v+=.25)d+=(d?'L':'M')+f(X(v))+' '+f(Y(Tat(v)));return d;};
+    h+=`<path d="${path(10)}" fill="none" stroke="${c}" stroke-width="2.5" opacity=".28"/><path d="${path(t)}" fill="none" stroke="${c}" stroke-width="4.5" stroke-linecap="round"/><circle cx="${f(X(t))}" cy="${f(Y(Tc))}" r="7" fill="${c}" stroke="#fff" stroke-width="2.5"/>`;
+    return {svg:h,reads:[['經過時間',t.toFixed(1)+' 分鐘'],['溫度（示意）',tnum(Tc)+'°C'],['熱',warm?'放熱':'吸熱']],
+      note:warm?'<b>暖暖包</b>：撕開包裝後，裡面的鐵粉和空氣中的氧作用，<b>放熱</b>，所以摸起來變熱。放熱的例子還有燃燒、白色硫酸銅粉末遇水。<br>溫度數值是示意。':'<b>硝酸銨溶於水</b>會<b>吸熱</b>，水溫下降，拋棄式冷敷包就是利用這個原理。吸熱的例子還有加熱硫酸銅晶體、冰熔化、水蒸發。<br>溫度數值是示意。'};}
+};
+
+/* ===== 5-5 熱的傳播方式 ===== */
+/* ===== 5-5 熱的傳播方式：傳導、對流、輻射、保溫瓶、判斷題 ===== */
+const TRANSFER_MAT={
+  ag:{n:'銀',a:1.66,c1:'#f6f8fa',c2:'#b4bcc5'},cu:{n:'銅',a:1.11,c1:'#f1b98f',c2:'#b3683d'},al:{n:'鋁',a:.97,c1:'#e9edf0',c2:'#a3adb6'},
+  fe:{n:'鐵',a:.23,c1:'#b4bac1',c2:'#69717a'},gl:{n:'玻璃',a:.0034,c1:'#eaf8fb',c2:'#a8d2db'},wd:{n:'木',a:.0012,c1:'#e6c696',c2:'#a87b44'}};
+const TRANSFER_ORDER=['ag','cu','al','fe','gl','wd'];
+/* 一維熱擴散：棒長 21 cm、每格 0.5 cm；x＝0 維持 400°C，另一端絕熱，側面少量散熱。每 1 秒存一筆，共 120 秒 */
+const TRANSFER_CACHE={};
+function transferRod(k){if(TRANSFER_CACHE[k])return TRANSFER_CACHE[k];
+  const a=TRANSFER_MAT[k].a,N=43,dx=.5,dt=.05,r=a*dt/dx/dx,snaps=[];let u=new Array(N).fill(25);u[0]=400;
+  for(let i=0;i<=2400;i++){if(i%20===0)snaps.push(u.slice());const w=u.slice();
+    for(let j=1;j<N;j++){const rt=j<N-1?u[j+1]:u[j-1];w[j]=u[j]+r*(u[j-1]-2*u[j]+rt)-.004*dt*(u[j]-25);}u=w;}
+  return TRANSFER_CACHE[k]=snaps;}
+function transferRodT(k,x,t){const S=transferRod(k),ti=clamp(t,0,120),i0=Math.min(119,Math.floor(ti)),ft=ti-i0,xj=clamp(x/.5,0,42),j0=Math.min(41,Math.floor(xj)),fx=xj-j0;
+  const at=i=>S[i][j0]+(S[i][j0+1]-S[i][j0])*fx;return at(i0)+(at(i0+1)-at(i0))*ft;}
+/* 蠟在 60°C 熔化：回傳火柴掉落的時間（120 秒內沒掉回傳 999） */
+function transferDrop(k,x){const key=k+'@'+x;if(TRANSFER_CACHE[key]!==undefined)return TRANSFER_CACHE[key];let out=999;
+  for(let t=1;t<=120;t++){const b=transferRodT(k,x,t);if(b>=60){const a=transferRodT(k,x,t-1);out=t-1+(60-a)/(b-a);break;}}
+  return TRANSFER_CACHE[key]=out;}
+const transferGlow=T=>{const f=clamp((T-25)/375,0,1);return [`rgb(255,${Math.round(196-150*f)},${Math.round(72-44*f)})`,f<.004?0:Math.min(.95,1.5*Math.pow(f,.72))];};
+/* 試管：上層 a、下層 b 兩區，冰塊比例 f。熱在下方時靠對流混合得快，熱在上方時只靠傳導（很慢） */
+function transferTube(th){const key='tube'+th;if(TRANSFER_CACHE[key])return TRANSFER_CACHE[key];
+  const top=th==='top',dt=.05,out=[];let a=10,b=10,f=1;
+  for(let i=0;i<=2400;i++){if(i%10===0)out.push([a,b,f]);let qa=top?2.6:0,qb=top?0:2.6;const ex=(top?.0015:.6)*(b-a);qa+=ex;qb-=ex;
+    if(f>0){const q=(top?.012:.07)*Math.cbrt(f*f)*(top?b:a);if(top)qb-=q;else qa-=q;f=Math.max(0,f-q*dt/60);}
+    a=clamp(a+qa*dt,0,100);b=clamp(b+qb*dt,0,100);}
+  return TRANSFER_CACHE[key]=out;}
+/* 對流的流場：在 u＝h 處上升的兩個環流；v0～v1 是有流動的高度範圍（v 由底往上） */
+function transferFlow(s){if(s.cs==='room'){const ac=s.rd==='ac',w=s.wrong;return {h:ac?0:1,v0:w&&!ac?.74:0,v1:w&&ac?.26:1,k:w?.06:.085};}
+  return {h:({l:.14,c:.5,r:.86})[s.hp],v0:0,v1:1,k:.036*s.pw};}
+function transferVel(f,u,v){if(v<f.v0||v>f.v1||f.k<=0)return [0,0];const bh=f.v1-f.v0,e=(v-f.v0)/bh,PI=Math.PI;let du,dv;
+  if(u<f.h){const w=Math.max(f.h,.001),x=u/w;du=w*PI*Math.sin(PI*x)*Math.cos(PI*e);dv=-PI*Math.cos(PI*x)*Math.sin(PI*e);}
+  else{const w=Math.max(1-f.h,.001),x=(u-f.h)/w;du=-w*PI*Math.sin(PI*x)*Math.cos(PI*e);dv=PI*Math.cos(PI*x)*Math.sin(PI*e);}
+  return [du*f.k,dv*f.k*bh];}
+const TRANSFER_PTS=(()=>{const a=[];for(let i=0;i<54;i++){a.push(+(((i%9)+.5+(rnd(i+3)-.5)*.8)/9).toFixed(3),+((Math.floor(i/9)+.5+(rnd(i+91)-.5)*.8)/6).toFixed(3));}return a;})();
+/* 黑罐、亮罐：吸收率＝放射率 e；開燈由 25°C 升溫，關燈由 60°C 降溫（示意） */
+const TRANSFER_E=[.9,.2];
+function transferCan(s,j,t){const e=TRANSFER_E[j],k=.06+.12*e;if(s.rp==='off')return 25+35*Math.exp(-k*t);const eq=25+1200*e/(s.rdist*s.rdist*k);return eq+(25-eq)*Math.exp(-k*t);}
+/* 保溫瓶：三種途徑的散熱係數（每小時），水 500 g */
+function transferBottle(s,ideal){const air=!ideal&&s.bair,nos=!ideal&&s.bnos,open=!ideal&&s.bopen,hot=s.bc==='hot';
+  const c=.006+(air?.03:0),v=.002+(air?.06:0)+(open?(hot?.22:.05):0),r=nos?.05:.005;return {c,v,r,k:c+v+r,T0:hot?95:4};}
+const transferBT=(m,t)=>25+(m.T0-25)*Math.exp(-m.k*t);
+const transferClock=s=>s.mode==='cond'?['ct',120,8]:s.mode==='conv'&&s.cs==='tube'?['tt',120,6]:s.mode==='rad'?['rt',20,1.4]:s.mode==='bottle'?['bt',12,.9]:0;
+const TRANSFER_PLAY={type:'buttons',label:'時間',items:[['播放',s=>{const k=transferClock(s);if(k){if(s[k[0]]>=k[1])s[k[0]]=0;s.run=true;}}],['暫停',s=>{s.run=false;}],['從頭',s=>{const k=transferClock(s);if(k)s[k[0]]=0;s.run=false;}]],show:s=>!!transferClock(s)};
+
+/* ---------- 畫圖用的小工具 ---------- */
+function transferArrow(x1,y1,x2,y2,c,o={}){const{w=4,op=1}=o,dx=x2-x1,dy=y2-y1,l=Math.hypot(dx,dy);if(l<6)return '';const ux=dx/l,uy=dy/l,a=Math.min(l*.6,w*2.7),bx=x2-ux*a,by=y2-uy*a,n=a*.55;
+  return `<g opacity="${op}"><line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${(bx-uy*n).toFixed(1)} ${(by+ux*n).toFixed(1)}L${(bx+uy*n).toFixed(1)} ${(by-ux*n).toFixed(1)}Z" fill="${c}" stroke="${c}" stroke-width="1.5" stroke-linejoin="round"/></g>`;}
+/* 波浪箭頭：代表輻射 */
+function transferWavy(x1,y1,x2,y2,c,o={}){const{w=2.6,amp=5,wl=18,ph=0,op=1}=o,dx=x2-x1,dy=y2-y1,l=Math.hypot(dx,dy);if(l<14)return '';const ux=dx/l,uy=dy/l,body=l-11;let d='';
+  for(let q=0;q<=body;q+=2.5){const a=amp*Math.sin(q/wl*2*Math.PI-ph)*Math.min(1,q/7,(body-q)/7);d+=(q?'L':'M')+(x1+ux*q-uy*a).toFixed(1)+' '+(y1+uy*q+ux*a).toFixed(1);}
+  const bx=x2-ux*11,by=y2-uy*11;
+  return `<g opacity="${op}"><path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${(bx-uy*5.5).toFixed(1)} ${(by+ux*5.5).toFixed(1)}L${(bx+uy*5.5).toFixed(1)} ${(by-ux*5.5).toFixed(1)}Z" fill="${c}"/></g>`;}
+function transferFlame(x,yb,h,an,sc=1){const H=h*(1+.07*Math.sin(an*9)+.04*Math.sin(an*14.3)),sw=2.2*Math.sin(an*5.1),w=h*.36*sc,f=(W,HH,fill)=>`<path d="M${x} ${yb}C${x-W} ${yb-HH*.3} ${x-W*.55+sw} ${yb-HH*.72} ${x+sw} ${yb-HH}C${x+W*.55+sw} ${yb-HH*.72} ${x+W} ${yb-HH*.3} ${x} ${yb}Z" fill="${fill}"/>`;
+  return f(w,H,'url(#tr-flame)')+f(w*.5,H*.58,'#fff3b0')+f(w*.24,H*.3,'#8fc9ff');}
+/* 酒精燈：火焰尖端在 yTip，底部墊到桌面 table */
+function transferLamp(x,yTip,table,an,fh=40){const yb=yTip+fh,b=yb+62;let h='';
+  if(table-b>3)h+=`<rect x="${x-44}" y="${b}" width="88" height="${table-b}" rx="3" fill="#d9b98a" stroke="#b08a57" stroke-width="1.5"/>`;
+  h+=`<path d="M${x-12} ${yb+16}C${x-44} ${yb+22} ${x-48} ${yb+58} ${x-36} ${yb+62}H${x+36}C${x+48} ${yb+58} ${x+44} ${yb+22} ${x+12} ${yb+16}Z" fill="#f4fbfd" stroke="#83999d" stroke-width="2.5"/>`
+    +`<path d="M${x-39} ${yb+40}C${x-42} ${yb+52} ${x-40} ${yb+59} ${x-35} ${yb+60}H${x+35}C${x+40} ${yb+59} ${x+42} ${yb+52} ${x+39} ${yb+40}Z" fill="#bfe0f2"/>`
+    +`<rect x="${x-3}" y="${yb-5}" width="6" height="14" rx="2" fill="#f1ead8" stroke="#b9b09a"/><rect x="${x-13}" y="${yb+6}" width="26" height="11" rx="3" fill="#c7cdd2" stroke="#8a959c" stroke-width="1.5"/>`;
+  return h+transferFlame(x,yb-3,fh-3,an);}
+const transferPill=(x,y,w,h,t,o={})=>{const{c=P.ink,bg='#fffdf8',bd='#ddd7c9',size=16,weight=700}=o;return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(h/2,12)}" fill="${bg}" stroke="${bd}" stroke-width="1.5"/>`+T(x+w/2,y+h/2+size*.36,t,{size,fill:c,anchor:'middle',weight});};
+const transferPanel=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="#fffdf8" stroke="#ddd7c9"/>`;
+/* 環流箭頭：紅色上升、藍色下沉 */
+function transferLoop(bx,by,bw,bh,f,o={}){const{op=.5,w=5}=o;let h='';const y1=by+bh*(1-f.v1),y2=by+bh*(1-f.v0);
+  [[0,f.h,1],[f.h,1,0]].forEach(([a,b,ur])=>{const cw=(b-a)*bw;if(cw<80)return;const m=Math.min(36,cw*.2),my=Math.min(32,(y2-y1)*.24),xL=bx+a*bw+m,xR=bx+b*bw-m,yt=y1+my,yb=y2-my,xu=ur?xR:xL,xd=ur?xL:xR,g=16,sg=xd>xu?1:-1;
+    h+=transferArrow(xu,yb-g,xu,yt+g,P.red,{w,op})+transferArrow(xu+sg*g,yt,xd-sg*g,yt,'#8d8f95',{w,op})+transferArrow(xd,yt+g,xd,yb-g,P.blue,{w,op})+transferArrow(xd-sg*g,yb,xu+sg*g,yb,'#8d8f95',{w,op});});
+  return h;}
+const TRANSFER_DEFS=`<radialGradient id="tr-flame" cx=".5" cy=".75" r=".7"><stop offset="0" stop-color="#ffd35a"/><stop offset=".6" stop-color="#ff9a3c"/><stop offset="1" stop-color="#f0642c"/></radialGradient>`
+  +`<linearGradient id="tr-steel" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#aeb7bf"/><stop offset=".35" stop-color="#eef2f5"/><stop offset=".7" stop-color="#c3cbd2"/><stop offset="1" stop-color="#98a2ab"/></linearGradient>`
+  +`<linearGradient id="tr-shine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9aa5ae"/><stop offset=".22" stop-color="#f7fafc"/><stop offset=".45" stop-color="#c2cbd3"/><stop offset=".7" stop-color="#eef2f5"/><stop offset="1" stop-color="#8f9aa3"/></linearGradient>`
+  +`<linearGradient id="tr-black" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#23272b"/><stop offset=".3" stop-color="#4a5056"/><stop offset=".6" stop-color="#2c3035"/><stop offset="1" stop-color="#1b1e21"/></linearGradient>`;
+function transferGraph(x0,x1,y0,y1,xs,ys,xl,yl){let h='';
+  ys.forEach(([v,y])=>{h+=L(x0,y,x1,y,{stroke:P.faint,w:1,dash:'3 5'})+T(x0-8,y+5,v,{size:15,anchor:'end',fill:P.muted});});
+  xs.forEach(([v,x])=>{h+=L(x,y0,x,y0+6,{stroke:P.muted})+T(x,y0+24,v,{size:15,anchor:'middle',fill:P.muted});});
+  return h+L(x0,y0,x1+6,y0,{stroke:P.muted,w:1.5})+L(x0,y0,x0,y1-10,{stroke:P.muted,w:1.5})+T(x0+6,y1-14,yl,{size:15,fill:P.muted})+T(x1,y0+46,xl,{size:15,anchor:'end',fill:P.muted});}
+/* 簡單的人：腳底 (x,yf)、身高 h */
+function transferPerson(x,yf,h,c='#5d8fb3',o={}){const r=h*.105,hy=yf-h+r,sh=hy+r+4,hip=yf-h*.42,w=h*.15;
+  return `<rect x="${x-w*.8}" y="${hip-4}" width="${w*.7}" height="${yf-hip+4}" rx="${w*.3}" fill="#48586a"/><rect x="${x+w*.1}" y="${hip-4}" width="${w*.7}" height="${yf-hip+4}" rx="${w*.3}" fill="#48586a"/>`
+    +`<rect x="${x-w*(o.puff?1.35:1)}" y="${sh}" width="${w*(o.puff?2.7:2)}" height="${hip-sh+6}" rx="${w*(o.puff?.7:.55)}" fill="${c}"/>`
+    +`<circle cx="${x}" cy="${hy}" r="${r}" fill="#f2c9a5" stroke="#c99a76" stroke-width="1.5"/>`;}
+
+/* ---------- 「是哪一種傳播」的情境 ---------- */
+const TRANSFER_WAY=['傳導','對流','輻射'];
+const TRANSFER_W=[
+  {t:'金屬湯匙放在熱湯裡，握柄漸漸變燙',a:0,sc:'spoon',why:['熱沿著金屬湯匙，由泡在湯裡的高溫端','傳到握柄；湯匙本身沒有流動。']},
+  {t:'燒開水時，鍋裡的水上下翻滾，整鍋都變熱',a:1,sc:'boil',why:['底部的水受熱膨脹、密度變小而上升，','較冷的水下沉補過來，水流動時把熱帶走。']},
+  {t:'曬太陽時，身體覺得暖和',a:2,sc:'sun',why:['太陽和地球之間幾乎是真空，沒有介質，','熱只能用輻射傳過來。']},
+  {t:'開冷氣後，整個房間的空氣都變涼',a:1,sc:'ac',why:['冷空氣密度較大而下沉，較熱的空氣上升，','空氣在房間裡循環流動。']},
+  {t:'鍋子的握柄做成塑膠，是為了減少哪一種傳熱？',a:0,sc:'pan',why:['熱會沿著金屬鍋身傳導到握柄；','塑膠是熱的不良導體，握柄才不燙手。']},
+  {t:'站在烤箱前面，隔著一段距離臉也覺得熱',a:2,sc:'oven',why:['熱空氣是往上升的，不會往旁邊流到臉上；','臉感受到的是烤箱向四周放出的輻射。']},
+  {t:'點火加熱後，熱氣球慢慢升空',a:1,sc:'balloon',why:['球內的空氣受熱膨脹、密度變小而上升，','和熱水上升是同樣的道理。']},
+  {t:'羽絨衣困住空氣不讓它流動，熱只能靠什麼方式穿過？',a:0,sc:'jacket',why:['空氣不流動就不能對流，熱只能靠傳導；','空氣是熱的不良導體，所以散熱很慢。']},
+  {t:'烤肉時站在炭火旁邊（不是上方），臉覺得熱',a:2,sc:'bbq',why:['熱空氣往上升，不會流向旁邊的人；','傳到臉上的是炭火放出的輻射。']},
+  {t:'冰塊浮在飲料上方，整杯飲料很快都變涼',a:1,sc:'ice',why:['冰塊旁的飲料變冷、密度變大而下沉，','下方較溫的飲料上升，形成對流。']}];
+const TRANSFER_SCENE={
+  spoon(){let h=`<defs><linearGradient id="tr-spoon" gradientUnits="userSpaceOnUse" x1="235" y1="245" x2="370" y2="150"><stop offset="0" stop-color="#e2553a"/><stop offset=".55" stop-color="#e9a25c"/><stop offset="1" stop-color="#c5ccd2"/></linearGradient></defs>`;
+    h+=`<rect x="60" y="305" width="390" height="10" rx="5" fill="#d9c9a8"/>`;
+    for(let i=0;i<3;i++)h+=`<path d="M${160+i*40} 195q-9 -14 0 -28q9 -14 0 -28" fill="none" stroke="#c9a08a" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>`;
+    h+=`<path d="M112 222Q118 305 225 305Q332 305 338 222Z" fill="#fbfdff" stroke="#83999d" stroke-width="3" stroke-linejoin="round"/><ellipse cx="225" cy="222" rx="113" ry="17" fill="#e39a55" stroke="#83999d" stroke-width="3"/>`;
+    h+=`<line x1="238" y1="240" x2="370" y2="150" stroke="url(#tr-spoon)" stroke-width="11" stroke-linecap="round"/><ellipse cx="225" cy="222" rx="60" ry="8" fill="#e39a55"/>`;
+    h+=`<rect x="398" y="127" width="58" height="30" rx="12" fill="#a9c1d1" transform="rotate(-34 382 142)"/><rect x="356" y="123" width="52" height="38" rx="15" fill="#f2c9a5" stroke="#c99a76" stroke-width="2" transform="rotate(-34 382 142)"/>`;
+    return h+transferArrow(250,196,318,150,P.red,{w:4})+T(256,160,'熱',{size:18,fill:P.red,weight:700})+T(225,278,'熱湯',{size:17,anchor:'middle',fill:P.muted});},
+  boil(){let h=`<rect x="150" y="150" width="210" height="140" fill="#9cc9ea" fill-opacity=".5"/>`+L(150,150,360,150,{stroke:'#6da9d4',w:3})+`<path d="M146 122V292H364V122" fill="none" stroke="#6f7c84" stroke-width="5" stroke-linejoin="round"/>`+L(120,134,146,134,{stroke:'#6f7c84',w:6})+L(364,134,390,134,{stroke:'#6f7c84',w:6});
+    h+=transferArrow(255,270,255,176,P.red,{w:5})+transferArrow(238,166,196,166,'#8d8f95',{w:4})+transferArrow(272,166,314,166,'#8d8f95',{w:4})+transferArrow(180,178,180,268,P.blue,{w:5})+transferArrow(330,178,330,268,P.blue,{w:5});
+    [[222,250,5],[286,232,4],[240,210,3.5],[275,268,4.5]].forEach(([x,y,r])=>{h+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" fill-opacity=".8" stroke="#6da9d4"/>`;});
+    h+=`<rect x="165" y="318" width="180" height="16" rx="6" fill="#4a5860"/>`;for(let i=0;i<4;i++)h+=transferFlame(195+i*40,318,24,i*1.7);
+    return h;},
+  sun(){let h=`<circle cx="105" cy="140" r="56" fill="#ffd45a" fill-opacity=".25"/><circle cx="105" cy="140" r="36" fill="#ffc93c" stroke="#f0a020" stroke-width="2"/>`+L(40,332,470,332,{stroke:'#b9ad8f',w:3});
+    [[150,150,330,196],[146,170,322,236],[136,188,314,276]].forEach(([a,b,c,d],i)=>{h+=transferWavy(a,b,c,d,'#e58a1f',{ph:i*1.3});});
+    return h+transferPerson(380,332,170,'#5d8fb3')+T(105,226,'太陽',{size:17,anchor:'middle',fill:P.muted});},
+  ac(){let h=`<rect x="64" y="98" width="382" height="234" rx="4" fill="#eef5fa" stroke="#7e8b92" stroke-width="4"/><rect x="352" y="110" width="84" height="30" rx="6" fill="#fff" stroke="#7e8b92" stroke-width="2"/>`+L(362,132,426,132,{stroke:'#9aa8b0',w:2})+T(394,128,'冷氣',{size:14,anchor:'middle',fill:P.muted});
+    h+=transferArrow(404,150,404,300,P.blue,{w:5})+transferArrow(384,314,124,314,'#8d8f95',{w:5})+transferArrow(104,298,104,138,P.red,{w:5})+transferArrow(124,122,330,122,'#8d8f95',{w:5});
+    return h+transferPerson(250,332,150,'#6fa58a')+T(390,226,'冷空氣',{size:15,anchor:'end',fill:P.blue,weight:700})+T(120,226,'較熱的空氣',{size:15,fill:P.red,weight:700});},
+  pan(){let h=`<rect x="90" y="292" width="250" height="18" rx="6" fill="#4a5860"/>`;for(let i=0;i<4;i++)h+=transferFlame(150+i*40,292,26,i*2.1);
+    h+=`<path d="M100 226H330L318 262H112Z" fill="url(#tr-steel)" stroke="#6f7c84" stroke-width="3" stroke-linejoin="round"/><rect x="326" y="226" width="118" height="20" rx="10" fill="#2f3438"/>`;
+    h+=`<rect x="372" y="212" width="58" height="46" rx="17" fill="#f2c9a5" stroke="#c99a76" stroke-width="2"/><rect x="424" y="218" width="50" height="34" rx="12" fill="#a9c1d1"/>`;
+    h+=L(350,222,330,180,{stroke:P.muted,w:1.5})+T(330,172,'塑膠握柄',{size:16,anchor:'middle',weight:700})+L(200,224,190,180,{stroke:P.muted,w:1.5})+T(190,172,'金屬鍋身',{size:16,anchor:'middle',weight:700});
+    return h+transferArrow(230,244,312,244,P.red,{w:4});},
+  oven(){let h=L(40,332,470,332,{stroke:'#b9ad8f',w:3})+`<rect x="60" y="232" width="210" height="100" fill="#e8dfcc" stroke="#b9ad8f" stroke-width="2"/><rect x="72" y="112" width="186" height="120" rx="10" fill="#dfe4e8" stroke="#6f7c84" stroke-width="3"/><rect x="88" y="128" width="118" height="88" rx="6" fill="#ffb05a" stroke="#6f7c84" stroke-width="2"/>`;
+    for(let i=0;i<3;i++)h+=L(96,150+i*22,198,150+i*22,{stroke:'#f0642c',w:4});
+    h+=`<circle cx="232" cy="146" r="9" fill="#6f7c84"/><circle cx="232" cy="180" r="9" fill="#6f7c84"/>`;
+    [150,176,202].forEach((y,i)=>{h+=transferWavy(214,y,348,y-6+i*6,'#e0662c',{ph:i*1.4});});
+    [112,150,188].forEach(x=>{h+=transferArrow(x,104,x,84,'#9aa0a6',{w:3,op:.8});});
+    return h+transferPerson(392,332,172,'#b0825f');},
+  balloon(){let h=`<path d="M255 82C170 82 150 160 176 214L232 286H278L334 214C360 160 340 82 255 82Z" fill="#f6c453" stroke="#c98a1b" stroke-width="3"/><path d="M255 82C225 110 222 220 244 286M255 82C285 110 288 220 266 286" fill="none" stroke="#e0662c" stroke-width="3"/>`;
+    h+=L(236,286,240,318,{stroke:'#7b6a55',w:2})+L(274,286,270,318,{stroke:'#7b6a55',w:2})+`<rect x="236" y="318" width="38" height="26" rx="4" fill="#b98a55" stroke="#8a6238" stroke-width="2"/>`+transferFlame(255,312,24,1.2);
+    h+=transferArrow(255,262,255,150,P.red,{w:5,op:.85})+transferArrow(222,246,206,166,P.red,{w:4,op:.6})+transferArrow(288,246,304,166,P.red,{w:4,op:.6});
+    return h+T(372,170,'熱空氣',{size:16,fill:P.red,weight:700})+L(366,165,318,165,{stroke:P.muted,w:1.5});},
+  jacket(){let h=L(40,332,470,332,{stroke:'#b9ad8f',w:3})+transferPerson(160,332,190,'#d9785a',{puff:true});
+    for(let i=0;i<4;i++)h+=L(124,196+i*18,196,196+i*18,{stroke:'#b85a3f',w:2});
+    h+=`<rect x="108" y="184" width="20" height="74" rx="9" fill="#d9785a"/><rect x="192" y="184" width="20" height="74" rx="9" fill="#d9785a"/>`;
+    h+=L(198,214,290,180,{stroke:P.muted,w:1.5,dash:'4 4'})+`<circle cx="360" cy="190" r="80" fill="#fffdf8" stroke="#b9ad8f" stroke-width="2.5"/>`;
+    [[318,170,30],[352,150,-20],[392,176,40],[336,214,-35],[386,222,15]].forEach(([x,y,r])=>{h+=`<g transform="rotate(${r} ${x} ${y})"><path d="M${x-24} ${y}H${x+24}M${x-14} ${y}l-7 -9M${x-14} ${y}l-7 9M${x} ${y}l-7 -10M${x} ${y}l-7 10M${x+13} ${y}l-7 -9M${x+13} ${y}l-7 9" fill="none" stroke="#c9b79a" stroke-width="2" stroke-linecap="round"/></g>`;});
+    for(let i=0;i<14;i++)h+=`<circle cx="${(304+rnd(i+40)*112).toFixed(0)}" cy="${(136+rnd(i+70)*104).toFixed(0)}" r="3.2" fill="${P.blue}" opacity=".55"/>`;
+    return h+T(360,294,'羽絨之間：不流動的空氣',{size:15,anchor:'middle',fill:P.muted});},
+  bbq(){let h=L(40,332,470,332,{stroke:'#b9ad8f',w:3})+L(132,262,116,332,{stroke:'#4a5860',w:5})+L(268,262,284,332,{stroke:'#4a5860',w:5})+`<path d="M110 232H290L276 264H124Z" fill="#3b4348" stroke="#2a3034" stroke-width="2"/>`;
+    for(let i=0;i<7;i++)h+=`<circle cx="${134+i*22}" cy="${238+(i%2)*3}" r="9" fill="${i%2?'#e2553a':'#f08a3c'}"/>`;
+    h+=L(116,226,284,226,{stroke:'#8a959c',w:3});
+    [160,200,240].forEach(x=>{h+=transferArrow(x,206,x,128,'#9aa0a6',{w:4,op:.8});});
+    [[292,236,356,212],[292,246,352,244]].forEach(([a,b,c,d],i)=>{h+=transferWavy(a,b,c,d,'#e0662c',{ph:i*1.5});});
+    return h+T(200,114,'熱空氣往上升',{size:15,anchor:'middle',fill:P.muted})+transferPerson(400,332,172,'#6fa58a');},
+  ice(){let h=`<rect x="60" y="322" width="390" height="10" rx="5" fill="#d9c9a8"/><path d="M178 132L190 318H320L332 132Z" fill="#e7b76a" fill-opacity=".45"/>`+L(178,132,332,132,{stroke:'#c98f3a',w:3});
+    [[206,124,-8],[250,120,6],[292,126,-4]].forEach(([x,y,r])=>{h+=`<rect x="${x-17}" y="${y-13}" width="34" height="30" rx="5" fill="#eef8ff" stroke="#8fc3e3" stroke-width="2" transform="rotate(${r} ${x} ${y})"/>`;});
+    h+=`<path d="M172 100L188 320H322L338 100" fill="none" stroke="#83999d" stroke-width="4" stroke-linejoin="round"/>`;
+    h+=transferArrow(255,168,255,292,P.blue,{w:5})+transferArrow(212,296,208,176,P.red,{w:4,op:.75})+transferArrow(298,296,302,176,P.red,{w:4,op:.75});
+    return h+T(350,222,'變冷的飲料',{size:15,fill:P.blue,weight:700})+T(350,244,'下沉',{size:15,fill:P.blue,weight:700})+L(344,224,264,230,{stroke:P.muted,w:1.5});}};
+
+/* ---------- 想一想與例題 ---------- */
+const TRANSFER_Q={
+  cond:['冬天教室裡的鐵椅和木椅溫度一樣（都是室溫），為什麼摸起來鐵椅比較冰？','手的溫度比椅子高，熱由手傳到椅子。<b>鐵是熱的良導體</b>，手上的熱很快被傳走，手的溫度下降得快，就覺得冰；木頭是<b>不良導體</b>，熱傳得慢，手不太降溫。兩張椅子的溫度其實相同，這也說明用手感覺冷熱不可靠。'],
+  conv:['白天在海邊，風常常從海面吹向陸地（海風）。這和對流有什麼關係？','陸地（砂石）的比熱比水小，白天受日照後<b>升溫比海水快</b>。陸地上方的空氣受熱膨脹、密度變小而<b>上升</b>，海面上較冷、密度較大的空氣流過來補充，就形成<b>海風</b>。晚上陸地降溫比較快，方向反過來，成為<b>陸風</b>。這是大範圍的空氣對流。'],
+  rad:['太陽能熱水器的集熱板為什麼塗成黑色？夏天為什麼穿淺色衣服比較涼？','<b>黑色、粗糙</b>的表面容易<b>吸收</b>輻射，集熱板塗黑可以吸收較多太陽的輻射熱，水溫升得快。<b>白色、光亮</b>的表面容易<b>反射</b>輻射，吸收得少，所以夏天穿淺色衣服比較涼。'],
+  bottle:['保溫瓶摔過以後，外表沒破，卻變得不保溫了。最可能是哪裡壞了？','最可能是內、外層之間的<b>真空夾層漏氣</b>了。夾層裡一旦有空氣，熱就能靠<b>傳導和對流</b>穿過夾層，散熱變快很多。（打開「夾層灌入空氣」比較曲線）'],
+  which:['站在營火旁邊覺得熱，為什麼說主要是輻射，而不是傳導或對流？','空氣是熱的<b>不良導體</b>，隔著一段距離，靠傳導傳過來的熱很少。被火加熱的空氣密度變小會<b>往上升</b>，不會往旁邊流向人，所以也不是對流。火向四周放出的<b>輻射</b>不需要介質，可以直接傳到身上；用手或木板擋住臉，馬上就不那麼熱。']};
+const TRANSFER_QUIZ=[
+  {q:'粗細、長度相同的銅棒和鐵棒，各用蠟黏上幾根火柴，從兩棒相接的地方同時加熱。下列敘述何者正確？',opts:['鐵棒上的火柴先掉落','銅棒上的火柴先掉落','兩邊離火焰一樣遠的火柴同時掉落','離火焰最遠的火柴最先掉落'],ans:1,
+    sol:'銅的導熱比鐵快，同樣的距離，銅棒比較早達到蠟熔化的溫度，所以<b>銅棒上的火柴先掉落</b>；同一根棒子上，離火焰近的先掉。',go:s=>{s.mode='cond';s.cmp=true;s.mat='cu';s.matB='fe';s.ct=0;s.run=true;},goLabel:'用銅棒和鐵棒驗證'},
+  {q:'固體以傳導的方式傳熱時，物質的粒子是怎麼運動的？',opts:['由高溫處流動到低溫處','受熱後上升，冷卻後下沉','在原來的位置振動，把振動傳給相鄰的粒子','粒子靜止不動，熱自己穿過去'],ans:2,
+    sol:'傳導時，高溫處的粒子振動比較劇烈，並把振動<b>傳給相鄰的粒子</b>，熱就一路傳過去。粒子<b>留在原位</b>，物質本身沒有移動。',go:s=>{s.mode='cond';s.cmp=false;s.mat='cu';s.ct=30;s.run=false;},goLabel:'看粒子放大圖'},
+  {q:'下列物質中，哪一個最不容易傳導熱？',opts:['銅','鋁','鐵','空氣'],ans:3,
+    sol:'金屬是熱的良導體；液體、氣體是不良導體，其中<b>空氣</b>的導熱很差。羽絨衣、雙層玻璃窗、保麗龍都是利用不流動的空氣來隔熱。'},
+  {q:'試管裝水，用鐵絲網把冰塊壓在管底，再用酒精燈加熱試管上端的水。上端的水沸騰了，冰塊卻幾乎沒有熔化。這個實驗說明什麼？',opts:['水是熱的良導體','水是熱的不良導體，而且熱水留在上方，不會形成對流','冰塊不會吸收熱量','熱只能由下往上傳'],ans:1,
+    sol:'上端的水受熱後密度變小，本來就在上方，<b>不會往下流</b>，沒有對流；熱只能靠傳導往下傳，而<b>水是熱的不良導體</b>，所以冰塊熔化得很慢。',go:s=>{s.mode='conv';s.cs='tube';s.th='top';s.tt=0;s.run=true;},goLabel:'用試管實驗驗證'},
+  {q:'在燒杯底部的一側加熱，水中木屑的運動情形是：',opts:['在原地振動','從加熱處上升，到另一側下沉，不斷循環','全部沉在杯底不動','全部浮在水面不動'],ans:1,
+    sol:'加熱處的水膨脹、密度變小而<b>上升</b>，另一側較冷、密度較大的水<b>下沉</b>補過來，水循環流動，木屑跟著繞圈。',go:s=>{s.mode='conv';s.cs='beaker';s.hp='l';s.pw=3;},goLabel:'用燒杯實驗驗證'},
+  {q:'冷氣機通常裝在房間的高處，主要原因是：',opts:['冷空氣密度較大會下沉，容易形成對流，使整個房間變涼','冷空氣密度較小會上升','高處的空氣比較熱，不容易傳導','裝在高處輻射比較強'],ans:0,
+    sol:'冷氣吹出的<b>冷空氣密度較大而下沉</b>，房間下方較熱的空氣被擠上去，再被冷氣冷卻，形成<b>對流</b>。暖氣則要裝在低處，讓熱空氣上升。',go:s=>{s.mode='conv';s.cs='room';s.rd='ac';s.wrong=false;},goLabel:'看房間的對流'},
+  {q:'太陽的熱主要是以哪一種方式傳到地球？',opts:['傳導','對流','輻射','傳導和對流'],ans:2,
+    sol:'太陽和地球之間幾乎是<b>真空</b>，沒有介質，傳導和對流都無法進行。<b>輻射</b>不需要介質，在真空中也能傳播。',go:s=>{s.mode='rad';s.rp='on';s.rt=0;s.run=false;},goLabel:'看輻射實驗'},
+  {q:'兩個相同的鐵罐，一個塗成黑色、一個是光亮的銀色，裝等量的水，放在燈泡兩側相同距離處照射；一段時間後關燈，讓它們由相同的溫度開始冷卻。下列何者正確？',opts:['黑罐升溫快，降溫也快','黑罐升溫快，降溫慢','亮罐升溫快，降溫也快','兩罐升溫、降溫都一樣快'],ans:0,
+    sol:'黑色表面<b>容易吸收</b>輻射，照光時升溫快；容易吸收輻射的表面也<b>容易放出</b>輻射，所以由相同溫度開始冷卻時，黑罐降溫也比較快。',go:s=>{s.mode='rad';s.rp='on';s.rdist=15;s.rt=0;s.run=true;},goLabel:'用兩個罐子驗證'},
+  {q:'保溫瓶的內、外兩層瓶壁之間抽成真空，主要是為了：',opts:['減少輻射','阻絕傳導和對流','防止水蒸發','讓瓶子比較輕'],ans:1,
+    sol:'<b>傳導和對流都需要介質</b>，真空中沒有物質，這兩種方式都無法進行。輻射可以穿過真空，所以還要靠鍍銀面來減少。',go:s=>{s.mode='bottle';s.bc='hot';s.bair=true;s.bnos=false;s.bopen=false;s.bsel='gap';s.bt=6;s.run=false;},goLabel:'把夾層灌入空氣比較'},
+  {q:'保溫瓶夾層兩側的瓶壁鍍上光亮的銀，主要是為了減少哪一種方式的熱傳播？',opts:['傳導','對流','輻射','三種都一樣'],ans:2,
+    sol:'光亮的表面會把熱<b>輻射反射</b>回去，本身放出的輻射也少，所以能減少輻射造成的散熱。救難用的鋁箔毯也是同樣的道理。',go:s=>{s.mode='bottle';s.bc='hot';s.bair=false;s.bnos=true;s.bopen=false;s.bsel='silver';s.bt=6;s.run=false;},goLabel:'去掉鍍銀比較'}];
+
+/* 動畫每一格都會重畫圖，按下到放開之間元素被換掉時 click 會落空；所以按下的當下就處理 data-tap，隨後的 click 不重複計算 */
+let TRANSFER_TAPPED=0;
+
+LABS.transfer={group:4,n:'5-5',keep:['mode'],steps:'mode',
+  tasks:s=>({cond:'按「播放」：哪一根火柴先掉？換成鐵、玻璃再比一次，最後打開「兩根一起比」。',
+    conv:s.cs==='tube'?'先加熱上端，再改成加熱下端：冰塊熔化的快慢差在哪裡？':s.cs==='room'?'冷氣和暖氣各該裝在高處還是低處？打開「裝在不適合的位置」比較頭和腳的溫度。':'移動熱源、調整火力：木屑從哪裡上升、到哪裡下沉？',
+    rad:'按「播放」：哪一個罐子升溫快？再改成「關燈冷卻」，哪一個降溫快？',
+    bottle:'點瓶子的各個部分，再一次只拿掉一項：哪一項拿掉後水溫降得最快？',
+    which:'先預測是傳導、對流還是輻射，再點圖上的按鈕對答案。'})[s.mode],
+  name:'熱的傳播方式',subtitle:'熱由高溫處傳到低溫處，有傳導、對流、輻射三種方式。傳導、對流需要介質；輻射不需要介質，在真空中也能傳播。',
+  q:s=>({html:qBlockHTML(TRANSFER_Q[s.mode])+quizHTML(s,TRANSFER_QUIZ)}),
+  qAction(s,v){quizAction(s,v,TRANSFER_QUIZ);},
+  state:{mode:'cond',an:0,run:false,mat:'cu',cmp:false,matB:'fe',ct:0,cs:'beaker',hp:'l',pw:3,cp:TRANSFER_PTS.slice(),th:'top',tt:0,rd:'ac',wrong:false,
+    rp:'on',rdist:15,rt:0,bc:'hot',bair:false,bnos:false,bopen:false,bt:0,bsel:'',wi:0,wa:TRANSFER_W.map(()=>-1),qi:0,qp:null,qc:false,qs:false},
+  controls:[
+    {type:'seg',key:'mode',label:'主題',options:[['cond','傳導'],['conv','對流'],['rad','輻射'],['bottle','保溫瓶'],['which','是哪一種傳播']],onChange:s=>{s.run=false;}},
+    {type:'seg',key:'mat',label:'棒子的材質',options:TRANSFER_ORDER.map(k=>[k,TRANSFER_MAT[k].n]),show:s=>s.mode==='cond'},
+    {type:'toggle',key:'cmp',label:'兩根一起比（中間加熱）',show:s=>s.mode==='cond'},
+    {type:'seg',key:'matB',label:'右邊的棒子',options:TRANSFER_ORDER.map(k=>[k,TRANSFER_MAT[k].n]),show:s=>s.mode==='cond'&&s.cmp},
+    {type:'range',key:'ct',label:'加熱時間',min:0,max:120,step:1,fmt:s=>Math.round(s.ct)+' 秒',show:s=>s.mode==='cond'},
+    {type:'seg',key:'cs',label:'情境',options:[['beaker','燒杯裡的水'],['tube','試管與冰塊'],['room','房間的冷暖氣']],onChange:s=>{s.run=false;},show:s=>s.mode==='conv'},
+    {type:'seg',key:'hp',label:'熱源位置',options:[['l','左'],['c','中'],['r','右']],show:s=>s.mode==='conv'&&s.cs==='beaker'},
+    {type:'range',key:'pw',label:'火力',min:0,max:5,step:1,fmt:s=>s.pw===0?'關火':s.pw+' 級',show:s=>s.mode==='conv'&&s.cs==='beaker'},
+    {type:'seg',key:'th',label:'加熱的位置',options:[['top','加熱上端（冰塊壓在管底）'],['bottom','加熱下端（冰塊浮在上面）']],onChange:s=>{s.tt=0;s.run=false;},show:s=>s.mode==='conv'&&s.cs==='tube'},
+    {type:'range',key:'tt',label:'加熱時間',min:0,max:120,step:1,fmt:s=>Math.round(s.tt)+' 秒',show:s=>s.mode==='conv'&&s.cs==='tube'},
+    {type:'seg',key:'rd',label:'裝置',options:[['ac','冷氣（夏天）'],['heater','暖氣（冬天）']],show:s=>s.mode==='conv'&&s.cs==='room'},
+    {type:'toggle',key:'wrong',label:'裝在不適合的位置',show:s=>s.mode==='conv'&&s.cs==='room'},
+    {type:'seg',key:'rp',label:'燈',options:[['on','開燈照射（由 25°C 開始）'],['off','關燈冷卻（都由 60°C 開始）']],onChange:s=>{s.rt=0;s.run=false;},show:s=>s.mode==='rad'},
+    {type:'range',key:'rdist',label:'罐子到燈的距離',min:10,max:25,step:1,unit:' cm',show:s=>s.mode==='rad'&&s.rp==='on'},
+    {type:'range',key:'rt',label:'經過時間',min:0,max:20,step:.5,fmt:s=>s.rt.toFixed(1)+' 分鐘',show:s=>s.mode==='rad'},
+    {type:'seg',key:'bc',label:'瓶裡裝',options:[['hot','熱水 95°C'],['cold','冰水 4°C']],show:s=>s.mode==='bottle'},
+    {type:'toggle',key:'bair',label:'夾層灌入空氣（不是真空）',show:s=>s.mode==='bottle'},
+    {type:'toggle',key:'bnos',label:'去掉鍍銀',show:s=>s.mode==='bottle'},
+    {type:'toggle',key:'bopen',label:'拿掉瓶塞',show:s=>s.mode==='bottle'},
+    {type:'range',key:'bt',label:'經過時間',min:0,max:12,step:.5,fmt:s=>s.bt.toFixed(1)+' 小時',show:s=>s.mode==='bottle'},
+    TRANSFER_PLAY,
+    {type:'buttons',label:'題目',items:[['上一題',s=>{s.wi=(s.wi+TRANSFER_W.length-1)%TRANSFER_W.length;}],['下一題',s=>{s.wi=(s.wi+1)%TRANSFER_W.length;}],['全部重做',s=>{s.wi=0;s.wa=TRANSFER_W.map(()=>-1);}]],show:s=>s.mode==='which'}],
+  tick(s,dt){if(!reduceMotion)s.an=(s.an+dt)%3600;const k=transferClock(s);
+    if(k&&s.run){s[k[0]]=Math.min(k[1],s[k[0]]+dt*k[2]);if(s[k[0]]>=k[1])s.run=false;}
+    if(s.mode==='conv'&&s.cs!=='tube'&&!reduceMotion&&dt>0){const f=transferFlow(s),p=s.cp,h=dt/2;
+      for(let n=0;n<2;n++)for(let i=0;i<p.length;i+=2){const[a,b]=transferVel(f,p[i],p[i+1]),[c,d]=transferVel(f,p[i]+a*h/2,p[i+1]+b*h/2);p[i]=clamp(p[i]+c*h,.02,.98);p[i+1]=clamp(p[i+1]+d*h,.02,.98);}}},
+  pick(s,id){if(id[0]==='b')s.bsel=s.bsel===id.slice(2)?'':id.slice(2);
+    else if(id==='wn')s.wi=(s.wi+1)%TRANSFER_W.length;
+    else if(id[0]==='w'&&s.wa[s.wi]<0)s.wa[s.wi]=+id[1];},
+  tap(s,id){if(Date.now()-TRANSFER_TAPPED<700)return;this.pick(s,id);},
+  render(s){const o=this[s.mode==='conv'?s.cs:s.mode](s);o.svg=`<defs>${TRANSFER_DEFS}</defs>`+o.svg;return o;},
+
+  /* ---------- 1 傳導 ---------- */
+  cond(s){const t=s.ct,cmp=s.cmp,Y=112,RH=18,TB=262,px=cmp?15.6:24.5,x0=cmp?340:100,len=cmp?16.6:20.8,pos=cmp?[4,8,12,16]:[4,8,12,16,20];
+    const rods=cmp?[[s.mat,-1],[s.matB,1]]:[[s.mat,1]],GY=T=>448-T*.34,an=s.an;
+    let d='',h='',g='';
+    h+=L(30,TB,636,TB,{stroke:'#b9ad8f',w:3})+T(30,50,'一端加熱，熱沿著棒子傳過去',{size:22,weight:700})+T(612,50,`第 ${Math.round(t)} 秒`,{size:22,weight:700,anchor:'end',fill:P.accent});
+    /* 溫度—位置圖：和上面的棒子對齊 */
+    [0,100,200,300,400].forEach(v=>{g+=L(74,GY(v),614,GY(v),{stroke:P.faint,w:1,dash:'3 5'})+T(66,GY(v)+5,v,{size:14,anchor:'end',fill:P.muted});});
+    g+=L(74,GY(0),618,GY(0),{stroke:P.muted,w:1.5})+L(74,GY(0),74,GY(400)-8,{stroke:P.muted,w:1.5})+L(74,GY(60),614,GY(60),{stroke:P.orange,w:2,dash:'7 5'})
+      +T(80,300,'溫度（°C）',{size:14,fill:P.muted})+T(614,300,'橘色虛線：蠟熔化的溫度（約 60°C）',{size:14,fill:P.orange,anchor:'end'})+T(614,486,'離火焰的距離（cm）',{size:14,fill:P.muted,anchor:'end'});
+    const dropped=[];
+    rods.forEach(([k,dir],ri)=>{const M=TRANSFER_MAT[k],xa=x0,xb=x0+dir*len*px,xl=Math.min(xa,xb)-(cmp?0:12),wd=Math.abs(xb-xa)+(cmp?0:12);
+      d+=`<linearGradient id="tr-m${ri}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${M.c1}"/><stop offset=".45" stop-color="${M.c1}"/><stop offset="1" stop-color="${M.c2}"/></linearGradient><linearGradient id="tr-h${ri}" gradientUnits="userSpaceOnUse" x1="${xa}" y1="0" x2="${xb.toFixed(1)}" y2="0">`;
+      for(let i=0;i<=26;i++){const[c,a]=transferGlow(transferRodT(k,len*i/26,t));d+=`<stop offset="${(i/26).toFixed(3)}" stop-color="${c}" stop-opacity="${a.toFixed(2)}"/>`;}
+      d+='</linearGradient>';
+      h+=`<rect x="${xl.toFixed(1)}" y="${Y}" width="${wd.toFixed(1)}" height="${RH}" rx="4" fill="url(#tr-m${ri})" stroke="#5d676e" stroke-width="1.5"/><rect x="${xl.toFixed(1)}" y="${Y}" width="${wd.toFixed(1)}" height="${RH}" rx="4" fill="url(#tr-h${ri})"/>`+L(xl+5,Y+4,xl+wd-5,Y+4,{stroke:'#fff',w:2,op:.45});
+      h+=T((xa+xb)/2,Y-16,M.n+'棒',{size:20,weight:700,anchor:'middle'});
+      /* 支架 */
+      const sx=xb+dir*10;h+=`<rect x="${sx-3}" y="${Y-22}" width="6" height="${TB-Y+22}" fill="#7e8b92"/><rect x="${sx-26}" y="${TB-7}" width="52" height="7" rx="2" fill="#5d6b73"/><rect x="${sx-12}" y="${Y-5}" width="24" height="${RH+10}" rx="4" fill="#5d6b73"/>`;
+      /* 圖上的曲線 */
+      let pth='';for(let q=0;q<=len+.01;q+=.4)pth+=(q?'L':'M')+(x0+dir*q*px).toFixed(1)+' '+GY(transferRodT(k,q,t)).toFixed(1);
+      g+=`<path d="${pth}" fill="none" stroke="${P.red}" stroke-width="3.5" stroke-linejoin="round"/>`;
+      let n=0;const tds=[];
+      pos.forEach((p,i)=>{const x=x0+dir*p*px,td=transferDrop(k,p),Tp=transferRodT(k,p,t),hot=t>=td;tds.push(td);if(hot)n++;
+        g+=L(x,TB+5,x,GY(Tp),{stroke:P.muted,w:1,dash:'2 4'})+`<circle cx="${x.toFixed(1)}" cy="${GY(Tp).toFixed(1)}" r="5" fill="${hot?P.red:'#fffdf8'}" stroke="${hot?P.red:P.muted}" stroke-width="2"/>`+T(x,466,p,{size:14,anchor:'middle',fill:P.muted});
+        const q=hot?clamp((t-td)/2.5,0,1):0,yy=Y+RH+2+(TB-7-Y-RH-2)*q*q+(q>=1?2:0),sd=p>=14?-dir:dir,ang=-88*sd*q-(q>=1?2*sd:0);
+        h+=`<ellipse cx="${x.toFixed(1)}" cy="${Y+RH+1}" rx="${hot?4:5.5}" ry="${hot?2.5:4}" fill="#f6e7ae" stroke="#d6bf73"/>`
+          +`<g transform="translate(${x.toFixed(1)} ${yy.toFixed(1)}) rotate(${ang.toFixed(1)})"><line x1="0" y1="0" x2="0" y2="30" stroke="#e2c38d" stroke-width="4.5" stroke-linecap="round"/><ellipse cx="0" cy="31" rx="4" ry="5.5" fill="${P.red}"/></g>`;});
+      dropped.push([M.n,n,tds]);
+      if(ri===0)g+=T(x0,466,0,{size:14,anchor:'middle',fill:P.muted});});
+    h+=transferLamp(x0,Y+RH-2,TB,an,46);
+    /* 粒子放大圖 */
+    let pn=transferPanel(664,62,220,166)+T(774,86,'粒子放大圖（示意）',{size:15,weight:700,anchor:'middle'});
+    const lattice=(k,ys)=>{let o='';ys.forEach((y,r)=>{const pts=[];for(let i=0;i<8;i++){const f=clamp((transferRodT(k,i*2.6,t)-25)/375,0,1),a=1.2+7.5*Math.sqrt(f),ph=rnd(i*7+r*13+k.length)*6.28,bx=688+i*24.6;
+        pts.push([bx+(reduceMotion?0:a*Math.sin(an*11+ph)),y+(reduceMotion?0:a*.8*Math.cos(an*12.7+ph*1.7)),f,bx]);}
+      pts.forEach((p,i)=>{if(i)o+=L(pts[i-1][0].toFixed(1),pts[i-1][1].toFixed(1),p[0].toFixed(1),p[1].toFixed(1),{stroke:'#b9c2c8',w:1.5});});
+      pts.forEach(p=>{o+=`<circle cx="${p[3].toFixed(1)}" cy="${y}" r="2" fill="${P.faint}"/><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="7.5" fill="rgb(${Math.round(120+115*p[2])},${Math.round(150-80*p[2])},${Math.round(175-125*p[2])})" stroke="#fff" stroke-width="1.5"/>`;});});return o;};
+    if(cmp)pn+=T(676,106,TRANSFER_MAT[s.mat].n,{size:14,fill:P.muted})+lattice(s.mat,[120,142])+T(676,170,TRANSFER_MAT[s.matB].n,{size:14,fill:P.muted})+lattice(s.matB,[184,206]);
+    else pn+=lattice(s.mat,[118,146,174])+T(688,214,'熱端',{size:14,fill:P.red,weight:700})+T(860,214,'冷端',{size:14,fill:P.blue,weight:700,anchor:'end'});
+    pn+=T(774,250,'粒子在原位振動，',{size:14,anchor:'middle',fill:P.muted})+T(774,269,'把振動傳給旁邊的粒子',{size:14,anchor:'middle',fill:P.muted});
+    /* 掉落時間表 */
+    pn+=transferPanel(664,282,220,pos.length*25+62)+T(774,306,'火柴掉落的時間',{size:15,weight:700,anchor:'middle'})+T(680,330,'距離',{size:14,fill:P.muted});
+    const cols=cmp?[784,848]:[816];dropped.forEach(([n],j)=>{pn+=T(cols[j],330,n+'棒',{size:14,fill:P.muted,anchor:'middle'});});
+    pos.forEach((p,i)=>{pn+=T(680,355+i*25,p+' cm',{size:15});dropped.forEach(([,,tds],j)=>{const ok=t>=tds[i];pn+=T(cols[j],355+i*25,ok?Math.round(tds[i])+' 秒':'還沒掉',{size:15,anchor:'middle',weight:ok?700:400,fill:ok?P.red:P.muted});});});
+    const A=dropped[0],B=dropped[1],bad=k=>TRANSFER_MAT[k].a<.01;
+    const reads=[['加熱時間',Math.round(t)+' 秒'],[A[0]+'棒掉落',`${A[1]} 根（共 ${pos.length} 根）`]];
+    if(cmp)reads.push([B[0]+'棒掉落',`${B[1]} 根（共 ${pos.length} 根）`]);else reads.push(['距火焰 16 cm 處',tnum(transferRodT(s.mat,16,t))+'°C']);
+    let note='<b>傳導</b>：熱由高溫處沿著物體傳到低溫處。粒子只在原位振動，<b>物質本身沒有移動</b>；固體主要靠傳導傳熱。<br>金屬是熱的<b>良導體</b>（銀 ＞ 銅 ＞ 鋁 ＞ 鐵）；玻璃、木頭、水、空氣是<b>不良導體</b>。羽絨衣、雙層玻璃、保麗龍都是利用不流動的空氣隔熱。<br>';
+    note+=cmp?(s.mat===s.matB?'兩邊材質相同，離火焰一樣遠的火柴同時掉落。':`第 ${Math.round(t)} 秒：${A[0]}棒掉了 ${A[1]} 根，${B[0]}棒掉了 ${B[1]} 根。`)
+      :bad(s.mat)?`${A[0]}幾乎不導熱，120 秒內火柴都不會掉${s.mat==='wd'?'（木棒靠近火焰的一端實際上會燒焦）':''}。`:`第 ${Math.round(t)} 秒：${A[0]}棒掉了 ${A[1]} 根，離火焰越近越早掉。`;
+    note+='（溫度與時間為示意，動畫已加快）';
+    return {svg:`<defs>${d}</defs>`+h+g+pn,reads,note};},
+
+  /* ---------- 2 對流：燒杯 ---------- */
+  tracers(s,bx,yb,bw,bh,f,c,r,tl){let h='';const p=s.cp;for(let i=0;i<p.length;i+=2){const x=bx+p[i]*bw,y=yb-p[i+1]*bh,[a,b]=transferVel(f,p[i],p[i+1]),tx=x-a*bw*tl,ty=y+b*bh*tl;
+      h+=`<line x1="${tx.toFixed(1)}" y1="${ty.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="${(r*.9).toFixed(1)}" stroke-linecap="round" opacity=".3"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${c}"/>`;}return h;},
+  beaker(s){const bx=124,bw=332,wy=128,yb=350,bh=yb-wy,f=transferFlow(s),hx=bx+f.h*bw,on=s.pw>0;
+    let h=`<defs><radialGradient id="tr-plume" cx=".5" cy="1" r="1"><stop offset="0" stop-color="#f08a4a" stop-opacity="${(.14+.1*s.pw).toFixed(2)}"/><stop offset="1" stop-color="#f08a4a" stop-opacity="0"/></radialGradient><clipPath id="tr-water"><rect x="${bx}" y="${wy}" width="${bw}" height="${bh}"/></clipPath></defs>`;
+    h+=T(30,50,on?'加熱處的水上升，較冷的水下沉':'沒有加熱，水不流動',{size:22,weight:700})+L(30,462,500,462,{stroke:'#b9ad8f',w:3});
+    h+=`<rect x="${bx}" y="${wy}" width="${bw}" height="${bh}" fill="#a9d3ee" fill-opacity=".45"/>`;
+    if(on)h+=`<g clip-path="url(#tr-water)"><ellipse cx="${hx.toFixed(1)}" cy="${yb}" rx="62" ry="${bh*1.05}" fill="url(#tr-plume)"/><ellipse cx="${hx.toFixed(1)}" cy="${wy}" rx="150" ry="34" fill="url(#tr-plume)" transform="rotate(180 ${hx.toFixed(1)} ${wy})"/></g>`;
+    if(on)h+=transferLoop(bx,wy,bw,bh,f);
+    h+=this.tracers(s,bx,yb,bw,bh,f,'#8a5a2b',3.4,.17);
+    h+=L(bx,wy,bx+bw,wy,{stroke:'#6da9d4',w:3})+`<path d="M${bx-5} 92V${yb+3}H${bx+bw+5}V92" fill="none" stroke="#83999d" stroke-width="4.5" stroke-linejoin="round"/>`+L(bx+bw-22,150,bx+bw-22,320,{stroke:'#fff',w:4,op:.5});
+    h+=`<rect x="${bx-26}" y="${yb+5}" width="${bw+52}" height="7" rx="3" fill="#8a959c"/>`+L(bx-16,yb+12,bx-30,462,{stroke:'#6f7c84',w:5})+L(bx+bw+16,yb+12,bx+bw+30,462,{stroke:'#6f7c84',w:5});
+    if(on)h+=transferLamp(hx,yb+14,462,s.an,22+s.pw*3);
+    else h+=`<path d="M${hx-12} 416C${hx-44} 422 ${hx-48} 458 ${hx-36} 462H${hx+36}C${hx+48} 458 ${hx+44} 422 ${hx+12} 416Z" fill="#f4fbfd" stroke="#83999d" stroke-width="2.5"/><rect x="${hx-13}" y="406" width="26" height="11" rx="3" fill="#c7cdd2" stroke="#8a959c" stroke-width="1.5"/>`;
+    h+=T(bx+bw/2,112,'木屑隨著水流動',{size:15,anchor:'middle',fill:P.muted});
+    /* 右側：因果流程 */
+    const st=[['靠近熱源的水受熱',P.ink,'#fffdf8'],['體積膨脹，密度變小',P.ink,'#fffdf8'],['密度較小的熱水上升',P.red,'#fdf0ec'],['旁邊較冷、密度較大的水下沉補過來',P.blue,'#edf4fb'],['水不斷循環流動：對流',P.accent,'#e8f4f2']];
+    st.forEach(([t,c,bg],i)=>{const y=84+i*70;h+=`<rect x="536" y="${y}" width="344" height="46" rx="12" fill="${bg}" stroke="${c===P.ink?'#ddd7c9':c}" stroke-width="1.5" opacity="${on||i===4?1:.55}"/>`+T(708,y+29,t,{size:17,anchor:'middle',fill:c,weight:i>1?700:400});if(i<4)h+=transferArrow(708,y+50,708,y+66,P.muted,{w:3});});
+    h+=transferArrow(552,440,592,440,P.red,{w:5,op:.6})+T(600,446,'上升',{size:15,fill:P.muted})+transferArrow(672,440,712,440,P.blue,{w:5,op:.6})+T(720,446,'下沉',{size:15,fill:P.muted})+`<circle cx="790" cy="440" r="4" fill="#8a5a2b"/>`+T(802,446,'木屑',{size:15,fill:P.muted});
+    const where=({l:'左側',c:'中央',r:'右側'})[s.hp],sink=s.hp==='c'?'兩側':s.hp==='l'?'右側':'左側';
+    return {svg:h,reads:[['熱源位置',where],['火力',on?s.pw+' 級':'關火'],['水的流動',on?`${where}上升、${sink}下沉`:'不流動']],
+      note:`<b>對流</b>：液體或氣體受熱後膨脹、<b>密度變小而上升</b>，周圍較冷、密度較大的部分<b>下沉</b>補過來，物質<b>本身流動</b>，把熱帶到各處。<br>`
+        +(on?`現在熱源在${where}：水由${where}上升，到${sink}下沉；火力越大，流動越快。`:'關火後沒有溫度差，水不再流動。')+'對流需要能流動的介質，固體和真空中都不能對流。（流動情形為示意）'};},
+
+  /* ---------- 2 對流：試管與冰塊 ---------- */
+  tube(s){const top=s.th==='top',C=transferTube(s.th),ix=clamp(s.tt*2,0,C.length-1),i0=Math.min(C.length-2,Math.floor(ix)),fr=ix-i0,[Ta,Tb,ice]=[0,1,2].map(j=>C[i0][j]+(C[i0+1][j]-C[i0][j])*fr);
+    const P0=top?[172.6,374.2]:[246.5,279.6],sy=P0[1]-165.5,Sx=P0[0]+129.4,tf=`translate(${P0[0]} ${P0[1]}) rotate(38)`,an=s.an,TD='M-24 -270V0A24 24 0 0 0 24 0V-270';
+    let h=`<defs><clipPath id="tr-tubeclip"><path d="${TD}Z" transform="${tf}"/></clipPath><linearGradient id="tr-tubew" gradientUnits="userSpaceOnUse" x1="${P0[0]}" y1="${P0[1]}" x2="${Sx.toFixed(1)}" y2="${sy.toFixed(1)}"><stop offset="0" stop-color="${WARM(Tb)}"/><stop offset=".38" stop-color="${WARM(Tb)}"/><stop offset=".62" stop-color="${WARM(Ta)}"/><stop offset="1" stop-color="${WARM(Ta)}"/></linearGradient></defs>`;
+    h+=L(30,416,510,416,{stroke:'#b9ad8f',w:3})+transferLamp(265,287,416,an,40);
+    h+=`<g clip-path="url(#tr-tubeclip)"><rect x="0" y="${sy.toFixed(1)}" width="600" height="400" fill="url(#tr-tubew)" fill-opacity=".55"/>`+L(Sx-70,sy,Sx+70,sy,{stroke:WARM(Ta),w:3})+'</g>';
+    let g='';
+    if(ice>.01){const z=30*Math.cbrt(ice),cy=top?-12:-190;g+=`<rect x="${(-z/2).toFixed(1)}" y="${(cy-z/2).toFixed(1)}" width="${z.toFixed(1)}" height="${z.toFixed(1)}" rx="4" fill="#f1f9ff" stroke="#7fb6d9" stroke-width="2"/><path d="M${(-z/4).toFixed(1)} ${(cy-z/4).toFixed(1)}l${(z/5).toFixed(1)} 0" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>`;}
+    if(top)g+=`<path d="M-23 -38l5.75 -5l5.75 5l5.75 -5l5.75 5l5.75 -5l5.75 5l5.75 -5l5.75 5" fill="none" stroke="#5d676e" stroke-width="2.5" stroke-linejoin="round"/>`;
+    const bub=(y0,y1,n,k)=>{let o='';for(let i=0;i<n;i++){const yy=y1+((an*46+rnd(i+k)*200)%(y0-y1)),x=(rnd(i*3+k)-.5)*32;o+=`<circle cx="${x.toFixed(1)}" cy="${(y0+y1-yy).toFixed(1)}" r="${(2.4+rnd(i+k+9)*2.4).toFixed(1)}" fill="#fff" fill-opacity=".85" stroke="#9cc3dd"/>`;}return o;};
+    if(Ta>=99.5)g+=bub(-108,-200,6,5);if(Tb>=99.5)g+=bub(-8,-104,6,31);
+    if(!top&&Ta<99.5&&s.tt>0)g+=transferArrow(11,-34,11,-150,P.red,{w:4,op:.65})+transferArrow(-11,-150,-11,-34,P.blue,{w:4,op:.65});
+    g+=`<path d="${TD}" fill="#ffffff" fill-opacity=".18" stroke="#83999d" stroke-width="4" stroke-linejoin="round"/>`+L(-30,-270,-22,-270,{stroke:'#83999d',w:4})+L(22,-270,30,-270,{stroke:'#83999d',w:4})+L(14,-250,14,-40,{stroke:'#fff',w:3,op:.5});
+    g+=`<rect x="-94" y="-249" width="70" height="14" rx="6" fill="#b08455" stroke="#8a6238" stroke-width="1.5"/><rect x="-31" y="-248" width="62" height="12" rx="4" fill="#8a6238"/>`;
+    h+=`<g transform="${tf}">${g}</g>`;
+    h+=transferPill(Sx+38,sy+4,118,34,`上層 ${Math.round(Ta)}°C`,{c:WARM(Ta),size:17})+transferPill(P0[0]-150,P0[1]-28,112,34,`下層 ${Math.round(Tb)}°C`,{c:WARM(Tb),size:17});
+    if(top)h+=T(P0[0]-150,P0[1]+28,'鐵絲網壓住冰塊',{size:15,fill:P.muted});
+    h+=T(40,456,top?'熱水密度較小，留在上面，不會往下流':'下面的熱水上升、上面的冷水下沉：對流',{size:17,weight:700,fill:top?P.red:P.accent});
+    /* 圖 */
+    const X=t=>580+t*2.3,Y=v=>400-v*2.8;
+    h+=T(718,56,top?'加熱上端：上面沸騰，冰塊還在':'加熱下端：整管水一起變熱',{size:19,weight:700,anchor:'middle'});
+    h+=transferGraph(580,856,400,120,[0,30,60,90,120].map(v=>[v,X(v)]),[0,20,40,60,80,100].map(v=>[v,Y(v)]),'加熱時間（秒）','水溫（°C）');
+    const pth=j=>C.map((r,k)=>(k?'L':'M')+X(k/2).toFixed(1)+' '+Y(r[j]).toFixed(1)).join(''),pk=j=>C.slice(0,i0+1).map((r,k)=>(k?'L':'M')+X(k/2).toFixed(1)+' '+Y(r[j]).toFixed(1)).join('')+`L${X(s.tt).toFixed(1)} ${Y(j?Tb:Ta).toFixed(1)}`;
+    h+=`<path d="${pth(0)}" fill="none" stroke="${P.red}" stroke-width="2" opacity=".25"/><path d="${pth(1)}" fill="none" stroke="${P.blue}" stroke-width="2" opacity=".25"/><path d="${pk(0)}" fill="none" stroke="${P.red}" stroke-width="4" stroke-linejoin="round"/><path d="${pk(1)}" fill="none" stroke="${P.blue}" stroke-width="4" stroke-linejoin="round"/>`;
+    h+=`<circle cx="${X(s.tt).toFixed(1)}" cy="${Y(Ta).toFixed(1)}" r="6" fill="${P.red}"/><circle cx="${X(s.tt).toFixed(1)}" cy="${Y(Tb).toFixed(1)}" r="6" fill="${P.blue}"/>`;
+    h+=L(700,100,724,100,{stroke:P.red,w:4})+T(730,105,'上層',{size:15,fill:P.red})+L(784,100,808,100,{stroke:P.blue,w:4})+T(814,105,'下層',{size:15,fill:P.blue});
+    const pc=Math.round(ice*100);
+    h+=T(580,474,'冰塊剩下',{size:16,fill:P.muted})+`<rect x="656" y="460" width="130" height="16" rx="8" fill="#e9e4d8"/><rect x="656" y="460" width="${(130*ice).toFixed(1)}" height="16" rx="8" fill="#8fc3e3"/>`+T(798,475,pc+'%',{size:18,weight:700});
+    return {svg:h,reads:[['上層水溫',Math.round(Ta)+'°C'+(Ta>=99.5?'（沸騰）':'')],['下層水溫',Math.round(Tb)+'°C'+(Tb>=99.5?'（沸騰）':'')],['冰塊剩下',pc+'%']],
+      note:top?'<b>加熱上端</b>：上面的水變熱後密度變小，本來就在上方，<b>不會往下流，沒有對流</b>。熱只能靠傳導往下傳，而<b>水是熱的不良導體</b>，所以上面沸騰了，管底的冰塊只熔化一點。（數值為示意）'
+        :'<b>加熱下端</b>：下面的水受熱、密度變小而上升，上面較冷的水下沉，<b>對流</b>很快把熱帶到整管水，冰塊很快就熔化，上下層的溫度幾乎一樣。（數值為示意）'};},
+
+  /* ---------- 2 對流：房間 ---------- */
+  room(s){const ac=s.rd==='ac',w=s.wrong,bx=74,bw=752,ty=90,yb=428,bh=yb-ty,f=transferFlow(s),[tc,tf]=ac?(w?[32,21]:[27,25]):(w?[28,13]:[22,20]),hi=ac?!w:w;
+    const air=T=>{const q=clamp((T-24)/9,-1,1),a=Math.abs(q),m=q<0?[112,170,235]:[244,160,92];return `rgb(${[236,236,226].map((v,i)=>Math.round(v+(m[i]-v)*a)).join(',')})`;},e1=w?(ac?.66:.2):0,e2=w?(ac?.8:.34):1;
+    let h=`<defs><linearGradient id="tr-air" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${air(tc)}"/><stop offset="${e1}" stop-color="${air(tc)}"/><stop offset="${e2}" stop-color="${air(tf)}"/><stop offset="1" stop-color="${air(tf)}"/></linearGradient></defs>`;
+    const good=ac?'冷氣裝在高處：冷空氣下沉，整個房間都變涼':'暖氣裝在低處：熱空氣上升，整個房間都變暖',bad=ac?'冷氣裝在低處：冷空氣留在地板附近，上面還是熱':'暖氣裝在高處：熱空氣留在天花板附近，腳邊還是冷';
+    h+=T(450,54,w?bad:good,{size:22,weight:700,anchor:'middle',fill:w?P.red:P.accent});
+    h+=`<rect x="${bx}" y="${ty}" width="${bw}" height="${bh}" fill="url(#tr-air)" fill-opacity=".62"/>`+transferLoop(bx,ty,bw-96,bh,f,{op:.55,w:6})+this.tracers(s,bx,yb,bw,bh,f,'#7c8a92',2.8,.13);
+    h+=`<rect x="${bx-4}" y="${ty-4}" width="${bw+8}" height="${bh+8}" rx="4" fill="none" stroke="#7e8b92" stroke-width="6"/>`+L(bx-20,yb+7,bx+bw+20,yb+7,{stroke:'#b9ad8f',w:5});
+    h+=`<rect x="${bx-7}" y="170" width="6" height="120" fill="#bfe0f2" stroke="#7e8b92" stroke-width="1.5"/>`;
+    h+=transferPerson(450,yb,176,'#6fa58a');
+    const dy=hi?ty+10:yb-52;
+    if(ac){h+=`<rect x="726" y="${dy}" width="92" height="40" rx="8" fill="#fff" stroke="#7e8b92" stroke-width="2.5"/>`+L(736,dy+30,808,dy+30,{stroke:'#9aa8b0',w:2.5})+T(772,dy+22,'冷氣',{size:15,anchor:'middle',weight:700,fill:P.blue});
+      for(let i=0;i<3;i++)h+=hi?transferArrow(744+i*28,dy+46,744+i*28,dy+72,P.blue,{w:3,op:.8}):transferArrow(720,dy+8+i*12,694,dy+8+i*12,P.blue,{w:3,op:.8});}
+    else{h+=`<rect x="748" y="${dy-(hi?0:12)}" width="64" height="${hi?40:54}" rx="8" fill="#f4ede0" stroke="#7e8b92" stroke-width="2.5"/>`;for(let i=0;i<3;i++)h+=L(760,dy-(hi?0:12)+12+i*(hi?9:14),800,dy-(hi?0:12)+12+i*(hi?9:14),{stroke:'#f0642c',w:3.5});
+      h+=T(780,hi?dy+58:dy-44,'暖氣',{size:15,anchor:'middle',weight:700,fill:P.red});for(let i=0;i<3;i++)h+=hi?transferArrow(740,dy+8+i*12,714,dy+8+i*12,P.red,{w:3,op:.8}):transferArrow(760+i*20,dy-18,760+i*20,dy-36,P.red,{w:3,op:.8});}
+    h+=transferPill(160,ty+12,186,34,`天花板附近 ${tc}°C`,{size:16,c:tc>=tf+3?P.red:P.ink})+transferPill(160,yb-46,186,34,`地板附近 ${tf}°C`,{size:16,c:tc>=tf+3?P.blue:P.ink});
+    h+=T(450,474,w?(ac?'冷空氣密度較大，沉在下面不動；上方的熱空氣沒有被冷卻':'熱空氣密度較小，浮在上面不動；下方的冷空氣沒有被加熱'):(ac?'冷空氣（密度較大）下沉，較熱的空氣上升後再被冷氣冷卻':'熱空氣（密度較小）上升，較冷的空氣下沉後再被暖氣加熱'),{size:17,anchor:'middle',fill:P.ink});
+    return {svg:h,reads:[['裝置位置',(ac?'冷氣':'暖氣')+'在'+(hi?'高處':'低處')],['天花板附近',tc+'°C'],['地板附近',tf+'°C'],['上下溫差',(tc-tf)+'°C']],
+      note:`<b>冷氣裝高處、暖氣裝低處</b>：冷空氣密度較大會下沉，熱空氣密度較小會上升，這樣空氣才能<b>對流</b>，整個房間的溫度比較一致。<br>`
+        +(w?`現在${ac?'冷氣在低處，冷空氣一直留在下面':'暖氣在高處，熱空氣一直留在上面'}，上下溫差有 ${tc-tf}°C。`:`現在上下只差 ${tc-tf}°C。`)+'海風、陸風也是空氣的對流。（溫度為示意）'};},
+
+  /* ---------- 3 輻射 ---------- */
+  rad(s){const on=s.rp==='on',t=s.rt,Lx=255,Ly=188,D=46+s.rdist*6,TBL=262,an=s.an,xs=[Lx-D,Lx+D],Tn=[0,1].map(j=>transferCan(s,j,t)),names=['黑色罐','光亮的銀色罐'],col=['#2b2f33','#5d8fb3'];
+    let h=T(725,50,on?'燈的熱以輻射傳到兩側的罐子':'關燈後，罐子以輻射把熱放出去',{size:19,weight:700,anchor:'middle'})+L(20,TBL,500,TBL,{stroke:'#b9ad8f',w:3});
+    /* 燈 */
+    h+=`<rect x="${Lx-5}" y="${Ly+20}" width="10" height="${TBL-Ly-26}" fill="#8a959c"/><rect x="${Lx-30}" y="${TBL-8}" width="60" height="8" rx="3" fill="#5d6b73"/><rect x="${Lx-11}" y="${Ly+16}" width="22" height="14" rx="3" fill="#b9c2c8" stroke="#7e8b92"/>`;
+    if(on)h+=`<circle cx="${Lx}" cy="${Ly}" r="46" fill="#ffcf5a" fill-opacity="${(.2+.05*Math.sin(an*3)).toFixed(2)}"/>`;
+    h+=`<circle cx="${Lx}" cy="${Ly}" r="24" fill="${on?'#ffd65c':'#e7e9ea'}" stroke="${on?'#e59a1f':'#9aa5ae'}" stroke-width="2.5"/><path d="M${Lx-8} ${Ly+6}q4 -16 8 0q4 -16 8 0" fill="none" stroke="${on?'#e0662c':'#9aa5ae'}" stroke-width="2"/>`+T(Lx,Ly-56,on?'燈（開）':'燈（關）',{size:15,anchor:'middle',fill:P.muted});
+    xs.forEach((x,j)=>{const dir=j?1:-1,Tc=Tn[j],yl=168-(clamp(Tc,20,95)-20)*.8,face=x-dir*30;
+      h+=glassTherm(x,236,96,yl,{c:ALC,br:8,w:4});
+      h+=`<rect x="${x-30}" y="176" width="60" height="${TBL-177}" rx="5" fill="url(#${j?'tr-shine':'tr-black'})" stroke="${j?'#7e8b92':'#15181a'}" stroke-width="2"/><ellipse cx="${x}" cy="177" rx="30" ry="6" fill="${j?'#dfe5ea':'#3a3f44'}" stroke="${j?'#7e8b92':'#15181a'}" stroke-width="2"/><ellipse cx="${x}" cy="177" rx="6" ry="2" fill="#6d757e"/>`;
+      h+=transferPill(x-48,40,96,38,tnum(Tc)+'°C',{c:col[j],bd:col[j],size:19});
+      h+=T(x,286,names[j],{size:16,anchor:'middle',weight:700,fill:col[j]})+T(x,307,j?'反射多、吸收少':'吸收多、放出多',{size:14,anchor:'middle',fill:P.muted});
+      if(on){[196,218,240].forEach((y,i)=>{h+=transferWavy(Lx+dir*28,Ly+(i-1)*8,face-dir*2,y,'#e0662c',{ph:reduceMotion?i:an*5+i*1.3,op:.9,amp:4,wl:15});if(j)h+=transferArrow(face-dir*3,y-4,face-dir*20,y-18,'#e0662c',{w:2.2,op:.45});});}
+      else{const q=clamp((Tc-25)/35,0,1),n=j?1:3;for(let i=0;i<n;i++){const y=j?218:198+i*20,ln=Math.min(x-49,(j?24:38)*(.45+.55*q));[1,-1].forEach(sd=>{h+=transferWavy(x+sd*33,y,x+sd*(33+ln),y-6,'#e0662c',{ph:reduceMotion?i:-an*5+i,op:.35+.6*q,amp:4,wl:14});});}}
+      h+=L(Math.min(x,Lx),322,Math.max(x,Lx),322,{stroke:P.muted,w:1.5})+L(x,315,x,329,{stroke:P.muted,w:1.5})+T((x+Lx)/2,341,s.rdist+' cm',{size:15,anchor:'middle',fill:P.muted});});
+    h+=L(Lx,315,Lx,329,{stroke:P.muted,w:1.5});
+    /* 太陽與地球 */
+    h+=`<rect x="30" y="362" width="450" height="84" rx="12" fill="#17253a"/>`;for(let i=0;i<16;i++)h+=`<circle cx="${(120+rnd(i+5)*290).toFixed(0)}" cy="${(370+rnd(i+25)*68).toFixed(0)}" r="1.2" fill="#fff" opacity=".6"/>`;
+    h+=`<circle cx="76" cy="404" r="38" fill="#ffc93c" fill-opacity=".25"/><circle cx="76" cy="404" r="26" fill="#ffc93c"/><circle cx="440" cy="404" r="17" fill="#4c85bb"/><path d="M430 396q8 -6 14 2q-4 8 -12 6zM442 410q8 0 9 6q-6 5 -10 0z" fill="#6fb37a"/>`;
+    [392,404,416].forEach((y,i)=>{h+=transferWavy(112,y,414,y,'#ffd27a',{ph:reduceMotion?i:an*5+i*2,amp:4,op:.9});});
+    h+=`<rect x="205" y="368" width="100" height="24" rx="12" fill="#17253a" fill-opacity=".85"/>`+T(255,386,'太空是真空',{size:15,anchor:'middle',fill:'#cfe0f5'})+T(255,470,'太陽的熱穿過真空傳到地球：輻射不需要介質',{size:15,anchor:'middle',fill:P.muted});
+    /* 圖 */
+    const X=v=>590+v*13.5,Y=v=>420-(v-20)*3.8;
+    h+=transferGraph(590,860,420,116,[0,5,10,15,20].map(v=>[v,X(v)]),[20,40,60,80,100].map(v=>[v,Y(v)]),'經過時間（分鐘）','水溫（°C）');
+    [0,1].forEach(j=>{let a='',b='';for(let q=0;q<=20.01;q+=.25){const p=X(q).toFixed(1)+' '+Y(transferCan(s,j,q)).toFixed(1);a+=(q?'L':'M')+p;if(q<=t+1e-6)b+=(q?'L':'M')+p;}b+=`L${X(t).toFixed(1)} ${Y(Tn[j]).toFixed(1)}`;
+      h+=`<path d="${a}" fill="none" stroke="${col[j]}" stroke-width="2" opacity=".25"/><path d="${b}" fill="none" stroke="${col[j]}" stroke-width="4" stroke-linejoin="round"/><circle cx="${X(t).toFixed(1)}" cy="${Y(Tn[j]).toFixed(1)}" r="6" fill="${col[j]}" stroke="#fff" stroke-width="1.5"/>`;});
+    h+=L(X(0),Y(25),X(20),Y(25),{stroke:P.muted,w:1,dash:'6 5'})+T(X(20),Y(25)+17,'室溫 25°C',{size:14,anchor:'end',fill:P.muted});
+    h+=L(700,84,722,84,{stroke:col[0],w:4})+T(728,89,'黑色罐',{size:15,fill:col[0]})+L(790,84,812,84,{stroke:col[1],w:4})+T(818,89,'銀色罐',{size:15,fill:col[1]});
+    const diff=Tn[0]-Tn[1];
+    return {svg:h,reads:[['黑色罐',tnum(Tn[0])+'°C'],['銀色罐',tnum(Tn[1])+'°C'],[on?'黑色罐比銀色罐高':'黑色罐比銀色罐低',tnum(Math.abs(diff))+'°C']],
+      note:`<b>輻射</b>：熱不靠任何介質，直接由高溫物體向四周傳出，<b>在真空中也能傳播</b>。熱空氣是往上升的，所以傳到燈旁邊罐子上的熱主要是輻射。<br>`
+        +(on?`第 ${t.toFixed(1)} 分鐘：黑色罐 ${tnum(Tn[0])}°C、銀色罐 ${tnum(Tn[1])}°C。<b>黑色、粗糙</b>的表面容易吸收輻射，升溫快；<b>白色、光亮</b>的表面容易反射，升溫慢。離燈越遠，升溫越慢。`
+          :`第 ${t.toFixed(1)} 分鐘：黑色罐 ${tnum(Tn[0])}°C、銀色罐 ${tnum(Tn[1])}°C。容易吸收輻射的表面也<b>容易放出輻射</b>，所以黑色罐降溫也比較快。`)
+        +'<br>生活中：夏天穿淺色衣服、太陽能熱水器的集熱板塗黑、保溫瓶內壁鍍銀、救難用鋁箔毯。（數值為示意）'};},
+
+  /* ---------- 4 保溫瓶 ---------- */
+  bottle(s){const m=transferBottle(s,false),m0=transferBottle(s,true),hot=s.bc==='hot',t=s.bt,Tw=transferBT(m,t),dT=Math.abs(Tw-25),cx=215,an=s.an,sel=s.bsel,changed=s.bair||s.bnos||s.bopen;
+    const shp=(i,top)=>`M${cx-62+i} ${top}V150C${cx-62+i} 180 ${cx-104+i} 172 ${cx-104+i} 208V${430-i}Q${cx-104+i} ${456-i} ${cx-78+i} ${456-i}H${cx+78-i}Q${cx+104-i} ${456-i} ${cx+104-i} ${430-i}V208C${cx+104-i} 172 ${cx+62-i} 180 ${cx+62-i} 150V${top}Z`;
+    const liq=hot?'#e9a06a':'#9ccbea',tapA=(id,inner,label)=>`<g data-tap="b:${id}" tabindex="0" role="button" aria-label="${label}" style="cursor:pointer">${inner}</g>`,ring=shp(8,108)+shp(30,96);
+    let h=`<defs><clipPath id="tr-cav"><path d="${shp(37,96)}"/></clipPath><clipPath id="tr-low"><rect x="0" y="109" width="500" height="400"/></clipPath></defs>`;
+    h+=T(30,44,hot?'保溫瓶怎麼讓熱水不容易變冷':'保溫瓶怎麼讓冰水不容易變溫',{size:22,weight:700})+L(60,460,400,460,{stroke:'#b9ad8f',w:3});
+    /* 外壁、夾層、內壁 */
+    h+=tapA('wall',`<path d="${shp(0,96)}" fill="url(#tr-steel)" stroke="${sel==='wall'?P.accent:'#6f7c84'}" stroke-width="${sel==='wall'?3.5:2}"/>`,'雙層瓶壁');
+    let gp=`<path d="${ring}" fill-rule="evenodd" fill="${s.bair?'#dcebf5':'#fbfaf5'}" stroke="${sel==='gap'?P.accent:'none'}" stroke-width="3"/>`;
+    if(s.bair)for(let i=0;i<46;i++){const side=i%2?1:-1,yy=214+rnd(i+11)*212,xx=cx+side*(85+((rnd(i+50)+(reduceMotion?0:.08*Math.sin(an*2+i)))*14-7));gp+=`<circle cx="${xx.toFixed(1)}" cy="${(yy+(reduceMotion?0:2*Math.sin(an*1.7+i*2))).toFixed(1)}" r="2.2" fill="${P.blue}" opacity=".55"/>`;}
+    h+=tapA('gap',gp,'夾層');
+    h+=`<path d="${shp(30,96)}" fill="url(#tr-steel)" stroke="#6f7c84" stroke-width="1.5"/><path d="${shp(37,96)}" fill="#fffdf8"/>`;
+    if(!s.bnos)h+=tapA('silver',`<g clip-path="url(#tr-low)"><path d="${shp(8,108)}" fill="none" stroke="${sel==='silver'?P.accent:'#f4f8fb'}" stroke-width="3.5"/><path d="${shp(30,96)}" fill="none" stroke="${sel==='silver'?P.accent:'#f4f8fb'}" stroke-width="3.5"/><path d="${shp(8,108)}" fill="none" stroke="#9aa5ae" stroke-width="1" stroke-dasharray="2 5"/><path d="${shp(30,96)}" fill="none" stroke="#9aa5ae" stroke-width="1" stroke-dasharray="2 5"/></g>`,'鍍銀面');
+    /* 內容物 */
+    h+=`<g clip-path="url(#tr-cav)"><rect x="100" y="158" width="240" height="320" fill="${liq}" fill-opacity=".6"/>`+L(100,158,340,158,{stroke:hot?'#c9743a':'#5d9fcf',w:3})+'</g>';
+    h+=T(cx,290,hot?'熱水':'冰水',{size:18,anchor:'middle',fill:P.ink})+T(cx,326,tnum(Tw)+'°C',{size:28,anchor:'middle',weight:700,fill:hot?P.red:P.blue});
+    /* 瓶塞 */
+    if(!s.bopen)h+=tapA('stop',`<path d="M${cx-27} 84H${cx+27}L${cx+24.5} 140H${cx-24.5}Z" fill="#c9a36f" stroke="${sel==='stop'?P.accent:'#9a7645'}" stroke-width="${sel==='stop'?3.5:2}"/><rect x="${cx-70}" y="58" width="140" height="34" rx="9" fill="#d95f4a" stroke="${sel==='stop'?P.accent:'#a8402f'}" stroke-width="${sel==='stop'?3.5:2}"/>`+L(cx-56,68,cx+56,68,{stroke:'#fff',w:3,op:.35}),'瓶塞');
+    else{const c=hot?'#c8553d':'#8d8f95';[-16,0,16].forEach((dx,i)=>{const ph=reduceMotion?i:an*3+i*2;h+=hot?transferWavy(cx+dx,112,cx+dx*1.6,62,c,{ph,amp:4,wl:16,op:.7,w:2.2}):transferArrow(cx+dx*1.8,66,cx+dx,104,c,{w:2.5,op:.7});});}
+    /* 夾層裡的示意：輻射、對流、傳導（畫在左側夾層） */
+    const xi=cx-74,xo=cx-96;
+    [236,s.bair?318:330,424].forEach((y,i)=>{if(i===1&&s.bair&&!s.bnos)return;if(s.bnos)h+=hot?transferWavy(xi-2,y,xo-34,y,'#e0662c',{amp:3.5,wl:13,ph:reduceMotion?i:an*5+i,w:2.2}):transferWavy(xo-34,y,xi-2,y,'#e0662c',{amp:3.5,wl:13,ph:reduceMotion?i:an*5+i,w:2.2});
+      else{const a=hot?xi-2:xo+2,b=hot?xo+4:xi-4;h+=`<path d="M${a} ${y-9}L${b} ${y}L${a} ${y+9}" fill="none" stroke="#e0662c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M${a} ${y+9}l${hot?-7:7} ${-1}l${hot?3:-3} ${-6}z" fill="#e0662c"/>`;}});
+    if(s.bair){h+=transferArrow(xi-5,402,xi-5,346,hot?P.red:P.blue,{w:2.4,op:.85})+transferArrow(xo+5,346,xo+5,402,hot?P.blue:P.red,{w:2.4,op:.85})+(hot?transferArrow(xi-1,279,xo-30,279,P.red,{w:3}):transferArrow(xo-30,279,xi-1,279,P.red,{w:3}));}
+    /* 圖例 */
+    h+=transferWavy(22,196,62,196,'#e0662c',{amp:3.5,wl:13,w:2.2})+T(22,220,'輻射',{size:15,fill:P.muted})+transferArrow(22,252,62,252,P.red,{w:3})+T(22,276,'傳導',{size:15,fill:P.muted})+transferArrow(32,330,32,300,P.red,{w:2.4})+transferArrow(50,300,50,330,P.blue,{w:2.4})+T(22,354,'對流',{size:15,fill:P.muted});
+    /* 標籤 */
+    const tags=[['stop',s.bopen?'沒有瓶塞':'瓶塞',76,cx+(s.bopen?30:66),78],['wall','雙層瓶壁',232,cx+101,240],['gap',s.bair?'夾層（空氣）':'真空夾層',292,cx+86,300],['silver',s.bnos?'沒有鍍銀':'鍍銀面',352,cx+75,360]];
+    tags.forEach(([id,t2,y,px,py])=>{const on=sel===id,off=(id==='stop'&&s.bopen)||(id==='gap'&&s.bair)||(id==='silver'&&s.bnos);
+      h+=L(px,py,352,y+16,{stroke:on?P.accent:P.muted,w:1.5})+`<circle cx="${px}" cy="${py}" r="3.5" fill="${on?P.accent:P.muted}"/>`
+        +tapA(id,transferPill(352,y,118,34,t2,{size:16,c:on?'#fff':off?P.red:P.ink,bg:on?P.accent:'#fffdf8',bd:on?P.accent:off?P.red:'#cfc9ba'}),t2);});
+    /* 圖 */
+    const X=v=>548+v*26,Y=v=>292-v*2.05;
+    h+=transferGraph(548,860,292,84,[0,3,6,9,12].map(v=>[v,X(v)]),[0,20,40,60,80,100].map(v=>[v,Y(v)]),'經過時間（小時）','水溫（°C）');
+    h+=L(X(0),Y(25),X(12),Y(25),{stroke:P.muted,w:1,dash:'6 5'})+T(X(12),Y(25)+(hot?17:-7),'室溫 25°C',{size:14,anchor:'end',fill:P.muted});
+    const cur=(mm,upto)=>{let a='';for(let q=0;q<=upto+1e-6;q+=.25)a+=(q?'L':'M')+X(q).toFixed(1)+' '+Y(transferBT(mm,q)).toFixed(1);return a+`L${X(upto).toFixed(1)} ${Y(transferBT(mm,upto)).toFixed(1)}`;},cc=hot?P.red:P.blue;
+    if(changed)h+=`<path d="${cur(m0,12)}" fill="none" stroke="${P.accent}" stroke-width="2.5" stroke-dasharray="7 5"/>`+L(562,Y(hot?10:62),596,Y(hot?10:62),{stroke:P.accent,w:2.5,dash:'7 5'})+T(604,Y(hot?10:62)+5,'完整的保溫瓶',{size:15,fill:P.accent});
+    h+=`<path d="${cur(m,12)}" fill="none" stroke="${cc}" stroke-width="2" opacity=".25"/><path d="${cur(m,t)}" fill="none" stroke="${cc}" stroke-width="4" stroke-linejoin="round"/><circle cx="${X(t).toFixed(1)}" cy="${Y(Tw).toFixed(1)}" r="6" fill="${cc}" stroke="#fff" stroke-width="1.5"/>`;
+    /* 說明卡 */
+    const INFO={stop:['瓶塞（塑膠、軟木）',['塑膠、軟木是熱的不良導體：減少傳導','塞住瓶口，熱空氣和水蒸氣出不去：','減少對流，也防止蒸發']],wall:['雙層瓶壁（玻璃或不鏽鋼）',['內、外兩層瓶壁只在瓶口相連','熱要沿著薄薄的瓶壁繞到瓶口才出得去','傳導的路又長又窄，所以傳得很慢']],
+      gap:['真空夾層',['兩層瓶壁之間抽成真空，沒有物質','傳導和對流都需要介質：無法進行','只剩輻射能穿過真空']],silver:['鍍銀面',['夾層兩側的瓶壁鍍成光亮的銀色','光亮的表面把熱輻射反射回去','本身放出的輻射也少：減少輻射']]};
+    h+=transferPanel(490,346,394,134);
+    if(sel&&INFO[sel]){h+=T(508,374,INFO[sel][0],{size:18,weight:700,fill:P.accent});INFO[sel][1].forEach((l,i)=>{h+=T(508,402+i*25,l,{size:16});});}
+    else h+=T(687,392,'點一下瓶子的各個部分',{size:18,weight:700,anchor:'middle',fill:P.accent})+T(687,422,'看它擋住哪一種熱的傳播',{size:16,anchor:'middle',fill:P.muted})+T(687,448,'（瓶塞、雙層瓶壁、真空夾層、鍍銀面）',{size:15,anchor:'middle',fill:P.muted});
+    const rate=k=>k*500*dT/60,verb=hot?'散失':'傳入',fr=v=>v>=10?v.toFixed(0):v.toFixed(1),big=[['傳導',m.c],['對流',m.v],['輻射',m.r]].sort((a,b)=>b[1]-a[1])[0][0];
+    return {svg:h,reads:[['水溫',tnum(Tw)+'°C'],['傳導'+verb,fr(rate(m.c))+' cal/分'],['對流'+verb+(s.bopen&&hot?'（含蒸發）':''),fr(rate(m.v))+' cal/分'],['輻射'+verb,fr(rate(m.r))+' cal/分']],
+      note:`<b>真空夾層</b>阻絕傳導和對流，<b>鍍銀面</b>把輻射反射回去，<b>瓶塞</b>減少傳導、對流並防止蒸發。三種途徑都擋住，${hot?'熱水就不容易變冷':'外面的熱不容易傳進來，冰水也不容易變溫'}。<br>`
+        +`第 ${t.toFixed(1)} 小時：水溫 ${tnum(Tw)}°C，每分鐘共${verb} ${fr(rate(m.k))} cal`+(changed?`，其中<b>${big}</b>最多。`:'。')+(s.bopen&&!hot?'冷空氣密度較大，會留在瓶內，所以拿掉瓶塞對冰水的影響比熱水小。':'')+'（500 g 的水，數值為示意）'};},
+
+  /* ---------- 5 是哪一種傳播 ---------- */
+  which(s){const n=TRANSFER_W.length,i=clamp(s.wi,0,n-1),Q=TRANSFER_W[i],pk=s.wa[i],done=pk>=0,right=s.wa.filter((a,j)=>a===TRANSFER_W[j].a).length,ans=s.wa.filter(a=>a>=0).length;
+    let h=T(30,38,`第 ${i+1} 題（共 ${n} 題）`,{size:16,fill:P.muted})+T(30,68,Q.t,{size:21,weight:700});
+    for(let j=0;j<n;j++){const a=s.wa[j],c=a<0?'#e9e4d8':a===TRANSFER_W[j].a?P.accent:P.red;h+=`<circle cx="${668+j*22}" cy="32" r="${j===i?8:6}" fill="${c}" stroke="${j===i?P.ink:'none'}" stroke-width="2"/>`;}
+    h+=`<rect x="30" y="84" width="450" height="266" rx="14" fill="#fffdf8" stroke="#ddd7c9"/>`+TRANSFER_SCENE[Q.sc]();
+    TRANSFER_WAY.forEach((w,j)=>{const x=30+j*155,isA=j===Q.a,st=!done?'idle':isA?'ok':j===pk?'bad':'dim',bg=st==='ok'?P.accent:st==='bad'?P.red:'#fffdf8',fc=st==='ok'||st==='bad'?'#fff':st==='dim'?P.muted:P.ink,bd=st==='ok'?P.accent:st==='bad'?P.red:st==='dim'?'#ddd7c9':P.accent;
+      h+=`<g data-tap="w${j}" tabindex="0" role="button" aria-label="${w}" style="cursor:${done?'default':'pointer'}"><rect x="${x}" y="366" width="140" height="58" rx="14" fill="${bg}" stroke="${bd}" stroke-width="2.5"/>`+T(x+70,404,(st==='ok'?'✓ ':st==='bad'?'✗ ':'')+w,{size:24,weight:700,anchor:'middle',fill:fc})+'</g>';});
+    h+=T(255,458,done?'':'這主要是哪一種熱的傳播方式？點一個答案',{size:16,anchor:'middle',fill:P.muted});
+    /* 比較表 */
+    const cx=[538,612,700,812],rows=[['','介質','物質本身','主要發生在'],['傳導','需要','不移動','固體'],['對流','需要','流動','液體、氣體'],['輻射','不需要','不靠物質','真空中也能傳']];
+    h+=transferPanel(500,84,384,170);
+    rows.forEach((r,k)=>{const y=110+k*38;if(k)h+=L(512,y-24,872,y-24,{stroke:'#e4dfd2',w:1});r.forEach((c,q)=>{h+=T(cx[q],y,c,{size:k&&q?16:15,anchor:'middle',weight:q===0?700:400,fill:k===0?P.muted:q===0?P.accent:P.ink});});});
+    h+=T(692,276,'三種方式都是由高溫傳到低溫',{size:15,anchor:'middle',fill:P.muted});
+    /* 回饋 */
+    h+=`<rect x="500" y="290" width="384" height="116" rx="14" fill="${!done?'#fffdf8':pk===Q.a?'#e8f4f2':'#fdf0ec'}" stroke="${!done?'#ddd7c9':pk===Q.a?P.accent:P.red}" stroke-width="1.5"/>`;
+    if(done)h+=T(518,320,pk===Q.a?`✓ 答對了：${TRANSFER_WAY[Q.a]}`:`✗ 答案是「${TRANSFER_WAY[Q.a]}」`,{size:20,weight:700,fill:pk===Q.a?P.accent:P.red})+Q.why.map((l,k)=>T(518,352+k*26,l,{size:16})).join('');
+    else h+=T(692,342,'先預測，再點左邊的答案',{size:18,anchor:'middle',fill:P.muted})+T(692,372,'答對或答錯都會說明原因',{size:15,anchor:'middle',fill:P.muted});
+    h+=T(500,452,`答對 ${right} 題`,{size:22,weight:700,fill:P.accent})+T(500,478,ans===n?'全部作答完畢':`已作答 ${ans} 題`,{size:15,fill:P.muted});
+    h+=`<g data-tap="wn" tabindex="0" role="button" aria-label="下一題" style="cursor:pointer"><rect x="744" y="424" width="140" height="52" rx="14" fill="${done?P.accent:'#fffdf8'}" stroke="${P.accent}" stroke-width="2.5"/>`+T(814,458,'下一題',{size:20,weight:700,anchor:'middle',fill:done?'#fff':P.accent})+'</g>';
+    return {svg:h,reads:[['題號',`${i+1}／${n}`],['答對',right+' 題'],['已作答',ans+' 題']],
+      note:'<b>傳導</b>：需要介質，物質不移動，固體為主。<br><b>對流</b>：需要介質，物質本身流動，發生在液體和氣體。<br><b>輻射</b>：不需要介質，真空中也能傳，以電磁波（例如紅外線）的形式傳出。<br>三種方式都是把熱由<b>高溫</b>傳到<b>低溫</b>。'};}
+};
+
+/* ===== 6-1、6-5 元素、化合物與化學式 ===== */
+/* ===== 6-1 元素與化合物、6-5 分子與化學式 ===== */
+/* 原子的顏色與相對大小：五個分頁共用（H、O、N、C、He 沿用「物質與粒子」的顏色） */
+const COMPOUND_EL={H:{n:'氫',c:'#7fa6d6',r:9.5},He:{n:'氦',c:'#a37acc',r:11.5},C:{n:'碳',c:'#4a5860',r:14},N:{n:'氮',c:'#0f9488',r:14},O:{n:'氧',c:'#df7c44',r:14},
+  Ne:{n:'氖',c:'#e389a8',r:12.5},Na:{n:'鈉',c:'#6f7fd6',r:12.5},S:{n:'硫',c:'#e0b92c',r:16},Cl:{n:'氯',c:'#74b24a',r:16.5},Ar:{n:'氬',c:'#c2a35a',r:15},
+  Fe:{n:'鐵',c:'#868e96',r:15},Cu:{n:'銅',c:'#b0622f',r:15},Zn:{n:'鋅',c:'#9db4bd',r:15}};
+const compoundMix=(hex,to,f)=>{const a=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)),b=[1,3,5].map(i=>parseInt(to.slice(i,i+2),16));return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*f).toString(16).padStart(2,'0')).join('');};
+/* 原子顏色和其他單元一致（EL_COLOR）；淺色的球（氫）用深色邊線和字 */
+for(const k of Object.keys(COMPOUND_EL)){const E=COMPOUND_EL[k];if(EL_COLOR[k])E.c=EL_COLOR[k][0];const lum=[1,3,5].reduce((s,i,j)=>s+parseInt(E.c.slice(i,i+2),16)*[.3,.59,.11][j],0),light=lum>205;E.d=light?'#7d8b99':compoundMix(E.c,'#000000',.32);E.ink=light?'#56677a':compoundMix(E.c,'#000000',.28);E.tx=light||k==='S'||k==='Zn'?'#1b2a33':'#fff';}
+const COMPOUND_DEFS='<defs>'+Object.entries(COMPOUND_EL).map(([k,E])=>`<radialGradient id="cpd-${k}" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="${compoundMix(E.c,'#ffffff',.72)}"/><stop offset=".42" stop-color="${E.c}"/><stop offset="1" stop-color="${compoundMix(E.c,'#000000',.3)}"/></radialGradient>`).join('')
+  +'<linearGradient id="cpd-water" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe7f3"/><stop offset="1" stop-color="#a9d0e4"/></linearGradient>'
+  +'<linearGradient id="cpd-glassv" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity=".75"/><stop offset=".3" stop-color="#ffffff" stop-opacity=".1"/><stop offset="1" stop-color="#9fb6bd" stop-opacity=".22"/></linearGradient>'
+  +'<linearGradient id="cpd-rod" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7c8a92"/><stop offset=".45" stop-color="#39444b"/><stop offset="1" stop-color="#20282d"/></linearGradient>'
+  +'<linearGradient id="cpd-batt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d6b73"/><stop offset=".5" stop-color="#2f3a40"/><stop offset="1" stop-color="#1d2529"/></linearGradient>'
+  +'<radialGradient id="cpd-flame" cx=".5" cy=".75" r=".7"><stop offset="0" stop-color="#fff6c2"/><stop offset=".45" stop-color="#ffc73a"/><stop offset="1" stop-color="#f0692a"/></radialGradient>'
+  +'<radialGradient id="cpd-sugar" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="#fff7e2"/><stop offset=".5" stop-color="#ecd29c"/><stop offset="1" stop-color="#c9a660"/></radialGradient>'
+  +'<filter id="cpd-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="4"/></filter></defs>';
+/* 下標：HTML 用 <sub>，SVG 用 <tspan> 降低基線，字級不小於 13 */
+const COMPOUND_SUBD='₀₁₂₃₄₅₆₇₈₉';
+const compoundDig=m=>[...m].map(c=>COMPOUND_SUBD.indexOf(c)).join('');
+const compoundHtml=t=>String(t).replace(/[₀-₉]+/g,m=>'<sub>'+compoundDig(m)+'</sub>');
+function compoundT(x,y,str,o={}){const{size=16,fill=P.ink,anchor='start',weight=400,op=1}=o,ss=Math.max(13,Math.round(size*.68)),d=+(size*.2).toFixed(1);let out='',down=false;
+  String(str).split(/([₀-₉]+)/).forEach((seg,i)=>{if(!seg)return;if(i%2){out+=`<tspan dy="${down?0:d}" font-size="${ss}">${compoundDig(seg)}</tspan>`;down=true;}else{out+=down?`<tspan dy="${-d}">${seg}</tspan>`:seg;down=false;}});
+  return `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}"${op<1?` opacity="${op}"`:''}>${out}</text>`;}
+const compoundSubN=n=>String(n).replace(/\d/g,d=>COMPOUND_SUBD[d]);
+const compoundFstr=f=>f.map(([e,n])=>e+(n>1?compoundSubN(n):'')).join('');
+/* 分子模型：a 是原子（依繪製順序，後面的畫在上層），f 是化學式的寫法 */
+const COMPOUND_MOL={
+  He:{n:'氦',f:[['He',1]],a:[['He',0,0]]},Ne:{n:'氖',f:[['Ne',1]],a:[['Ne',0,0]]},Ar:{n:'氬',f:[['Ar',1]],a:[['Ar',0,0]]},
+  H2:{n:'氫氣',f:[['H',2]],a:[['H',-8,0],['H',8,0]]},O2:{n:'氧氣',f:[['O',2]],a:[['O',-11.5,0],['O',11.5,0]]},N2:{n:'氮氣',f:[['N',2]],a:[['N',-11,0],['N',11,0]]},
+  Cl2:{n:'氯氣',f:[['Cl',2]],a:[['Cl',-13.5,0],['Cl',13.5,0]]},O3:{n:'臭氧',f:[['O',3]],a:[['O',-19,8],['O',19,8],['O',0,-5]]},
+  H2O:{n:'水',f:[['H',2],['O',1]],a:[['H',-14.5,9.5],['H',14.5,9.5],['O',0,-2]]},CO2:{n:'二氧化碳',f:[['C',1],['O',2]],a:[['O',-23,0],['O',23,0],['C',0,0]]},
+  NH3:{n:'氨',f:[['N',1],['H',3]],a:[['H',-16,9],['H',16,9],['N',0,-4],['H',0,13]]},CH4:{n:'甲烷',f:[['C',1],['H',4]],a:[['H',0,-19],['H',-18,8],['H',18,8],['C',0,0],['H',2,13]]},
+  HCl:{n:'氯化氫',f:[['H',1],['Cl',1]],a:[['H',-14,0],['Cl',6,0]]},
+  H2SO4:{n:'硫酸',f:[['H',2],['S',1],['O',4]],a:[['H',-38,-9],['H',38,9],['O',0,-24],['O',0,24],['O',-25,0],['O',25,0],['S',0,0]]},
+  C2H5OH:{n:'酒精（乙醇）',f:[['C',2],['H',5],['O',1],['H',1]],a:[['H',-37,0],['H',-22,-18],['H',-22,18],['H',4,-18],['H',4,18],['H',38,9],['O',26,-2],['C',-20,0],['C',4,0]]},
+  C6H12O6:{n:'葡萄糖',f:[['C',6],['H',12],['O',6]],a:(()=>{const pt=(r,a)=>[+(r*Math.cos(rad(a))).toFixed(1),+(r*Math.sin(rad(a))).toFixed(1)],H=[],O=[],C=[];
+    for(let i=0;i<6;i++){const a=-90+60*i;if(i===0){O.push(['O',...pt(24,a)]);continue;}C.push(['C',...pt(24,a)]);H.push(['H',...pt(40,a-24)]);
+      if(i<5){O.push(['O',...pt(47,a+4)]);H.push(['H',...pt(60,a+12)]);}
+      else{const[cx,cy]=pt(50,a+6);C.push(['C',cx,cy]);H.push(['H',cx-4,cy+17],['H',cx-16,cy-8]);O.push(['O',...pt(72,a+18)]);H.push(['H',...pt(85,a+24)]);}}
+    return [...H,...O,...C];})()}};
+for(const k of Object.keys(COMPOUND_MOL)){const M=COMPOUND_MOL[k];M.d=2*Math.max(...M.a.map(([e,x,y])=>Math.hypot(x,y)+COMPOUND_EL[e].r));M.fs=compoundFstr(M.f);
+  M.cnt={};M.f.forEach(([e,n])=>{M.cnt[e]=(M.cnt[e]||0)+n;});M.els=Object.keys(M.cnt);M.tot=M.a.length;}
+function compoundAtom(el,x,y,sc=1,o={}){const E=COMPOUND_EL[el],r=E.r*sc,{lab=false,dim=false,glow=false,rot=0}=o,fs=Math.round(clamp(r*.82,13,30));
+  return (glow?`<circle cx="${x}" cy="${y}" r="${(r+Math.min(3.5,r*.25)).toFixed(1)}" fill="none" stroke="#f2a91e" stroke-width="${Math.min(3.5,r*.3).toFixed(1)}"/>`:'')
+    +`<circle cx="${x}" cy="${y}" r="${r.toFixed(1)}" fill="url(#cpd-${el})" stroke="${E.d}" stroke-width="${r>20?1.6:1}"${dim?' opacity=".3"':''}/>`
+    +(lab&&r>=10.5?`<text x="${x}" y="${(y+fs*.36).toFixed(1)}" font-size="${fs}" fill="${E.tx}" text-anchor="middle" font-weight="700"${rot?` transform="rotate(${(-rot).toFixed(1)} ${x} ${y})"`:''}${dim?' opacity=".2"':''}>${el}</text>`:'');}
+function compoundMol(key,x,y,sc=1,rot=0,o={}){const M=COMPOUND_MOL[key];
+  return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)})">${M.a.map(([e,ax,ay])=>compoundAtom(e,+(ax*sc).toFixed(1),+(ay*sc).toFixed(1),sc,{...o,rot,dim:o.hl?e!==o.hl:false,glow:o.hl?e===o.hl:false})).join('')}</g>`;}
+const compoundSugar=(x,y,r)=>`<path d="M${[0,1,2,3,4,5].map(i=>`${(x+r*Math.cos(rad(60*i))).toFixed(1)} ${(y+r*Math.sin(rad(60*i))).toFixed(1)}`).join('L')}Z" fill="url(#cpd-sugar)" stroke="#a8843f" stroke-width="1.2" stroke-linejoin="round"/>`+T(x,y+5,'糖',{size:13,anchor:'middle',weight:700,fill:'#6b4e16'});
+const compoundAny=(key,x,y,sc,rot,o)=>key==='SUG'?compoundSugar(x,y,17*sc):COMPOUND_MOL[key]?compoundMol(key,x,y,sc,rot,o):compoundAtom(key,+x.toFixed(1),+y.toFixed(1),sc,o);
+const compoundD=key=>key==='SUG'?34:COMPOUND_MOL[key]?COMPOUND_MOL[key].d:COMPOUND_EL[key].r*2;
+/* 氣體：每個粒子在自己的格子裡慢慢漂移、轉動（不會互相重疊）；seed 決定排法 */
+function compoundGas(parts,x,y,w,h,sc,t,seed,o={}){const list=parts.flatMap(([k,n])=>Array(n).fill(k)),n=list.length;let best=null;
+  for(let c=2;c<=8;c++){const r=Math.ceil(n/c),m=Math.min(w/c,h/r)-(c*r-n)*2;if(!best||m>best.m)best={c,r,m};}
+  const cw=w/best.c,ch=h/best.r,cells=[];for(let j=0;j<best.r;j++)for(let i=0;i<best.c;i++)cells.push([x+(i+.5)*cw,y+(j+.5)*ch]);
+  for(let i=cells.length-1;i>0;i--){const j=Math.floor(rnd(seed*7.13+i*3.31)*(i+1));[cells[i],cells[j]]=[cells[j],cells[i]];}
+  const order=list.map((k,i)=>[rnd(seed*1.7+i*9.1),k]).sort((a,b)=>a[0]-b[0]).map(v=>v[1]);
+  return order.map((k,i)=>{const d=compoundD(k)*sc,ax=Math.max(0,(cw-d)/2-2),ay=Math.max(0,(ch-d)/2-2),p=rnd(seed+i*5.7)*6.28,q=rnd(seed+i*8.3)*6.28;
+    const px=cells[i][0]+ax*Math.sin(t*(.5+rnd(i+seed)*.5)+p),py=cells[i][1]+ay*Math.cos(t*(.45+rnd(i*2+seed)*.5)+q),rot=rnd(seed+i*3.9)*360+t*(rnd(i*4.4+seed)>.5?1:-1)*(10+rnd(i*6.1)*14);
+    return compoundAny(k,px,py,sc,rot,o);}).join('');}
+/* 液體：靠得很近、位置不固定地晃動。pick(i) 傳回第 i 個位置放什麼粒子 */
+function compoundLiquid(pick,x,y,w,h,sx,sy,sc,t,free=true){let out='',i=0;const cols=Math.floor((w-sx*.5)/sx),rows=Math.floor(h/sy),x0=x+(w-(cols-.5)*sx)/2,y0=y+h-(rows-.5)*sy-3;
+  for(let j=0;j<rows;j++)for(let c=0;c<cols;c++,i++){const k=pick(i,cols*rows),px=x0+c*sx+(j%2?sx/2:0)+2.6*Math.sin(t*1.7+i*2.3),py=y0+j*sy+2.6*Math.cos(t*1.5+i*1.9);
+    const rot=(free?rnd(i*3.7)*360:(rnd(i*3.7)>.5?180:0)+rnd(i*5.1)*30-15)+14*Math.sin(t*1.1+i);out+=compoundAny(k,px,py,sc,rot);}
+  return out;}
+/* 金屬：原子緊密堆積（el 可以是函式，用來畫合金） */
+function compoundMetal(cx,cy,cols,rows,r,t,el,o={}){let out='';const dy=r*1.732,x0=cx-(cols-.5)*r,y0=cy-(rows-1)*dy/2;
+  for(let j=0;j<rows;j++)for(let c=0;c<cols-(j%2);c++){const i=j*cols+c,e=typeof el==='function'?el(i):el,x=x0+c*2*r+(j%2?r:0)+r*.5+.7*Math.sin(t*8+i*2.1),y=y0+j*dy+.7*Math.cos(t*7+i*1.3);
+    out+=compoundAtom(e,+x.toFixed(1),+y.toFixed(1),(r-.6)/COMPOUND_EL[e].r,o);}
+  return out;}
+/* 氯化鈉：鈉、氯粒子依 1：1 交錯排列 */
+function compoundSalt(cx,cy,cols,rows,sp,t,o={}){let out='';const sc=sp/31;
+  for(let pass=0;pass<2;pass++)for(let j=0;j<rows;j++)for(let c=0;c<cols;c++){const na=(c+j)%2===0;if(na!==(pass===0))continue;const i=j*cols+c,x=cx+(c-(cols-1)/2)*sp+.6*Math.sin(t*8+i*2.1),y=cy+(j-(rows-1)/2)*sp+.6*Math.cos(t*7+i*1.3);
+    out+=compoundAtom(na?'Na':'Cl',+x.toFixed(1),+y.toFixed(1),sc*(na?.98:1.02),o);}
+  return out;}
+/* 鑽石：每個碳原子和周圍的碳原子相連（平面示意） */
+function compoundDia(cx,cy,cols,rows,sx,sy,r,t,o={}){const pt=(c,j)=>[cx+(c-(cols-1)/2)*sx+(j%2?sx/2:0)-sx/4,cy+(j-(rows-1)/2)*sy];let b='',a='';
+  for(let j=0;j<rows;j++)for(let c=0;c<cols;c++){const[x,y]=pt(c,j);if(j<rows-1)for(const c2 of j%2?[c,c+1]:[c-1,c]){if(c2<0||c2>=cols)continue;const[x2,y2]=pt(c2,j+1);b+=`<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="#8b979c" stroke-width="${(r*.42).toFixed(1)}" stroke-linecap="round"/>`;}
+    a+=compoundAtom('C',+(x+.5*Math.sin(t*8+(j*cols+c)*2.1)).toFixed(1),+(y+.5*Math.cos(t*7+(j*cols+c))).toFixed(1),r/14,o);}
+  return b+a;}
+/* 石墨：碳原子連成一層一層的六角形網（斜看的示意） */
+function compoundGra(cx,cy,a,r,o={}){let out='';const cols=7,rows=3,W=(cols-1)*a*.866,Hh=(rows-1)*1.5*a+a/2;
+  for(const ly of [58,-58]){const pt=(i,j)=>{const x=i*a*.866-W/2,y=j*1.5*a+((i+j)%2?a/2:0)-Hh/2;return[+(cx+x+.6*y).toFixed(1),+(cy+ly+.5*y).toFixed(1)];};let b='',at='';
+    for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const[x,y]=pt(i,j);if(i<cols-1){const[x2,y2]=pt(i+1,j);b+=`<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="#8b979c" stroke-width="${(r*.42).toFixed(1)}"/>`;}
+      if(j<rows-1&&(i+j)%2){const[x2,y2]=pt(i,j+1);b+=`<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="#8b979c" stroke-width="${(r*.42).toFixed(1)}"/>`;}at+=compoundAtom('C',x,y,r/14,o);}
+    out+=b+at;}
+  return out;}
+const compoundLegend=(x,y,els,extra='')=>els.map((e,i)=>`<circle cx="${x+i*74+9}" cy="${y-5}" r="8" fill="url(#cpd-${e})" stroke="${COMPOUND_EL[e].d}"/>`+T(x+i*74+22,y,`${COMPOUND_EL[e].n} ${e}`,{size:14,fill:P.muted})).join('')+extra;
+const compoundPanel=(x,y,w,h,o={})=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.rx||14}" fill="${o.fill||'#fffdf8'}" stroke="${o.stroke||'#ddd7c9'}" stroke-width="${o.sw||1.5}"/>`;
+const compoundChip=(x,y,w,t,c)=>`<rect x="${x}" y="${y-21}" width="${w}" height="30" rx="15" fill="${c}"/>`+T(x+w/2,y,t,{size:16,anchor:'middle',weight:700,fill:'#fff'});
+const COMPOUND_CLS={E:['元素',P.accent],C:['化合物',P.orange],M:['混合物','#7a5aa8']};
+/* 6-1 物質的分類：st 狀態（g 氣體、l 液體、s 固體）、cls 分類、pk 粒子、ek 元素、r 兩行理由 */
+const COMPOUND_SUB={
+  o2:{n:'氧氣',f:'O₂',st:'g',cls:'E',ic:'jar',gas:[['O2',14]],els:['O'],pk:'1 種（O₂ 分子）',ek:'1 種（氧）',r:['只有一種粒子（O₂ 分子）→ 純物質','O₂ 分子只由氧原子組成 → 元素']},
+  he:{n:'氦氣',f:'He',st:'g',cls:'E',ic:'jar',gas:[['He',16]],els:['He'],pk:'1 種（He 原子）',ek:'1 種（氦）',r:['只有一種粒子（He 原子）→ 純物質','只有氦一種原子 → 元素']},
+  cu:{n:'銅',f:'Cu',st:'s',cls:'E',ic:'block',col:'#c27a45',els:['Cu'],pk:'1 種（銅原子）',ek:'1 種（銅）',r:['只有銅原子，緊密堆在一起 → 純物質','只有銅一種原子 → 元素（化學式寫 Cu）']},
+  dia:{n:'鑽石',f:'C',st:'s',cls:'E',ic:'gem',els:['C'],pk:'1 種（碳原子）',ek:'1 種（碳）',r:['只有碳原子，互相連結 → 純物質','只有碳一種原子 → 元素（化學式寫 C）']},
+  h2o:{n:'水',f:'H₂O',st:'l',cls:'C',ic:'beaker',col:'#bcdcec',els:['H','O'],pk:'1 種（H₂O 分子）',ek:'2 種（氫、氧）',r:['只有一種粒子（H₂O 分子）→ 純物質','分子由氫、氧兩種原子結合 → 化合物']},
+  co2:{n:'二氧化碳',f:'CO₂',st:'g',cls:'C',ic:'jar',gas:[['CO2',12]],els:['C','O'],pk:'1 種（CO₂ 分子）',ek:'2 種（碳、氧）',r:['只有一種粒子（CO₂ 分子）→ 純物質','分子由碳、氧兩種原子結合 → 化合物']},
+  nacl:{n:'食鹽（氯化鈉）',f:'NaCl',st:'s',cls:'C',ic:'salt',els:['Na','Cl'],pk:'鈉、氯依 1：1 排列',ek:'2 種（鈉、氯）',r:['只有氯化鈉一種物質 → 純物質','鈉、氯兩種元素依 1：1 結合 → 化合物']},
+  eth:{n:'酒精（乙醇）',f:'C₂H₅OH',st:'l',cls:'C',ic:'beaker',col:'#e3eef2',els:['C','H','O'],pk:'1 種（酒精分子）',ek:'3 種（碳、氫、氧）',r:['只有一種粒子（酒精分子）→ 純物質','分子由碳、氫、氧三種原子結合 → 化合物']},
+  air:{n:'空氣',f:'',st:'g',cls:'M',ic:'jar',gas:[['N2',15],['O2',4],['Ar',1]],els:['N','O','Ar'],pk:'N₂、O₂、Ar 等好幾種',ek:'氮、氧、氬…',r:['有氮氣、氧氣、氬等好幾種物質 → 混合物','各種粒子各自分開，沒有結合在一起']},
+  sugar:{n:'糖水',f:'',st:'l',cls:'M',ic:'beaker',col:'#efe6c8',els:['H','O'],pk:'2 種（水分子、糖分子）',ek:'碳、氫、氧',r:['有水和糖兩種物質 → 混合物','糖分子分散在水分子之間，沒有結合']},
+  salt:{n:'食鹽水',f:'',st:'l',cls:'M',ic:'beaker',col:'#cfe3ec',els:['H','O','Na','Cl'],pk:'水分子和食鹽的粒子',ek:'氫、氧、鈉、氯',r:['有水和食鹽兩種物質 → 混合物','食鹽的粒子分散在水分子之間']},
+  brass:{n:'黃銅（銅鋅合金）',f:'',st:'s',cls:'M',ic:'block',col:'#d6ac3e',els:['Cu','Zn'],pk:'2 種（銅原子、鋅原子）',ek:'2 種（銅、鋅）',r:['有銅和鋅兩種物質 → 混合物（合金）','兩種原子混在一起，比例可以改變']}};
+const COMPOUND_STATE={g:'氣體',l:'液體',s:'固體'};
+/* 6-5 粒子模型圖鑑 */
+const COMPOUND_KINDS=[['單原子（鈍氣）',['He','Ne','Ar']],['元素的分子',['H2','O2','N2','Cl2','O3']],['化合物的分子',['H2O','CO2','NH3','CH4','HCl']],['不是一個個分子',['Cu','Fe','DIA','GRA','NaCl']]];
+const COMPOUND_LAT={Cu:{n:'銅',fs:'Cu',cls:'E',els:['Cu']},Fe:{n:'鐵',fs:'Fe',cls:'E',els:['Fe']},DIA:{n:'鑽石',fs:'C',cls:'E',els:['C']},GRA:{n:'石墨',fs:'C',cls:'E',els:['C']},NaCl:{n:'食鹽（氯化鈉）',fs:'NaCl',cls:'C',els:['Na','Cl']}};
+const COMPOUND_KLABEL={DIA:'鑽石',GRA:'石墨'};
+const compoundKind=k=>COMPOUND_LAT[k]||COMPOUND_MOL[k];
+/* 6-5 粒子圖判讀：12 種題型 */
+const COMPOUND_BUILD=[
+  {ans:'E',parts:[['O2',11]],nm:'氧氣 O₂',r:'只有一種分子，分子裡只有一種原子'},
+  {ans:'C',parts:[['H2O',11]],nm:'水 H₂O',r:'只有一種分子，分子由兩種原子結合'},
+  {ans:'M',parts:[['H2',6],['O2',5]],nm:'氫氣 H₂ 和氧氣 O₂ 混合',r:'有兩種分子，各自分開、沒有結合'},
+  {ans:'E',parts:[['He',12]],nm:'氦氣 He',r:'只有一種原子，各自獨立'},
+  {ans:'C',parts:[['CO2',10]],nm:'二氧化碳 CO₂',r:'只有一種分子，分子由兩種原子結合'},
+  {ans:'M',parts:[['He',6],['Ne',6]],nm:'氦氣 He 和氖氣 Ne 混合',r:'兩種原子各自分開，並沒有結合'},
+  {ans:'E',lat:'Cu',nm:'銅 Cu',r:'只有一種原子，緊密堆在一起'},
+  {ans:'C',parts:[['NH3',10]],nm:'氨 NH₃',r:'只有一種分子，分子由兩種原子結合'},
+  {ans:'M',parts:[['O2',6],['O3',5]],nm:'氧氣 O₂ 和臭氧 O₃ 混合',r:'原子只有一種，但有兩種不同的分子'},
+  {ans:'E',parts:[['O3',10]],nm:'臭氧 O₃',r:'只有一種分子，分子裡只有一種原子'},
+  {ans:'C',parts:[['HCl',11]],nm:'氯化氫 HCl',r:'只有一種分子，分子由兩種原子結合'},
+  {ans:'M',parts:[['H2O',6],['CO2',5]],nm:'水 H₂O 和二氧化碳 CO₂ 混合',r:'有兩種分子（兩種化合物混在一起）'}];
+const compoundBuildI=s=>{const n=COMPOUND_BUILD.length,lap=Math.floor(s.bi/n);return lap%2?(s.bi*5+3)%n:s.bi%n;};
+/* 想一想與例題 */
+const COMPOUND_Q={
+  sort:['空氣裡有氮氣和氧氣，空氣是化合物嗎？糖水呢？','都<b>不是</b>，兩者都是<b>混合物</b>。化合物是不同元素的原子<b>結合</b>成的另一種物質，組成固定；混合物只是幾種物質<b>混在一起</b>，各成分保有原來的性質，比例也可以改變。空氣裡的氮分子、氧分子各自分開；糖水蒸乾後，糖還是糖。'],
+  split:['把食鹽水蒸乾得到食鹽，和把水電解得到氫氣、氧氣，這兩種「分開」有什麼不同？','蒸發是<b>物理方法</b>：食鹽和水本來只是混在一起，分開後還是食鹽和水，沒有產生新物質。電解是<b>化學方法</b>：水分子被拆開，原子重新組合成氫氣和氧氣，產生了<b>新物質</b>。混合物用過濾、蒸發等物理方法就能分離；化合物要用通電、加熱等化學方法才能分解；元素不能再用一般的化學方法分解。'],
+  kinds:['氧氣是由 O₂ 分子組成的。「由分子組成」就是化合物嗎？','<b>不是</b>。O₂ 分子由 2 個<b>同一種</b>原子結合而成，所以氧氣是<b>元素</b>。分元素或化合物要看<b>原子的種類</b>：只有一種是元素，兩種以上結合才是化合物。分子只是「幾個原子結合成的粒子」，元素和化合物都可能以分子存在。'],
+  formula:['2H₂O 和 H₂O₂ 裡都有數字 2，意思一樣嗎？','不一樣。<b>2H₂O</b> 前面的 2 是<b>係數</b>：有 2 個水分子；右下角的 2 是<b>下標</b>：一個水分子裡有 2 個氫原子。<b>H₂O₂</b>（過氧化氫，雙氧水的成分）是另一種物質，一個分子有 2 個氫原子和 2 個氧原子。改下標就變成別的物質，改係數只是改變分子的個數。'],
+  build:['粒子圖裡有兩種顏色的原子，就一定是化合物嗎？','<b>不一定</b>。要看兩種原子有沒有<b>結合在同一個粒子裡</b>：每個粒子都相同，而且裡面有兩種原子，才是化合物。如果是兩種粒子各自分開（例如 H₂ 和 O₂ 混在一起），就是混合物。']};
+for(const k of Object.keys(COMPOUND_Q))COMPOUND_Q[k]=COMPOUND_Q[k].map(compoundHtml);
+const COMPOUND_QUIZ=[
+  {q:'下列哪一種物質是<b>元素</b>？',opts:['水','二氧化碳','氧氣','空氣'],ans:2,
+    sol:'氧氣只由<b>氧一種原子</b>組成（O₂ 分子），是元素。水（氫、氧）和二氧化碳（碳、氧）是化合物；空氣含有氮氣、氧氣等，是混合物。',go:s=>{s.mode='sort';s.sub='o2';s.guess=false;},goLabel:'看氧氣的粒子圖'},
+  {q:'下列哪一種物質是<b>混合物</b>？',opts:['食鹽（氯化鈉）','酒精（乙醇）','鑽石','黃銅'],ans:3,
+    sol:'黃銅是銅和鋅熔合成的<b>合金</b>，兩種金屬混在一起、比例可以改變，是混合物。食鹽、酒精是化合物，鑽石是只由碳原子組成的元素。',go:s=>{s.mode='sort';s.sub='brass';s.guess=false;},goLabel:'看黃銅的粒子圖'},
+  {q:'電解水時，兩極產生的氣體和體積比，何者正確？',opts:['正極產生氫氣，氫：氧 ＝ 2：1','負極產生氫氣，氫：氧 ＝ 2：1','負極產生氫氣，氫：氧 ＝ 1：2','負極產生氧氣，氫：氧 ＝ 2：1'],ans:1,
+    sol:'<b>負極</b>產生氫氣、<b>正極</b>產生氧氣，體積比 氫：氧 ＝ <b>2：1</b>。',go:s=>{s.mode='split';s.tm=10;s.play=false;s.test='none';},goLabel:'看電解的結果'},
+  {q:'電解水一段時間後，負極的試管收集到 12 mL 氣體。正極的試管大約收集到多少氣體？',opts:['6 mL','12 mL','24 mL','36 mL'],ans:0,
+    sol:'負極是氫氣、正極是氧氣，體積比 2：1。氧氣 ＝ 12 ÷ 2 ＝ <b>6 mL</b>。',go:s=>{s.mode='split';s.tm=6;s.play=false;s.test='none';},goLabel:'通電到氫氣 12 mL'},
+  {q:'把有餘燼的線香伸入一瓶氣體中，線香立刻<b>復燃</b>。這瓶氣體最可能是：',opts:['氫氣','二氧化碳','氮氣','氧氣'],ans:3,
+    sol:'氧氣有<b>助燃性</b>，能使有餘燼的線香復燃。氫氣有可燃性，點火會有爆鳴聲；二氧化碳和氮氣不助燃。',go:s=>{s.mode='split';s.tm=10;s.play=false;s.test='o2';},goLabel:'檢驗正極的氣體'},
+  {q:'關於元素、化合物和分子，下列敘述何者正確？',opts:['由分子組成的物質都是化合物','化合物可以用過濾的方法分解成元素','氧氣由 O₂ 分子組成，是元素','元素加熱後可以分解成更簡單的物質'],ans:2,
+    sol:'O₂ 分子只含氧一種原子，所以氧氣是<b>元素</b>。分子不一定是化合物；化合物要用化學方法（通電、加熱）才能分解，過濾是物理方法；元素不能再用一般的化學方法分解。',go:s=>{s.mode='kinds';s.kd='O2';},goLabel:'看 O₂ 的模型'},
+  {q:'下列哪一種物質<b>不是</b>由一個個分子組成的？',opts:['二氧化碳 CO₂','銅 Cu','氨 NH₃','氧氣 O₂'],ans:1,
+    sol:'金屬是由原子緊密堆積而成，沒有一個個分子，所以化學式只寫元素符號 <b>Cu</b>。CO₂、NH₃、O₂ 都以分子存在。',go:s=>{s.mode='kinds';s.kd='Cu';},goLabel:'看銅的模型'},
+  {q:'3CO₂ 中共有多少個氧原子？',opts:['2 個','3 個','5 個','6 個'],ans:3,
+    sol:'係數 3：有 3 個 CO₂ 分子；下標 2：每個分子有 2 個氧原子。3 × 2 ＝ <b>6 個</b>。',go:s=>{s.mode='formula';s.fs='CO2';s.k=3;s.hl='O';},goLabel:'用化學式驗證'},
+  {q:'一個硫酸分子 H₂SO₄ 是由幾種元素、幾個原子組成的？',opts:['3 種元素、7 個原子','3 種元素、6 個原子','4 種元素、7 個原子','7 種元素、3 個原子'],ans:0,
+    sol:'元素有氫、硫、氧 <b>3 種</b>；原子數 2 ＋ 1 ＋ 4 ＝ <b>7 個</b>（S 右下角沒有數字，代表 1 個）。',go:s=>{s.mode='formula';s.fs='H2SO4';s.k=1;s.hl='none';},goLabel:'用化學式驗證'},
+  {q:'密閉容器中有許多 H₂ 分子和 O₂ 分子，彼此沒有結合。容器裡的物質屬於：',opts:['元素','化合物','混合物','純物質'],ans:2,
+    sol:'容器裡有<b>兩種</b>分子，各自分開，是<b>混合物</b>。兩種元素要結合成同一種分子（例如 H₂O）才是化合物。',go:s=>{s.mode='build';s.bi=2;s.bp='';},goLabel:'看這個粒子圖'}];
+COMPOUND_QUIZ.forEach(Q=>{Q.q=compoundHtml(Q.q);Q.sol=compoundHtml(Q.sol);Q.opts=Q.opts.map(compoundHtml);});
+
+LABS.compound={group:5,n:'6-1',keep:['mode'],steps:'mode',
+  stepGroups:[{label:'6-1 元素與化合物',keys:['sort','split']},{label:'6-5 分子與化學式',keys:['kinds','formula','build']}],
+  tasks:{sort:'換不同的物質，先看放大的粒子圖：裡面有幾種粒子？每種粒子由幾種原子組成？再對照右邊的分類。',
+    split:'按「通電」：哪一極收集到的氣體比較多？兩支試管的氣體體積比是多少？再選一種方法檢驗氣體。',
+    kinds:'一個一個點來看：哪些是分子？哪些分子只由同一種原子組成？哪些物質沒有一個個分子？',
+    formula:'把前面的數字由 1 調到 6，再換不同的化學式：哪個數字決定分子的個數？哪個數字決定一個分子裡的原子個數？',
+    build:'先數有幾種粒子，再看每種粒子由幾種原子組成，然後在圖上點選答案。'},
+  name:'元素、化合物與化學式',subtitle:'物質分成純物質和混合物，純物質又分成元素和化合物。化學式用元素符號和數字，表示物質由哪些原子、各幾個組成。',
+  q:s=>({html:qBlockHTML(COMPOUND_Q[s.mode])+quizHTML(s,COMPOUND_QUIZ)}),
+  qAction(s,v){quizAction(s,v,COMPOUND_QUIZ);},
+  state:{mode:'sort',t:0,sub:'o2',guess:false,rev:false,tm:0,play:false,test:'none',eq:false,kd:'H2O',lab:true,fs:'H2O',k:3,hl:'none',bi:0,bp:'',bs:0,bn:0,qi:0,qp:null,qc:false,qs:false},
+  controls:[
+    {type:'seg',key:'mode',label:'分頁',options:[['sort','物質的分類'],['split','化合物可以再分解'],['kinds','原子與分子'],['formula','讀化學式'],['build','粒子圖判讀']],onChange:s=>{s.play=false;}},
+    {type:'seg',key:'sub',label:'物質',options:Object.entries(COMPOUND_SUB).map(([k,v])=>[k,v.n.replace(/（.*/,'')]),onChange:s=>{s.rev=false;},show:s=>s.mode==='sort'},
+    {type:'toggle',key:'guess',label:'先猜再看：先不顯示分類',onChange:s=>{s.rev=false;},show:s=>s.mode==='sort'},
+    {type:'buttons',items:[['揭曉答案',s=>{s.rev=true;}]],primary:true,show:s=>s.mode==='sort'&&s.guess&&!s.rev},
+    {type:'range',key:'tm',label:'通電時間',min:0,max:10,step:.5,fmt:s=>s.tm.toFixed(1)+' 分鐘',show:s=>s.mode==='split'},
+    {type:'buttons',label:'電源',items:[['▶ 通電／暫停',s=>{if(reduceMotion){s.tm=10;s.play=false;return;}if(s.tm>=10)s.tm=0;s.play=!s.play;}],['重新開始',s=>{s.tm=0;s.play=false;}]],show:s=>s.mode==='split'},
+    {type:'seg',key:'test',label:'檢驗氣體',options:[['none','先不檢驗'],['h2','點燃的火柴 → 負極的氣體'],['o2','有餘燼的線香 → 正極的氣體']],show:s=>s.mode==='split'},
+    {type:'toggle',key:'eq',label:'（延伸）顯示化學反應式',adv:true,show:s=>s.mode==='split'},
+    {type:'seg',key:'kd',label:'粒子',options:COMPOUND_KINDS.flatMap(([,ks])=>ks.map(k=>[k,COMPOUND_KLABEL[k]||compoundHtml(compoundKind(k).fs)])),show:s=>s.mode==='kinds'},
+    {type:'seg',key:'fs',label:'化學式',options:['H2O','CO2','O2','NH3','CH4','H2SO4','C2H5OH','C6H12O6'].map(k=>[k,compoundHtml(COMPOUND_MOL[k].fs)]),show:s=>s.mode==='formula'},
+    {type:'range',key:'k',label:'前面的數字（係數）',min:1,max:6,step:1,show:s=>s.mode==='formula'},
+    {type:'seg',key:'hl',label:'標出同一種原子',options:[['none','不標示'],['H','氫 H'],['C','碳 C'],['O','氧 O'],['N','氮 N'],['S','硫 S']],show:s=>s.mode==='formula'},
+    {type:'toggle',key:'lab',label:'顯示原子符號',show:s=>s.mode==='kinds'||s.mode==='formula'},
+    {type:'buttons',label:'題目',items:[['下一題',s=>{s.bi++;s.bp='';}],['分數歸零',s=>{s.bs=0;s.bn=0;s.bp='';}]],show:s=>s.mode==='build'}],
+  tick(s,dt){s.t+=dt;if(s.mode==='split'&&s.play){s.tm=Math.min(10,s.tm+dt*.8);if(s.tm>=10)s.play=false;}},
+  tap(s,v){const[k,x]=v.split(':');
+    if(k==='ans'){if(s.mode==='build'&&!s.bp&&COMPOUND_CLS[x]){s.bp=x;s.bn++;if(x===COMPOUND_BUILD[compoundBuildI(s)].ans)s.bs++;}}
+    else if(k==='next'){if(s.bp){s.bi++;s.bp='';}}
+    else if(k==='kd'&&compoundKind(x))s.kd=x;},
+  render(s){const out=this[s.mode](s,reduceMotion?0:s.t);return {svg:COMPOUND_DEFS+out.svg,reads:out.reads.map(([a,b])=>[a,compoundHtml(b)]),note:compoundHtml(out.note)};},
+
+  /* ---- 1 物質的分類 ---- */
+  icon(S,cx,cy){const g='#8fa3a8';
+    if(S.ic==='jar')return `<rect x="${cx-30}" y="${cy-44}" width="60" height="88" rx="10" fill="#e2eff3" stroke="${g}" stroke-width="2.5"/><rect x="${cx-37}" y="${cy-52}" width="74" height="9" rx="3" fill="#dfe9ec" stroke="${g}" stroke-width="2"/><path d="M${cx-19} ${cy-32}v62" stroke="#fff" stroke-width="5" stroke-linecap="round"/>`;
+    if(S.ic==='beaker')return `<path d="M${cx-30} ${cy-8}H${cx+30}V${cy+40}a4 4 0 0 1-4 4H${cx-26}a4 4 0 0 1-4-4Z" fill="${S.col}"/><path d="M${cx-30} ${cy-8}H${cx+30}" stroke="${compoundMix(S.col,'#000000',.2)}" stroke-width="2"/><path d="M${cx-36} ${cy-44}q6 0 6 6V${cy+40}a4 4 0 0 0 4 4H${cx+26}a4 4 0 0 0 4-4V${cy-44}" fill="none" stroke="${g}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M${cx-20} ${cy-34}v66" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".8"/>`;
+    if(S.ic==='block'){const c=S.col,l=compoundMix(c,'#ffffff',.45),d=compoundMix(c,'#000000',.28);return `<path d="M${cx-38} ${cy-6}l16-16h60l-16 16Z" fill="${l}" stroke="${d}" stroke-linejoin="round"/><path d="M${cx+22} ${cy-6}l16-16v34l-16 16Z" fill="${d}" stroke="${d}" stroke-linejoin="round"/><rect x="${cx-38}" y="${cy-6}" width="60" height="34" fill="${c}" stroke="${d}"/><path d="M${cx-32} ${cy+1}h36" stroke="${l}" stroke-width="3" stroke-linecap="round" opacity=".8"/>`;}
+    if(S.ic==='gem')return `<path d="M${cx-34} ${cy-12}l14-18h40l14 18l-34 42Z" fill="#e6f5fb" stroke="#7fa4b6" stroke-width="2" stroke-linejoin="round"/><path d="M${cx-34} ${cy-12}h68M${cx-20} ${cy-30}l8 18l12-18l12 18l8-18M${cx-12} ${cy-12}l12 42l12-42" fill="none" stroke="#7fa4b6" stroke-width="1.4" stroke-linejoin="round"/><path d="M${cx-12} ${cy-12}l12-18l12 18Z" fill="#fff"/>`;
+    const cube=(x,y,a)=>`<path d="M${x} ${y}l${a} ${-a*.5}l${a} ${a*.5}l${-a} ${a*.5}Z" fill="#fff" stroke="#9aa8ad"/><path d="M${x} ${y}v${a}l${a} ${a*.5}v${-a}Z" fill="#eef1f2" stroke="#9aa8ad"/><path d="M${x+2*a} ${y}v${a}l${-a} ${a*.5}v${-a}Z" fill="#d9dfe1" stroke="#9aa8ad"/>`;
+    return `<ellipse cx="${cx}" cy="${cy+30}" rx="42" ry="10" fill="#eef4f5" stroke="${g}" stroke-width="2"/>`+cube(cx-30,cy+4,12)+cube(cx+6,cy+6,11)+cube(cx-13,cy-14,13)+cube(cx-10,cy+14,10);},
+  view(key,S,x,y,w,h,t){let g='';const cx=x+w/2,cy=y+h/2;
+    if(S.st==='g')g=compoundGas(S.gas,x+8,y+8,w-16,h-16,key==='air'?.86:key==='co2'?.9:1,t,3);
+    else if(S.st==='l'){const top=y+h*.2;g=`<rect x="${x}" y="${top}" width="${w}" height="${y+h-top}" fill="${S.col}" opacity=".55"/><path d="M${x} ${top}H${x+w}" stroke="${compoundMix(S.col,'#000000',.22)}" stroke-width="2.5"/>`;
+      if(key==='eth')g+=compoundLiquid(()=>'C2H5OH',x+4,top+10,w-8,y+h-top-12,72,44,.6,t,false);
+      else{const sol=key==='sugar'?{5:'SUG',16:'SUG',22:'SUG',31:'SUG',38:'SUG'}:key==='salt'?{3:'Na',10:'Cl',17:'Na',20:'Cl',26:'Na',33:'Cl',36:'Na',40:'Cl'}:{};g+=compoundLiquid(i=>sol[i]||'H2O',x+4,top+8,w-8,y+h-top-10,42,38,.74,t);}}
+    else if(key==='cu')g=compoundMetal(cx,cy,7,9,20,t,'Cu');
+    else if(key==='brass')g=compoundMetal(cx,cy,7,9,20,t,i=>rnd(i*2.37+1)<.34?'Zn':'Cu');
+    else if(key==='nacl')g=compoundSalt(cx,cy,8,8,35,t);
+    else g=compoundDia(cx,cy,6,9,48,34,11,t);
+    return `<clipPath id="cpd-view"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="16"/></clipPath><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="16" fill="#fff"/><g clip-path="url(#cpd-view)">${g}</g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="16" fill="none" stroke="#b9c7c4" stroke-width="2.5"/>`;},
+  tree(cls,hide){const N={root:[690,100,'物質'],pure:[600,206,'純物質'],mix:[800,206,'混合物'],el:[530,312,'元素'],cp:[672,312,'化合物']},lit=hide?[]:cls==='M'?['root','mix']:['root','pure',cls==='E'?'el':'cp'],W=116,Hh=46;let h='';
+    const edge=(a,b)=>{const on=lit.includes(a)&&lit.includes(b),[x1,y1]=N[a],[x2,y2]=N[b],my=(y1+Hh+y2)/2;return `<path d="M${x1} ${y1+Hh}V${my}H${x2}V${y2}" fill="none" stroke="${on?P.accent:hide?'#9aa7ab':P.faint}" stroke-width="${on?4.5:2.5}" stroke-linejoin="round"/>`;};
+    for(const[a,b]of [['root','pure'],['root','mix'],['pure','el'],['pure','cp']])if(!(lit.includes(a)&&lit.includes(b)))h+=edge(a,b);
+    for(const[a,b]of [['root','pure'],['root','mix'],['pure','el'],['pure','cp']])if(lit.includes(a)&&lit.includes(b))h+=edge(a,b);
+    for(const k of Object.keys(N)){const[x,y,t]=N[k],on=lit.includes(k),leaf=k==='el'||k==='cp'||k==='mix',c=on&&leaf?COMPOUND_CLS[k==='el'?'E':k==='cp'?'C':'M'][1]:P.accent;
+      h+=`<rect x="${x-W/2}" y="${y}" width="${W}" height="${Hh}" rx="12" fill="${on?c:'#fffdf8'}" stroke="${on?c:hide?'#7f8c90':P.faint}" stroke-width="2"/>`+T(x,y+30,t,{size:21,anchor:'middle',weight:700,fill:on?'#fff':hide?P.ink:'#9aa39f'});}
+    const q=(x,y,t,a,on)=>T(x,y,t,{size:14,anchor:a,fill:on?P.accent:P.muted,weight:on?700:400});
+    h+=q(634,166,'只有一種物質','end',lit.includes('pure'))+q(746,166,'兩種以上的物質','start',lit.includes('mix'));
+    h+=q(520,272,'一種元素','end',lit.includes('el'))+q(682,272,'兩種以上的元素','start',lit.includes('cp'));
+    return h;},
+  sort(s,t){const S=COMPOUND_SUB[s.sub],hide=s.guess&&!s.rev,[cn,cc]=COMPOUND_CLS[S.cls];
+    let h=T(150,56,S.n,{size:26,weight:700})+(S.f?compoundT(456,58,S.f,{size:28,anchor:'end',weight:700,fill:P.accent}):T(456,82,'沒有固定的化學式',{size:14,anchor:'end',fill:P.muted}));
+    h+=T(150,82,'放大的粒子圖（示意）',{size:14,fill:P.muted});
+    h+=`<path d="M86 270L150 94M86 310L150 440" stroke="#b9c7c4" stroke-width="1.5" stroke-dasharray="5 5" fill="none"/>`+this.icon(S,78,290)+`<circle cx="78" cy="290" r="21" fill="#fff" fill-opacity=".25" stroke="#6f8f8b" stroke-width="2" stroke-dasharray="4 4"/>`;
+    h+=T(78,372,S.n.replace(/（.*/,''),{size:17,anchor:'middle',weight:700})+T(78,394,'常溫：'+COMPOUND_STATE[S.st],{size:14,anchor:'middle',fill:P.muted});
+    h+=this.view(s.sub,S,150,94,306,346,t);
+    h+=compoundLegend(152,468,S.els.slice(0,4),s.sub==='sugar'?compoundSugar(310,462,9).replace(/<text.*<\/text>/,'')+T(324,468,'糖分子',{size:14,fill:P.muted}):'');
+    h+=T(690,56,'物質的分類',{size:18,anchor:'middle',weight:700,fill:P.muted})+this.tree(S.cls,hide);
+    h+=compoundPanel(476,378,404,100);
+    if(hide)h+=T(494,406,'先猜猜看：',{size:16,weight:700,fill:P.orange})+T(494,432,'① 粒子圖裡有幾種粒子？',{size:16})+T(494,458,'② 每種粒子由幾種原子組成？',{size:16});
+    else h+=compoundT(494,406,'① '+S.r[0],{size:16})+compoundT(494,434,'② '+S.r[1],{size:16})+compoundChip(770,466,94,cn,cc)+T(494,462,S.n.replace(/（.*/,'')+'是',{size:16,weight:700})+`<path d="M${494+(S.n.replace(/（.*/,'').length+1)*16+8} 456H760" stroke="${cc}" stroke-width="2" stroke-dasharray="3 5"/>`;
+    const extra={air:'空氣的成分：氮氣約 78 %、氧氣約 21 %，其餘是氬等氣體（圖中的粒子數是示意）。',brass:'合金是金屬和其他元素熔合成的<b>混合物</b>。',nacl:'食鹽是鈉、氯的粒子交錯排列而成，沒有一個個「NaCl 分子」。',dia:'鑽石和石墨都只由碳原子組成，是同一種元素。',cu:'金屬沒有一個個分子，化學式只寫元素符號。',sugar:'糖水蒸乾後糖還在：成分保有原來的性質。',salt:'食鹽水蒸乾後得到食鹽：混合物可以用物理方法分離。'}[s.sub]||'';
+    return {svg:h,reads:[['物質',S.n+(S.f?'　'+S.f:'')],['粒子圖裡的粒子',S.pk],['原子（元素）種類',S.ek],['分類',hide?'？（先猜）':S.cls==='M'?'混合物':'純物質 · '+cn]],
+      note:hide?'先看粒子圖再猜：只有一種物質是<b>純物質</b>，兩種以上是<b>混合物</b>；純物質裡只有一種原子是<b>元素</b>，兩種以上的原子結合是<b>化合物</b>。'
+        :(S.cls==='M'?`${S.r[0].replace('→ ','→ <b>')}</b>。混合物的成分各自保有原來的性質，沒有固定的組成。`:`${S.r[0].replace('→ 純物質','→ <b>純物質</b>')}；${S.r[1].replace(/→ (元素|化合物)/,'→ <b>$1</b>')}。`)+(extra?'<br>'+extra:'')};},
+
+  /* ---- 2 電解水 ---- */
+  flame(x,y,k,t){const w=1+.08*Math.sin(t*11),hh=1+.12*Math.sin(t*14+1);return `<g transform="translate(${x} ${y}) scale(${(k*w).toFixed(3)} ${(k*hh).toFixed(3)})"><path d="M0 0C-9 -6 -7 -17 0 -28C7 -17 9 -6 0 0Z" fill="url(#cpd-flame)"/><path d="M0 -2C-4 -6 -3 -11 0 -16C3 -11 4 -6 0 -2Z" fill="#fff8d6" opacity=".9"/></g>`;},
+  split(s,t){const tm=s.tm,vh=2*tm,vo=tm,p=tm/10,on=s.play&&tm<10,xL=185,xR=315,y0=106,px=8,yb=398,HC=COMPOUND_EL.H.ink,OC=COMPOUND_EL.O.ink;
+    let h=T(250,40,'水　→　氫氣 ＋ 氧氣',{size:23,anchor:'middle',weight:700})+T(203,22,'通電',{size:14,anchor:'middle',fill:P.accent,weight:700});
+    if(s.eq)h+=compoundT(250,64,'（延伸）2H₂O → 2H₂ ＋ O₂',{size:14,anchor:'middle',fill:P.muted});
+    /* 水槽 */
+    h+=`<rect x="83" y="306" width="334" height="122" fill="url(#cpd-water)" opacity=".75"/><path d="M83 306H417" stroke="#7fb1cb" stroke-width="2.5"/><path d="M74 286q6 0 6 6V424a6 6 0 0 0 6 6H414a6 6 0 0 0 6-6V292q0-6 6-6" fill="none" stroke="#83999d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><rect x="88" y="296" width="8" height="126" rx="4" fill="#fff" opacity=".55"/>`;
+    /* 導線與電池 */
+    h+=`<path d="M${xL} 430V461H222" fill="none" stroke="#39444b" stroke-width="3.5" stroke-linejoin="round"/><path d="M${xR} 430V461H282" fill="none" stroke="${P.red}" stroke-width="3.5" stroke-linejoin="round"/>`
+      +`<rect x="222" y="447" width="56" height="28" rx="5" fill="url(#cpd-batt)"/><rect x="278" y="455" width="6" height="12" rx="2" fill="#8d999f"/><rect x="258" y="447" width="20" height="28" rx="5" fill="#c79a3a"/>`
+      +T(236,467,'−',{size:18,anchor:'middle',weight:700,fill:'#fff'})+T(268,467,'＋',{size:15,anchor:'middle',weight:700,fill:'#3a2a08'});
+    h+=T(xL-14,458,'負極',{size:16,anchor:'end',weight:700})+T(xR+14,458,'正極',{size:16,weight:700,fill:P.red})+`<circle cx="${xR+62}" cy="453" r="6" fill="${on?'#3fb26b':'#b9c0c4'}"/>`+T(xR+74,458,on?'通電中':'未通電',{size:14,fill:on?'#23804a':P.muted});
+    h+=T(16,484,'水中加少量氫氧化鈉（幫助導電）',{size:13,fill:P.muted});
+    /* 兩支試管 */
+    const tube=(cx,V,name,c,nb,id)=>{const yi=y0+V*px,sh=`M${cx-20} ${yb}V${y0+8}a10 10 0 0 1 10-10h20a10 10 0 0 1 10 10V${yb}`;
+      let g=`<clipPath id="cpd-${id}"><path d="${sh}Z"/></clipPath><g clip-path="url(#cpd-${id})"><rect x="${cx-22}" y="90" width="44" height="${yb-88}" fill="#bfdcea"/><rect x="${cx-22}" y="90" width="44" height="${(yi-90).toFixed(1)}" fill="#fcfefe"/><path d="M${cx-22} ${yi.toFixed(1)}H${cx+22}" stroke="#6fa6c2" stroke-width="2.5"/>`;
+      if(on&&yi<350)for(let i=0;i<nb;i++){const f=(t*.55+i/nb+rnd(i*3.1+cx)*.2)%1,by=366-f*(366-yi-3),bx=cx+7*Math.sin(i*2.4+f*7);g+=`<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${(2.2+rnd(i+cx)*1.8).toFixed(1)}" fill="#fff" fill-opacity=".85" stroke="#7fb1cb"/>`;}
+      g+=`<rect x="${cx-22}" y="90" width="44" height="${yb-88}" fill="url(#cpd-glassv)"/></g><path d="${sh}" fill="none" stroke="#83999d" stroke-width="3" stroke-linejoin="round"/>`;
+      g+=`<rect x="${cx-3.5}" y="370" width="7" height="60" rx="2" fill="url(#cpd-rod)"/><rect x="${cx-9}" y="424" width="18" height="9" rx="2" fill="#6b777e"/>`;
+      g+=T(cx,90,name,{size:17,anchor:'middle',weight:700,fill:V>0?c:P.muted});return g;};
+    h+=tube(xL,vh,'氫氣',HC,9,'tl')+tube(xR,vo,'氧氣',OC,5,'tr');
+    for(let v=0;v<=20;v++){const yy=y0+v*px,b=v%5===0;h+=L(xL+22,yy,xL+(b?33:28),yy,{stroke:P.muted,w:b?1.6:1})+L(xR-22,yy,xR-(b?33:28),yy,{stroke:P.muted,w:b?1.6:1});if(b)h+=T(250,yy+5,v,{size:14,anchor:'middle',fill:P.muted});}
+    h+=T(250,y0-14,'mL',{size:13,anchor:'middle',fill:P.muted});
+    h+=`<path d="M${xL-24} ${y0+vh*px}H${xL-44}" stroke="${HC}" stroke-width="2"/>`+T(xL-48,y0+vh*px+6,vh.toFixed(1)+' mL',{size:19,anchor:'end',weight:700,fill:HC})
+      +`<path d="M${xR+24} ${y0+vo*px}H${xR+44}" stroke="${OC}" stroke-width="2"/>`+T(xR+48,y0+vo*px+6,vo.toFixed(1)+' mL',{size:19,weight:700,fill:OC});
+    /* 粒子圖：6 個水分子，一次兩個拆開重組 */
+    h+=compoundPanel(480,20,400,268)+T(498,46,'放大看粒子（示意）',{size:15,weight:700,fill:P.muted});
+    const sm=q=>q*q*(3-2*q),mv=(el,a,b,e,up)=>compoundAtom(el,+(a[0]+(b[0]-a[0])*e).toFixed(1),+(a[1]+(b[1]-a[1])*e-up*Math.sin(Math.PI*e)).toFixed(1),.88);
+    let nw=0,nh=0,no=0,lo='',hi='';
+    for(let r=0;r<3;r++){const q=clamp((p*3-r)/.75,0,1),e=sm(q),y=92+r*50;if(q<=0)nw+=2;else if(q>=1){nh+=2;no+=1;}
+      [[652,516],[708,566]].forEach(([wx,hx],j)=>{lo+=mv('H',[wx-12.5,y+8],[hx-7,y],e,12+j*5)+mv('H',[wx+12.5,y+8],[hx+7,y],e,20+j*5);hi+=mv('O',[wx,y-2],[824+(j?10:-10),y],e,j?-14:16);});}
+    h+=`<path d="M606 62V238M762 62V238" stroke="${P.faint}" stroke-width="1.5" stroke-dasharray="4 6"/>`+lo+hi;
+    h+=T(541,226,`氫分子 ${nh} 個`,{size:15,anchor:'middle',weight:700,fill:HC})+T(680,226,`水分子 ${nw} 個`,{size:15,anchor:'middle',weight:700})+T(824,226,`氧分子 ${no} 個`,{size:15,anchor:'middle',weight:700,fill:OC});
+    h+=T(680,254,'氫原子 12 個、氧原子 6 個：數目沒有變，只是重新組合',{size:14,anchor:'middle',fill:P.muted})+T(680,276,'負極這一側　　　　　　　　　　　　　　正極這一側',{size:13,anchor:'middle',fill:P.muted});
+    /* 檢驗或性質比較 */
+    h+=compoundPanel(480,300,400,180);
+    if(s.test==='none'){h+=T(498,326,'性質比一比',{size:15,weight:700,fill:P.muted});
+      [['H2O','水（化合物）','可以滅火',P.ink],['H2','氫氣（元素）','可以燃燒（可燃性）',HC],['O2','氧氣（元素）','幫助燃燒（助燃性）',OC]].forEach(([k,a,b,c],i)=>{const y=356+i*36;h+=compoundMol(k,520,y-5,.72,0)+T(552,y,a,{size:16,weight:700,fill:c})+T(690,y,b,{size:16});});
+      h+=T(498,468,'化合物的性質，和組成它的元素不同。',{size:15,fill:P.accent,weight:700});}
+    else{const isH=s.test==='h2',ok=(isH?vh:vo)>=2,c=isH?HC:OC;h+=T(498,326,isH?'檢驗負極的氣體':'檢驗正極的氣體',{size:15,weight:700,fill:P.muted});
+      if(isH){h+=`<g transform="rotate(-12 560 400)"><path d="M610 384H520a16 16 0 0 0 0 32H610" fill="#fcfefe" stroke="#83999d" stroke-width="3" stroke-linejoin="round"/><path d="M522 392H600" stroke="#fff" stroke-width="4"/></g>`+T(548,446,'氫氣',{size:14,anchor:'middle',fill:c,weight:700});
+        h+=`<path d="M644 440L628 392" stroke="#b98a4b" stroke-width="4" stroke-linecap="round"/><circle cx="627" cy="391" r="4" fill="#5a2f1a"/>`+this.flame(627,389,.8,t);
+        if(ok){const k=1+.14*Math.sin(t*15),pts=Array.from({length:16},(_,i)=>{const a=rad(i*22.5),r=(i%2?11:24)*k;return `${(622+r*Math.cos(a)).toFixed(1)} ${(374+r*Math.sin(a)).toFixed(1)}`;}).join('L');h+=`<path d="M${pts}Z" fill="#ffd95a" stroke="#f0692a" stroke-width="2" stroke-linejoin="round" opacity=".92"/>`+T(622,350,'啵！',{size:20,anchor:'middle',weight:700,fill:P.red});}}
+      else{h+=`<path d="M530 352V440a17 17 0 0 0 34 0V352" fill="#fcfefe" stroke="#83999d" stroke-width="3" stroke-linejoin="round"/><path d="M537 358V436" stroke="#fff" stroke-width="4"/>`+T(547,474,'氧氣',{size:14,anchor:'middle',fill:c,weight:700});
+        h+=`<path d="M612 322L550 398" stroke="#b98a4b" stroke-width="3.5" stroke-linecap="round"/>`;
+        if(ok)h+=`<circle cx="550" cy="394" r="20" fill="#ffd95a" opacity=".5" filter="url(#cpd-soft)"/>`+this.flame(550,398,1.15,t);else h+=`<circle cx="550" cy="398" r="4" fill="#e2572a"/>`;}
+      const X=660;
+      if(!ok)h+=T(X,372,'收集到的氣體還太少，',{size:16})+T(X,398,'先通電一段時間。',{size:16});
+      else if(isH)h+=T(X,362,'點燃的火柴靠近管口',{size:16})+T(X,392,'→ 有爆鳴聲',{size:19,weight:700,fill:P.red})+T(X,428,'氫氣可以燃燒',{size:16,weight:700,fill:c})+T(X,452,'（可燃性）',{size:15,fill:P.muted});
+      else h+=T(X,362,'有餘燼的線香伸入管中',{size:16})+T(X,392,'→ 復燃',{size:19,weight:700,fill:P.red})+T(X,428,'氧氣幫助燃燒',{size:16,weight:700,fill:c})+T(X,452,'（助燃性）',{size:15,fill:P.muted});}
+    return {svg:h,reads:[['通電時間',tm.toFixed(1)+' 分鐘'],['負極：氫氣',vh.toFixed(1)+' mL'],['正極：氧氣',vo.toFixed(1)+' mL'],['體積比 氫：氧',tm>0?'2：1':'—']],
+      note:(tm>0?`通電 ${tm.toFixed(1)} 分鐘：負極收集到氫氣 ${vh.toFixed(1)} mL，正極收集到氧氣 ${vo.toFixed(1)} mL，體積比 <b>氫：氧 ＝ 2：1</b>。`:'還沒通電：兩支試管都裝滿水。')
+        +'<br>水是<b>化合物</b>，可以用通電這種化學方法分解成氫氣和氧氣；氫和氧是<b>元素</b>，不能再用一般的化學方法分解。（每分鐘的氣體量與粒子圖為示意）'};},
+
+  /* ---- 3 原子與分子 ---- */
+  mini(k,cx,cy){if(COMPOUND_MOL[k])return compoundMol(k,cx,cy,Math.min(.82,44/COMPOUND_MOL[k].d),0);
+    if(k==='Cu'||k==='Fe')return compoundMetal(cx,cy,4,2,8.5,0,k);if(k==='NaCl')return compoundSalt(cx,cy,4,2,15,0);if(k==='DIA')return compoundDia(cx+5,cy,3,3,20,13,5.5,0);
+    return [-8,8].map(d=>`<path d="M${cx-22} ${cy+d}l10-6h14l10 6l-10 6h-14Z" fill="none" stroke="#8b979c" stroke-width="2"/>`+[[-22,0],[-12,-6],[2,-6],[12,0],[2,6],[-12,6]].map(([x,y])=>compoundAtom('C',cx+x+5,cy+d+y,.3)).join('')).join('');},
+  kinds(s,t){const k=s.kd,K=compoundKind(k),mol=COMPOUND_MOL[k],cls=mol?(mol.els.length>1?'C':'E'):K.cls,[cn,cc]=COMPOUND_CLS[cls],ci=COMPOUND_KINDS.findIndex(([,ks])=>ks.includes(k)),o={lab:s.lab};let h='';
+    COMPOUND_KINDS.forEach(([title,ks],r)=>{h+=T(26,40+r*110,title,{size:15,weight:700,fill:r===ci?P.accent:P.muted});
+      ks.forEach((key,i)=>{const x=24+i*80,y=50+r*110,on=key===k;h+=`<g data-tap="kd:${key}" tabindex="0" role="button" aria-label="${compoundKind(key).n}" style="cursor:pointer"><rect x="${x}" y="${y}" width="74" height="72" rx="12" fill="${on?'#e3f3f0':'#fffdf8'}" stroke="${on?P.accent:'#ddd7c9'}" stroke-width="${on?3:1.5}"/>${this.mini(key,x+37,y+27)}${compoundT(x+37,y+65,COMPOUND_KLABEL[key]||compoundKind(key).fs,{size:15,anchor:'middle',weight:700,fill:on?P.accent:P.ink})}</g>`;});});
+    h+=compoundPanel(440,20,440,460,{rx:16})+T(462,62,K.n,{size:26,weight:700})+compoundT(858,66,K.fs,{size:40,anchor:'end',weight:700,fill:P.accent});
+    const cx=660,cy=202;let l2,l3,chip,els=mol?mol.els:K.els;
+    if(mol){const sc=Math.min(4,205/mol.d);h+=`<ellipse cx="${cx}" cy="${cy+mol.d*sc*.38+26}" rx="${mol.d*sc*.4}" ry="9" fill="#1b2a33" opacity=".07"/>`+compoundMol(k,cx,cy,sc,mol.tot>1?4*Math.sin(t*.9):0,o);
+      if(mol.tot===1){chip='單原子';l2='一個原子就是一個粒子，不結合成分子';l3='鈍氣（He、Ne、Ar…）都以單獨的原子存在';}
+      else{chip='分子';l2=mol.els.length===1?`一個分子有 ${mol.tot} 個${COMPOUND_EL[mol.els[0]].n}原子`:`一個分子有 ${mol.tot} 個原子（${mol.els.map(e=>COMPOUND_EL[e].n+' '+mol.cnt[e]).join('、')}）`;
+        l3=cls==='E'?'是分子，但只有一種原子 → 元素，不是化合物':'分子裡有兩種以上的原子 → 化合物';}}
+    else{chip='不是分子';
+      if(k==='Cu'||k==='Fe'){h+=compoundMetal(cx,cy,5,4,27,t,k,o);l2=`${K.n}原子緊密堆在一起，沒有一個個分子`;l3=`金屬的化學式只寫元素符號：${K.fs}`;}
+      else if(k==='NaCl'){h+=compoundSalt(cx,cy,6,4,47,t,o);l2='鈉、氯的粒子整齊交錯排列';l3='化學式 NaCl 只表示 鈉：氯 ＝ 1：1';}
+      else if(k==='DIA'){h+=compoundDia(cx,cy,5,6,62,36,13,t,o);l2='碳原子互相連結成一大片，化學式寫 C';l3='鑽石和石墨都只由碳原子組成，排列方式不同';}
+      else{h+=compoundGra(cx,cy,30,10,o);l2='碳原子連成一層一層，化學式寫 C';l3='鑽石和石墨都只由碳原子組成，排列方式不同';}}
+    const elT=els.map(e=>COMPOUND_EL[e].n).join('、');
+    h+=compoundLegend(462,332,els)+compoundChip(462,372,84,cn,cc)+T(558,372,cls==='E'?`只由${elT}一種原子組成`:`由${elT} ${els.length} 種元素結合而成`,{size:16});
+    h+=compoundChip(462,412,chip.length>2?96:84,chip,chip==='分子'?P.blue:'#6b777e')+T(chip.length>2?570:558,412,l2,{size:16});
+    h+=`<path d="M462 432H858" stroke="${P.faint}"/>`+compoundT(462,460,l3,{size:17,weight:700,fill:P.accent});
+    return {svg:h,reads:[['化學式',K.fs],['分類',cn],['粒子的形式',mol?(mol.tot===1?'單原子':mol.tot+' 個原子結合成的分子'):'不是一個個分子'],['原子種類',`${els.length} 種（${elT}）`]],
+      note:`<b>${K.n} ${K.fs}</b>：${cls==='E'?`只由${elT}一種原子組成，是<b>元素</b>`:`由${elT} ${els.length} 種元素結合而成，是<b>化合物</b>`}；${l2}。<br>分元素或化合物看<b>原子的種類</b>，和是不是分子無關：O₂、N₂ 是分子，也是元素。`};},
+
+  /* ---- 4 讀化學式 ---- */
+  formula(s,t){const M=COMPOUND_MOL[s.fs],k=s.k,hl=s.hl==='none'?'':s.hl,size=M.f.length>2?66:78,ss=Math.round(size*.56),base=138;
+    /* 逐字排版，才知道每個符號的位置 */
+    const cells=[];cells.push({t:k>1?String(k):'1',w:size*.66,coef:true});M.f.forEach(([e,n],i)=>{cells.push({t:e,w:size*.76,el:e,part:i});if(n>1)cells.push({t:String(n),w:ss*.6*String(n).length+4,sub:true,el:e,part:i});});
+    const tw=cells.reduce((a,c)=>a+c.w,0);let x=300-tw/2,h='';const pos=[];
+    for(const c of cells){const cx=x+c.w/2,lit=hl&&c.el===hl;
+      if(c.coef){if(k>1)h+=T(cx,base,c.t,{size,anchor:'middle',weight:700,fill:P.orange});else h+=`<rect x="${(cx-size*.26).toFixed(1)}" y="${base-size*.78}" width="${(size*.52).toFixed(1)}" height="${size*.86}" rx="8" fill="none" stroke="${P.faint}" stroke-width="2" stroke-dasharray="5 5"/>`+T(cx,base,'1',{size,anchor:'middle',weight:700,fill:'#e2ddd0'});c.cx=cx;pos.coef=cx;}
+      else if(c.sub){h+=T(cx,base+size*.2,c.t,{size:ss,anchor:'middle',weight:700,fill:lit?COMPOUND_EL[c.el].ink:hl?'#9aa39f':P.blue});pos[c.part].x2=x+c.w;}
+      else{h+=T(cx,base,c.t,{size,anchor:'middle',weight:700,fill:lit?COMPOUND_EL[c.el].ink:hl?'#9aa39f':P.ink});pos[c.part]={x1:x,x2:x+c.w,cx,el:c.el,n:M.f[c.part][1]};}
+      x+=c.w;}
+    h+=`<path d="M${pos.coef.toFixed(1)} ${base-size*.84}V58" stroke="${P.orange}" stroke-width="2"/>`+T(clamp(pos.coef,150,300),46,k>1?`係數 ${k}：有 ${k} 個分子`:'前面沒有寫數字：1 個分子',{size:17,anchor:'middle',weight:700,fill:P.orange});
+    pos.forEach((p,i)=>{const mx=(p.x1+p.x2)/2,y1=Math.round(base+size*.3),y2=y1+28+(i%2)*24,c=COMPOUND_EL[p.el].ink;h+=`<path d="M${(p.x1+5).toFixed(1)} ${y1}H${(p.x2-5).toFixed(1)}M${mx.toFixed(1)} ${y1}V${y2-15}" fill="none" stroke="${c}" stroke-width="2" opacity="${hl&&p.el!==hl?.3:1}"/>`+T(mx,y2,`${COMPOUND_EL[p.el].n} ${p.n} 個`,{size:16,anchor:'middle',weight:700,fill:c})+(hl&&p.el!==hl?`<rect x="${mx-40}" y="${y2-17}" width="80" height="22" fill="#fbf8f1" opacity=".6"/>`:'');});
+    h+=T(300,246,'下標：一個分子裡這種原子的個數（1 省略不寫）',{size:15,anchor:'middle',fill:P.blue,weight:700});
+    /* 計數表 */
+    h+=compoundPanel(588,20,292,232)+T(606,48,`${k} 個${M.n.replace(/（.*/,'')}分子裡有`,{size:16,weight:700,fill:P.muted});
+    const rh=M.els.length>3?30:34;M.els.forEach((e,i)=>{const y=80+i*rh,E=COMPOUND_EL[e];if(hl===e)h+=`<rect x="596" y="${y-22}" width="276" height="${rh-2}" rx="8" fill="#fdf0cf"/>`;
+      h+=`<circle cx="614" cy="${y-6}" r="9" fill="url(#cpd-${e})" stroke="${E.d}"/>`+T(632,y,`${E.n} ${e}`,{size:17,weight:700,fill:E.ink})+T(790,y,`${M.cnt[e]} × ${k} ＝`,{size:16,anchor:'end',fill:P.muted})+T(862,y,`${M.cnt[e]*k} 個`,{size:19,anchor:'end',weight:700});});
+    const yb=80+M.els.length*rh;h+=`<path d="M604 ${yb-14}H864" stroke="${P.faint}" stroke-width="1.5"/>`+T(606,yb+12,'原子總數',{size:16,fill:P.muted})+T(862,yb+12,`${M.tot*k} 個`,{size:20,anchor:'end',weight:700,fill:P.accent})+T(606,yb+40,'元素種類',{size:16,fill:P.muted})+T(862,yb+40,`${M.els.length} 種`,{size:20,anchor:'end',weight:700,fill:P.accent});
+    /* 分子模型 */
+    h+=compoundPanel(20,264,860,216,{fill:'#fff'});const sc=Math.min(2.3,170/M.d,Math.max(128,840/k-26)/M.d),slot=Math.min(840/k,M.d*sc+26),x0=450-(k-1)*slot/2;
+    for(let i=0;i<k;i++)h+=compoundMol(s.fs,x0+i*slot,366+3*Math.sin(t*1.2+i*1.3),sc,s.fs==='C6H12O6'||s.fs==='C2H5OH'||s.fs==='H2SO4'?0:3*Math.sin(t*.9+i*2),{lab:s.lab,hl});
+    h+=T(38,290,`${k} 個${M.n.replace(/（.*/,'')}分子`,{size:16,weight:700,fill:P.orange})+compoundLegend(862-M.els.length*74,468,M.els);
+    const per=M.els.map(e=>`${COMPOUND_EL[e].n} ${M.cnt[e]*k}`).join('、'),nm=M.n.replace(/（.*/,''),fx=(k>1?k:'')+M.fs;
+    return {svg:h,reads:[['分子數',`${k} 個`],['各種原子',per+'（個）'],['原子總數',`${M.tot} × ${k} ＝ ${M.tot*k} 個`],['元素種類',`${M.els.length} 種`]],
+      note:`<b>${fx}</b>：${k} 個${nm}分子，一個分子有 ${M.els.map(e=>`${M.cnt[e]} 個${COMPOUND_EL[e].n}原子`).join('、')}（共 ${M.tot} 個）。${k} 個分子共有 <b>${M.tot*k} 個原子</b>、${M.els.length} 種元素。`
+        +(hl?(M.cnt[hl]?`<br>${COMPOUND_EL[hl].n}原子：每個分子 ${M.cnt[hl]} 個 × ${k} 個分子 ＝ <b>${M.cnt[hl]*k} 個</b>。`:`<br>這個化學式裡沒有${COMPOUND_EL[hl].n}原子。`):'<br><b>係數</b>（前面的數字）是分子的個數；<b>下標</b>（右下角的小數字）是一個分子裡該原子的個數。')
+        +(s.fs==='C6H12O6'||s.fs==='C2H5OH'||s.fs==='H2SO4'?'（模型的形狀為示意）':'')};},
+
+  /* ---- 5 粒子圖判讀 ---- */
+  build(s,t){const qi=compoundBuildI(s),Q=COMPOUND_BUILD[qi],done=!!s.bp,right=s.bp===Q.ans;
+    let h=T(30,46,`第 ${s.bi+1} 題`,{size:22,weight:700})+T(144,46,'這個粒子圖代表哪一類物質？',{size:17,fill:P.muted});
+    h+=`<rect x="30" y="62" width="480" height="386" rx="18" fill="#fff" stroke="#b9c7c4" stroke-width="2.5"/>`+(Q.lat?compoundMetal(270,255,9,8,24,t,Q.lat):compoundGas(Q.parts,42,74,456,362,1.12,t,s.bi*13+5));
+    h+=T(30,474,'不同顏色代表不同種類的原子；連在一起表示已經結合。',{size:14,fill:P.muted});
+    h+=T(872,46,`答對 ${s.bs} ／ ${s.bn} 題`,{size:18,anchor:'end',weight:700,fill:P.accent});
+    ['E','C','M'].forEach((k,i)=>{const y=66+i*66,[nm,c]=COMPOUND_CLS[k],isAns=done&&k===Q.ans,isPick=s.bp===k,bad=isPick&&!right,fill=isAns?'#e2f4ea':bad?'#fbe7e1':'#fffdf8',st=isAns?'#2e9460':bad?P.red:done?P.faint:c;
+      h+=`<g data-tap="ans:${k}" tabindex="0" role="button" aria-label="${nm}" style="cursor:${done?'default':'pointer'}"><rect x="536" y="${y}" width="340" height="54" rx="14" fill="${fill}" stroke="${st}" stroke-width="${isAns||bad?3.5:2.5}"/>`
+        +T(566,y+35,nm,{size:23,weight:700,fill:done&&!isAns&&!bad?'#9aa39f':isAns?'#1f7a4c':bad?P.red:c})+T(654,y+34,['純物質，只有一種原子','純物質，兩種以上的原子結合','兩種以上的物質混在一起'][i],{size:14,fill:done&&!isAns&&!bad?'#b3b9b5':P.muted})+(isAns?T(864,y+36,'✓',{size:24,anchor:'end',weight:700,fill:'#1f7a4c'}):bad?T(864,y+36,'✗',{size:24,anchor:'end',weight:700,fill:P.red}):'')+'</g>';});
+    h+=compoundPanel(536,270,340,132);
+    if(!done)h+=T(556,302,'判斷的順序',{size:16,weight:700,fill:P.muted})+T(556,332,'① 有幾種粒子？兩種以上 → 混合物',{size:16})+T(556,360,'② 只有一種粒子：裡面有幾種原子？',{size:16})+T(556,386,'　一種 → 元素，兩種以上 → 化合物',{size:16});
+    else h+=T(556,302,right?'答對了':'再看一次粒子圖',{size:18,weight:700,fill:right?'#1f7a4c':P.red})+T(556,332,Q.r,{size:16})+T(556,362,'→ '+COMPOUND_CLS[Q.ans][0],{size:20,weight:700,fill:COMPOUND_CLS[Q.ans][1]})+compoundT(556,390,'這是'+Q.nm,{size:15,fill:P.muted});
+    if(done)h+=`<g data-tap="next" tabindex="0" role="button" aria-label="下一題" style="cursor:pointer"><rect x="696" y="416" width="180" height="48" rx="24" fill="${P.accent}"/>`+T(786,447,'下一題 →',{size:19,anchor:'middle',weight:700,fill:'#fff'})+'</g>';
+    else h+=T(876,446,'點上面的答案',{size:15,anchor:'end',fill:P.muted});
+    return {svg:h,reads:[['題號',`第 ${s.bi+1} 題`],['你的答案',done?COMPOUND_CLS[s.bp][0]+(right?'　✓':'　✗'):'還沒作答'],['正確答案',done?COMPOUND_CLS[Q.ans][0]:'？'],['答對',`${s.bs} ／ ${s.bn} 題`]],
+      note:done?`${Q.r} → <b>${COMPOUND_CLS[Q.ans][0]}</b>（${Q.nm}）。`:'先看<b>粒子的種類</b>：兩種以上的粒子混在一起是混合物。只有一種粒子時再看<b>原子的種類</b>：一種是元素，兩種以上結合是化合物。'};}
+};
+/* 這個單元每一格都重畫圖面，滑鼠按下到放開之間元素會被換掉；圖上的按鈕改在按下時就處理（tap 重複呼叫不會重複計分） */
+
+/* ===== 6-3 物質結構與原子 ===== */
+/* ===== 6-3 物質結構與原子（深色舞台） ===== */
+const ATOM_C={ink:'#eaf3ff',muted:'#a9b8cf',dim:'#7387a3',panel:'#14243a',panel2:'#1b3050',line:'#2f4868',p:'#ff7466',n:'#b4bfcd',e:'#5fcbff',a:'#ffcc6a',ok:'#86e3a4',warn:'#ffb35c',bg:'#0b1626'};
+const ATOM_DEFS=`<defs>`
+  +[['p','#ffd0c8','#ff7466','#b8392c'],['n','#f4f7fb','#b4bfcd','#66758a'],['e','#e6f8ff','#5fcbff','#1f7fc0'],['a','#fff6d8','#ffcc6a','#c8872a'],
+    ['H','#ffffff','#dfe7f0','#8d9bb0'],['O','#ffc4bc','#f0604f','#9c2a20'],['C','#b9c3d0','#6f7c8d','#333e4d'],['D','#f6e3bd','#d9b36c','#8a6630'],['Fe','#e3eaf2','#9aa9bb','#4c5a6c'],['S','#f6e7c4','#d8bb82','#8d6f3c']]
+    .map(([k,a,b,c])=>`<radialGradient id="atom-g${k}" cx=".36" cy=".32" r=".75"><stop offset="0" stop-color="${a}"/><stop offset=".45" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></radialGradient>`).join('')
+  +`<radialGradient id="atom-glow"><stop offset="0" stop-color="#ffd27a" stop-opacity=".95"/><stop offset=".35" stop-color="#ff8a5c" stop-opacity=".45"/><stop offset="1" stop-color="#ff8a5c" stop-opacity="0"/></radialGradient>`
+  +`<radialGradient id="atom-pud"><stop offset="0" stop-color="#ff7466" stop-opacity=".34"/><stop offset="1" stop-color="#ff7466" stop-opacity=".2"/></radialGradient>`
+  +`<linearGradient id="atom-metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#dfe6ee"/><stop offset=".5" stop-color="#93a1b3"/><stop offset="1" stop-color="#5a6779"/></linearGradient>`
+  +`<linearGradient id="atom-gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b98a1e"/><stop offset=".5" stop-color="#ffe08a"/><stop offset="1" stop-color="#b98a1e"/></linearGradient>`
+  +`<clipPath id="atom-clipA"><circle cx="690" cy="232" r="130"/></clipPath><clipPath id="atom-clipS"><rect x="20" y="30" width="520" height="440" rx="12"/></clipPath><clipPath id="atom-clipZ"><rect x="20" y="20" width="460" height="460" rx="12"/></clipPath><clipPath id="atom-clipN"><circle cx="668" cy="272" r="76"/></clipPath></defs>`;
+const atomT=(x,y,t,o={})=>T(x,y,t,{fill:ATOM_C.ink,...o});
+const atomBox=(x,y,w,h,o={})=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.rx??14}" fill="${o.fill||ATOM_C.panel}" stroke="${o.stroke||ATOM_C.line}" stroke-width="${o.sw||1.5}"/>`;
+const atomBall=(x,y,r,k)=>`<circle cx="${(+x).toFixed(1)}" cy="${(+y).toFixed(1)}" r="${(+r).toFixed(1)}" fill="url(#atom-g${k})"/>`;
+const atomSign=(x,y,r,plus)=>`<path d="M${(x-r).toFixed(1)} ${y.toFixed(1)}H${(x+r).toFixed(1)}${plus?`M${x.toFixed(1)} ${(y-r).toFixed(1)}V${(y+r).toFixed(1)}`:''}" stroke="#fff" stroke-width="${Math.max(1.4,r*.42).toFixed(1)}" stroke-linecap="round" opacity=".92"/>`;
+const atomElec=(x,y,r=5.5)=>`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r*1.9).toFixed(1)}" fill="${ATOM_C.e}" opacity=".2"/>`+atomBall(x,y,r,'e')+atomSign(x,y,r*.5,false);
+const atomProton=(x,y,r)=>atomBall(x,y,r,'p')+atomSign(x,y,r*.5,true);
+const atomEase=x=>{x=clamp(x,0,1);return x*x*(3-2*x);};
+const atomMix=(a,b,f)=>a+(b-a)*f;
+/* 原子核：質子、中子依葵花籽排列緊密堆在一起（固定排列，不用亂數） */
+function atomNucleus(cx,cy,p,n,r0){const A=p+n;if(A<1)return '';const r=r0||(A<=4?11:A<=12?9.5:A<=28?8:6.8),out=[];
+  for(let k=0;k<A;k++){const isP=Math.floor((k+1)*p/A)>Math.floor(k*p/A),rr=A===1?0:r*.9*Math.sqrt(k+.35),an=k*2.39996+.6;out.push([cx+rr*Math.cos(an),cy+rr*Math.sin(an),isP]);}
+  return out.reverse().map(([x,y,isP])=>isP?atomProton(x,y,r):atomBall(x,y,r,'n')).join('');}
+/* 元素（原子序 1～20）：符號、名稱、最常見的中子數、自然界存在的中子數 */
+const ATOM_EL=[['H','氫',0,[0,1,2]],['He','氦',2,[1,2]],['Li','鋰',4,[3,4]],['Be','鈹',5,[5]],['B','硼',6,[5,6]],['C','碳',6,[6,7,8]],['N','氮',7,[7,8]],['O','氧',8,[8,9,10]],['F','氟',10,[10]],['Ne','氖',10,[10,11,12]],
+  ['Na','鈉',12,[12]],['Mg','鎂',12,[12,13,14]],['Al','鋁',14,[14]],['Si','矽',14,[14,15,16]],['P','磷',16,[16]],['S','硫',16,[16,17,18,20]],['Cl','氯',18,[18,20]],['Ar','氬',22,[18,20,22]],['K','鉀',20,[20,21,22]],['Ca','鈣',20,[20,22,23,24,26,28]]];
+const atomNow=s=>{const p=clamp(Math.round(s.p),1,20),E=ATOM_EL[p-1];return {p,n:s.nfree?s.nn:E[2],e:s.efree?s.e:p,sym:E[0],name:E[1],nat:E[3]};};
+const atomSet=(s,p,n,e)=>{s.mode='build';s.p=p;s.nfree=true;s.nn=n;s.efree=e!==p;s.e=e;};
+
+/* 拉塞福散射：α 粒子受原子核的斥力（與距離平方成反比），逐步計算軌跡。長度單位是放大圖的像素。
+   d＝正面對撞時最接近原子核的距離；布丁模型把同樣多的正電均勻分布在半徑 Ra 的球內。 */
+const ATOM_SC={d:2.5,V:520,B:200,Ra:200,rate:12,T:1.1};
+const ATOM_SHOTS=[[],[]];
+const atomB=i=>{const u=(.342+i*.6180339887)%1;return ATOM_SC.B*(2*u-1);};
+function atomShot(i,pud){const c=ATOM_SHOTS[pud?1:0];if(c[i])return c[i];
+  const {d,V,Ra}=ATOM_SC,K=d*V*V/2,b=atomB(i);let x=-270,y=b,vx=V,vy=0,t=0,lx=1,ly=0;const pts=[[x,y,0]];
+  const acc=(x,y)=>{const r2=x*x+y*y,r=Math.sqrt(r2)||1e-6,f=pud&&r<Ra?K/(Ra*Ra*Ra):K/(r2*r);return [f*x,f*y];};
+  let [ax,ay]=acc(x,y);
+  for(let k=0;k<40000;k++){const r=Math.hypot(x,y),dt=clamp(.02*r/V,2e-5,.004);
+    vx+=ax*dt/2;vy+=ay*dt/2;x+=vx*dt;y+=vy*dt;[ax,ay]=acc(x,y);vx+=ax*dt/2;vy+=ay*dt/2;t+=dt;
+    const sp=Math.hypot(vx,vy),ux=vx/sp,uy=vy/sp;if(ux*lx+uy*ly<.9997){pts.push([x,y,t]);lx=ux;ly=uy;}
+    if(Math.abs(x)>275||Math.abs(y)>265||t>4)break;}
+  pts.push([x,y,t]);const th=deg(Math.atan2(vy,vx)),a=Math.abs(th);
+  return c[i]={b,th,cat:a<5?0:a<90?1:2,pts,tEnd:t};}
+const atomShotPos=(sh,tau)=>{const P=sh.pts;if(tau>=sh.tEnd)return P[P.length-1];let k=1;while(k<P.length-1&&P[k][2]<tau)k++;const a=P[k-1],b=P[k],f=clamp((tau-a[2])/Math.max(1e-9,b[2]-a[2]),0,1);return [atomMix(a[0],b[0],f),atomMix(a[1],b[1],f),tau];};
+const atomEnd=s=>(s.sn-1)/ATOM_SC.rate+ATOM_SC.T+.5;
+const atomTally=s=>{const c=[0,0,0];let fired=0,done=0;for(let i=0;i<s.sn;i++){const t0=i/ATOM_SC.rate;if(s.st>=t0)fired++;if(s.st>=t0+ATOM_SC.T){done++;c[atomShot(i,s.pud).cat]++;}}return {c,fired,done};};
+const atomLen=m=>{const f=v=>+v.toPrecision(2);return m>=1?f(m)+' m':m>=.01?f(m*100)+' cm':f(m*1000)+' mm';};
+const atomW=z=>140*Math.pow(5e-5,z);
+
+const ATOM_DAL=[
+  {t:'原子不可分割',l:['物質由原子組成，','原子是不可分割的最小粒子'],cap:['把物質一直放大來看，最後是一顆一顆的原子。','道耳頓認為原子是實心的小球，不能再分割。'],fix:['修正：原子還可以再分成<tspan fill="#5fcbff" font-weight="700">電子</tspan>、<tspan fill="#ff7466" font-weight="700">質子</tspan>、<tspan font-weight="700">中子</tspan>。','不過在化學反應中，原子仍然不會被分割。']},
+  {t:'同種原子都相同',l:['同種元素的原子，質量和性質','都相同；不同元素的原子不同'],cap:['每個氧原子都一樣；每個氫原子也都一樣。','氧原子和氫原子的質量、性質不同。'],fix:['修正（延伸）：同一種元素的原子，質量可能不同，','稱為同位素。它們的質子數仍然相同。']},
+  {t:'簡單整數比',l:['不同元素的原子，以簡單','整數比結合成化合物'],cap:['原子是一顆一顆的，不會只用半顆，','所以化合物中各種原子的個數是簡單整數比。'],fix:['至今仍成立：水一定是 2 個氫原子配 1 個氧原子，','二氧化碳一定是 1 個碳原子配 2 個氧原子。']},
+  {t:'反應是重新排列',l:['化學反應只是原子重新排列，','原子不會消失、新生或變種類'],cap:['原子只是換了排列方式，','種類和個數在反應前後都沒有改變。'],fix:['至今仍成立：化學反應前後，原子的種類和個數不變。','（所以反應前後的總質量也不變）']}];
+const ATOM_HIS=[
+  {who:'道耳頓',yr:1803,what:'提出原子說',model:'實心球模型',l:['提出原子說：物質由原子組成，','原子是不可分割的實心小球。']},
+  {who:'湯姆森',yr:1897,what:'發現電子',model:'湯姆森的想法：正電均勻分布，電子嵌在裡面',l:['研究陰極射線，發現原子裡有帶負電的粒子：電子。','原子不帶電，所以原子裡一定還有帶正電的部分。']},
+  {who:'拉塞福',yr:1911,what:'發現原子核',model:'有原子核的模型：電子在原子核外運動',l:['用 α 粒子撞擊金箔，發現原子的正電和大部分質量','集中在中心很小的原子核，電子在原子核外。']},
+  {who:'拉塞福',yr:1919,what:'發現質子',model:'原子核裡有帶正電的質子',l:['發現原子核裡有帶正電的粒子：質子。','質子帶的電量和電子一樣多，電性相反。']},
+  {who:'查兌克',yr:1932,what:'發現中子',model:'原子核 ＝ 質子 ＋ 中子，電子在核外',l:['發現原子核裡還有不帶電的粒子：中子。','中子的質量和質子差不多。']}];
+
+const ATOM_Q={
+  dalton:['後來發現原子裡還有電子、質子、中子，道耳頓的原子說就全錯了嗎？','<b>不是</b>。被修正的是「原子不可分割」和「同種原子質量都相同」這兩點。在<b>化學反應</b>中，原子不會被分割，只是<b>重新排列</b>，種類和個數都不變，這些到現在仍然成立。科學理論常常是保留正確的部分、修正不合的部分。'],
+  history:['湯姆森發現原子裡有帶負電的電子，可是原子整體不帶電。由此可以推想什麼？','原子裡一定還有<b>帶正電</b>的部分，而且正電和負電<b>一樣多</b>，才會互相抵消成電中性。後來拉塞福用 α 粒子散射實驗，發現正電集中在很小的<b>原子核</b>。'],
+  scatter:['如果原子的正電像布丁一樣均勻分布，α 粒子射向金箔會怎樣？和實驗結果哪裡不合？','正電分散開來，對 α 粒子的斥力很弱，α 粒子應該<b>全部幾乎直線穿過</b>。但實驗中有極少數 α 粒子<b>大角度偏折甚至反彈</b>，表示正電和質量集中在很小的<b>原子核</b>。（打開「如果原子像均勻的布丁？」比較）'],
+  build:['鈉原子有 11 個質子。多放 1 個中子，或拿走 1 個電子，它還是鈉嗎？','<b>都還是鈉</b>，因為元素的種類只由<b>質子數（原子序）</b>決定。多 1 個中子：質量數由 23 變成 24，電性不變。拿走 1 個電子：質子比電子多 1 個，變成<b>帶正電</b>的離子。只有質子數改變，才會變成別種元素。'],
+  scale:['原子核只占原子很小的空間，為什麼說原子的質量幾乎都在原子核？','質子和中子都在原子核裡，1 個質子（或中子）的質量大約是電子的 <b>1836 倍</b>。電子雖然占了原子大部分的空間，質量卻小到可以忽略，所以<b>質量數只算質子數＋中子數</b>。']};
+const ATOM_QUIZ=[
+  {q:'道耳頓原子說的內容中，哪一項後來被修正？',opts:['化合物由不同元素的原子以簡單整數比結合','化學反應是原子重新排列','原子是不可分割的最小粒子','化學反應前後原子的種類不變'],ans:2,
+    sol:'後來發現原子裡還有<b>電子、質子、中子</b>，所以原子可以再分割。其他三項在化學反應中仍然成立。',go:s=>{s.mode='dalton';s.dsel=1;s.dfix=true;s.da=0;},goLabel:'看後來的修正'},
+  {q:'2 個氫分子和 1 個氧分子反應，生成 2 個水分子。反應前後何者<b>改變</b>？',opts:['原子的排列方式','原子的種類','氫原子的個數','氧原子的個數'],ans:0,
+    sol:'化學反應只是原子<b>重新排列</b>：反應前後都是 4 個氫原子、2 個氧原子，種類和個數不變，改變的是原子的組合方式（分子的種類）。',go:s=>{s.mode='dalton';s.dsel=4;s.dfix=false;s.da=0;},goLabel:'看原子重新排列'},
+  {q:'發現「電子」、「原子核」、「中子」的科學家依序是：',opts:['道耳頓、湯姆森、拉塞福','拉塞福、湯姆森、查兌克','湯姆森、查兌克、拉塞福','湯姆森、拉塞福、查兌克'],ans:3,
+    sol:'<b>湯姆森</b>由陰極射線發現電子；<b>拉塞福</b>由 α 粒子散射實驗發現原子核（後來又發現質子）；<b>查兌克</b>發現中子。',go:s=>{s.mode='history';s.hsel=1;},goLabel:'看原子模型的演進'},
+  {q:'拉塞福的 α 粒子散射實驗中，「絕大多數 α 粒子直接穿過金箔」可以推論：',opts:['原子核帶正電','原子內部大部分是空的','原子核的質量很大','電子帶負電'],ans:1,
+    sol:'絕大多數 α 粒子沒有碰到東西就穿過去，表示原子內部<b>大部分是空的</b>，原子核只占很小的空間。',go:s=>{s.mode='scatter';s.sview='foil';s.pud=false;s.sn=100;s.st=999;s.run=false;},goLabel:'看 100 個 α 粒子的結果'},
+  {q:'α 粒子散射實驗中，有極少數 α 粒子被大角度偏折，甚至反彈。主要原因是 α 粒子：',opts:['被帶負電的電子吸引','撞到金箔表面的雜質','接近帶正電、質量很大的原子核而被排斥','在金箔中速度變慢'],ans:2,
+    sol:'α 粒子帶正電，接近同樣帶<b>正電</b>的原子核時受到很大的斥力；原子核<b>質量很大</b>，所以是 α 粒子被彈開。原子核很小，正好接近的機會很少。',go:s=>{s.mode='scatter';s.sview='atom';s.pud=false;s.sn=100;s.st=999;s.run=false;},goLabel:'放大看單一原子'},
+  {q:'某原子的原子核內有 17 個質子、18 個中子，核外有 17 個電子。它的原子序和質量數依序是：',opts:['17、35','17、34','18、35','35、52'],ans:0,
+    sol:'原子序 ＝ 質子數 ＝ <b>17</b>；質量數 ＝ 質子數 ＋ 中子數 ＝ 17 ＋ 18 ＝ <b>35</b>。電子不算進質量數。',go:s=>atomSet(s,17,18,17),goLabel:'組這個原子'},
+  {q:'一個電中性的鈉原子，原子序 11、質量數 23。它的質子數、中子數、電子數依序是：',opts:['11、23、11','12、11、12','11、12、23','11、12、11'],ans:3,
+    sol:'質子數 ＝ 原子序 ＝ 11；中子數 ＝ 質量數 − 質子數 ＝ 23 − 11 ＝ 12；電中性的原子，電子數 ＝ 質子數 ＝ 11。',go:s=>atomSet(s,11,12,11),goLabel:'組這個原子'},
+  {q:'某粒子有 12 個質子、12 個中子、10 個電子。下列敘述何者正確？',opts:['它是電中性的鎂原子','它帶正電，仍然屬於鎂元素','它帶負電，仍然屬於鎂元素','它變成了氖元素'],ans:1,
+    sol:'質子數 12 → 原子序 12，是<b>鎂</b>。質子（正電）比電子（負電）多 2 個，所以<b>帶正電</b>。元素種類只看質子數，和電子數無關。',go:s=>atomSet(s,12,12,10),goLabel:'組這個粒子'},
+  {q:'甲原子有 6 個質子、6 個中子；乙原子有 6 個質子、8 個中子。下列何者正確？',opts:['甲、乙是不同的元素','甲、乙的質量數相同','甲、乙是同一種元素，質量數不同','乙帶負電'],ans:2,
+    sol:'質子數都是 6 → 原子序都是 6，都是<b>碳</b>。質量數：甲 6 ＋ 6 ＝ 12，乙 6 ＋ 8 ＝ 14。中子不帶電，不影響電性。',go:s=>atomSet(s,6,8,6),goLabel:'組乙原子'},
+  {q:'關於質子、中子、電子，下列敘述何者正確？',opts:['中子帶負電','質子和電子都在原子核內','原子的質量大部分來自電子','電子在原子核外，質量比質子小很多'],ans:3,
+    sol:'質子（帶正電）和中子（不帶電）在<b>原子核內</b>；電子（帶負電）在<b>原子核外</b>，質量約為質子的 1/1836，所以原子的質量幾乎都在原子核。',go:s=>{s.mode='scale';s.sv='mass';s.me=1836;},goLabel:'用天平比較質量'}];
+
+LABS.atom={group:5,n:'6-3',dark:true,keep:['mode'],steps:'mode',
+  tasks:{dalton:'點左邊的四張卡片看動畫，再打開「後來的修正」：哪幾項後來被修正？哪幾項到現在仍然成立？',
+    history:'照順序點時間軸上的五個階段：每一次新發現，原子的模型多了什麼？',
+    scatter:'按「發射」：大部分 α 粒子怎麼走？有沒有被彈回來的？再切到「單一原子」，看它們是在哪裡轉彎的。',
+    build:'拉動「質子數」：元素名稱跟著誰改變？再打開「自己調中子」「自己調電子」，看質量數和電性各由誰決定。',
+    scale:'拉動「放大」，從整個操場一路放大到中心的原子核；再切到「質量」，看要幾個電子才和 1 個質子一樣重。'},
+  name:'物質結構與原子',subtitle:'原子由原子核和核外的電子組成；原子核很小，裡面有帶正電的質子和不帶電的中子。原子序 ＝ 質子數，質量數 ＝ 質子數 ＋ 中子數。',
+  q:s=>({html:qBlockHTML(ATOM_Q[s.mode])+quizHTML(s,ATOM_QUIZ)}),
+  qAction(s,v){quizAction(s,v,ATOM_QUIZ);},
+  state:{mode:'dalton',t:0,dsel:1,dfix:false,da:0,hsel:0,sview:'foil',sn:100,st:0,run:false,pud:false,p:11,nfree:false,nn:12,efree:false,e:11,sv:'size',z:0,zplay:false,me:0,qi:0,qp:null,qc:false,qs:false},
+  controls:[
+    {type:'seg',key:'mode',label:'分頁',options:[['dalton','道耳頓原子說'],['history','原子模型的演進'],['scatter','拉塞福的散射實驗'],['build','組一個原子'],['scale','原子與原子核有多小']],onChange:s=>{s.da=0;s.zplay=false;}},
+    {type:'seg',key:'dsel',label:'原子說的四項內容',options:[[1,'① 不可分割'],[2,'② 同種相同'],[3,'③ 整數比'],[4,'④ 重新排列']],onChange:s=>{s.da=0;},show:s=>s.mode==='dalton'},
+    {type:'toggle',key:'dfix',label:'後來的修正',show:s=>s.mode==='dalton'},
+    {type:'buttons',label:'動畫',items:[['↺ 重播',s=>{s.da=0;}]],show:s=>s.mode==='dalton'},
+    {type:'seg',key:'hsel',label:'階段',options:[[0,'① 道耳頓'],[1,'② 湯姆森'],[2,'③ 拉塞福'],[3,'④ 質子'],[4,'⑤ 中子']],show:s=>s.mode==='history'},
+    {type:'buttons',label:'α 粒子',primary:true,items:[['▶ 發射',s=>{if(s.st>=atomEnd(s)-.01)s.st=0;s.run=true;}],['⏸ 暫停',s=>{s.run=false;}],['↺ 重來',s=>{s.st=0;s.run=false;}],['直接看結果',s=>{s.st=999;s.run=false;}]],show:s=>s.mode==='scatter'},
+    {type:'range',key:'sn',label:'α 粒子數',min:20,max:240,step:20,unit:' 個',show:s=>s.mode==='scatter'},
+    {type:'seg',key:'sview',label:'觀察範圍',options:[['foil','整片金箔'],['atom','單一原子（放大）']],show:s=>s.mode==='scatter'},
+    {type:'toggle',key:'pud',label:'如果原子像均勻的布丁？',show:s=>s.mode==='scatter'},
+    {type:'range',key:'p',label:'質子數',min:1,max:20,step:1,unit:' 個',show:s=>s.mode==='build'},
+    {type:'toggle',key:'nfree',label:'自己調中子',onChange:s=>{if(s.nfree)s.nn=ATOM_EL[s.p-1][2];},show:s=>s.mode==='build'},
+    {type:'range',key:'nn',label:'中子數',min:0,max:28,step:1,unit:' 個',show:s=>s.mode==='build'&&s.nfree},
+    {type:'toggle',key:'efree',label:'自己調電子',onChange:s=>{if(s.efree)s.e=s.p;},show:s=>s.mode==='build'},
+    {type:'range',key:'e',label:'電子數',min:0,max:20,step:1,unit:' 個',show:s=>s.mode==='build'&&s.efree},
+    {type:'buttons',label:'常見原子',items:[[1,'H'],[2,'He'],[6,'C'],[7,'N'],[8,'O'],[11,'Na'],[12,'Mg'],[13,'Al'],[17,'Cl'],[20,'Ca']].map(([z,sy])=>[sy,s=>{s.p=z;s.nfree=false;s.efree=false;s.nn=ATOM_EL[z-1][2];s.e=z;}]),show:s=>s.mode==='build'},
+    {type:'seg',key:'sv',label:'比較',options:[['size','大小'],['mass','質量']],onChange:s=>{s.zplay=false;},show:s=>s.mode==='scale'},
+    {type:'range',key:'z',label:'放大',min:0,max:1,step:.005,fmt:s=>'畫面寬約 '+atomLen(atomW(s.z)),show:s=>s.mode==='scale'&&s.sv==='size'},
+    {type:'buttons',label:'鏡頭',items:[['▶ 自動放大',s=>{if(s.z>=.995)s.z=0;s.zplay=true;}],['⏸ 停',s=>{s.zplay=false;}],['回到操場',s=>{s.z=0;s.zplay=false;}],['看原子核',s=>{s.z=1;s.zplay=false;}]],show:s=>s.mode==='scale'&&s.sv==='size'},
+    {type:'range',key:'me',label:'右盤的電子數',min:0,max:2520,step:36,unit:' 個',show:s=>s.mode==='scale'&&s.sv==='mass'},
+    {type:'buttons',label:'快速設定',items:[['清空',s=>{s.me=0;}],['放 1836 個',s=>{s.me=1836;}]],show:s=>s.mode==='scale'&&s.sv==='mass'}],
+  tick(s,dt){if(reduceMotion){s.da=99;if(s.run){s.st=999;s.run=false;}if(s.zplay){s.z=1;s.zplay=false;}return;}
+    s.t=(s.t+dt)%3600;if(s.mode==='dalton')s.da=Math.min(99,s.da+dt);
+    if(s.mode==='scatter'&&s.run){s.st+=dt;if(s.st>=atomEnd(s)){s.st=atomEnd(s);s.run=false;}}
+    if(s.mode==='scale'&&s.zplay){s.z=Math.min(1,s.z+dt/9);if(s.z>=1)s.zplay=false;}},
+  tapDo(s,id){if(id[0]==='d'){s.dsel=clamp(+id.slice(1)||1,1,4);s.da=0;}else if(id[0]==='h')s.hsel=clamp(+id.slice(1)||0,0,4);},
+  tap(s,id){if(Date.now()-ATOM_TAP.t<700)return;this.tapDo(s,id);},
+  render(s){const m=s.mode;return m==='history'?this.history(s):m==='scatter'?this.scatter(s):m==='build'?this.build(s):m==='scale'?(s.sv==='mass'?this.mass(s):this.size(s)):this.dalton(s);},
+
+  /* ---------- 1 道耳頓原子說 ---------- */
+  dalton(s){const C=ATOM_C,k=clamp(s.dsel,1,4),fix=s.dfix,a=reduceMotion?99:s.da,t=s.t,D=ATOM_DAL[k-1];let h=ATOM_DEFS;
+    ATOM_DAL.forEach((d,i)=>{const y=20+i*116,on=k===i+1,ty=fix?y+34:y+46,chg=i<2;
+      h+=`<g data-tap="d${i+1}" tabindex="0" role="button" style="cursor:pointer" aria-label="第 ${i+1} 項：${d.t}">`+atomBox(20,y,318,106,{fill:on?C.panel2:C.panel,stroke:on?C.a:C.line,sw:on?3:1.5})
+        +`<circle cx="48" cy="${ty+6}" r="17" fill="${on?C.a:'#263b59'}"/>`+T(48,ty+13,i+1,{size:19,weight:700,anchor:'middle',fill:on?'#1b2a33':C.ink})
+        +atomT(76,ty,d.l[0],{size:16,weight:on?700:400})+atomT(76,ty+25,d.l[1],{size:16,weight:on?700:400})
+        +(fix?`<rect x="76" y="${y+70}" width="${chg?104:104}" height="26" rx="13" fill="${chg?C.warn:C.ok}" fill-opacity=".16" stroke="${chg?C.warn:C.ok}" stroke-width="1.5"/>`+T(128,y+88,chg?'後來修正':'仍然成立',{size:15,weight:700,anchor:'middle',fill:chg?C.warn:C.ok}):'')+`</g>`;});
+    h+=atomBox(352,20,528,454)+atomT(376,58,`第 ${k} 項：${D.t}`,{size:21,weight:700});
+    if(fix)h+=`<rect x="750" y="38" width="110" height="28" rx="14" fill="${k<3?C.warn:C.ok}" fill-opacity=".16" stroke="${k<3?C.warn:C.ok}" stroke-width="1.5"/>`+T(805,57,k<3?'後來修正':'仍然成立',{size:15,weight:700,anchor:'middle',fill:k<3?C.warn:C.ok});
+    if(k===1){const g=atomEase(a/.9);
+      h+=`<rect x="388" y="196" width="96" height="72" rx="8" fill="url(#atom-metal)"/><path d="M394 204H478" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".55"/>`+atomT(436,296,'一塊鐵',{size:16,anchor:'middle',fill:C.muted});
+      h+=`<g opacity="${g.toFixed(2)}">`+L(484,198,632,116,{stroke:C.dim,w:1.5,dash:'5 6'})+L(484,266,632,348,{stroke:C.dim,w:1.5,dash:'5 6'})+`<circle cx="690" cy="232" r="130" fill="${C.bg}"/><g clip-path="url(#atom-clipA)">`;
+      for(let j=-3;j<=3;j++)for(let i=-3;i<=3;i++){const x=690+58*(i+(j&1)/2),y=232+50*j,ph=(i*7+j*13);if(i===0&&j===0&&fix)continue;
+        h+=atomBall(x+1.6*Math.sin(t*5+ph),y+1.6*Math.cos(t*4.3+ph*1.7),28,'Fe');}
+      if(fix){h+=`<circle cx="690" cy="232" r="28" fill="#0e1d31" stroke="${C.warn}" stroke-width="2.5"/><circle cx="690" cy="232" r="11" fill="url(#atom-glow)"/>`+atomBall(690,232,4,'p');
+        for(let i=0;i<3;i++){const an=t*1.6+i*2.094;h+=atomElec(690+19*Math.cos(an),232+19*Math.sin(an),3.2);}}
+      h+=`</g><circle cx="690" cy="232" r="130" fill="none" stroke="#5f7da3" stroke-width="3"/></g>`;
+      h+=atomT(436,150,'一直放大',{size:15,anchor:'middle',fill:C.muted})+atomT(436,172,'→ 原子',{size:15,anchor:'middle',fill:C.muted});
+      if(fix)h+=atomT(690,388,'中間這顆原子：裡面有原子核和電子',{size:15,anchor:'middle',fill:C.warn});
+      else h+=atomT(690,388,'每一顆都是實心、不可分割的小球',{size:15,anchor:'middle',fill:C.muted});}
+    else if(k===2){const row=(y,r,kd,name)=>{let o=atomT(380,y+6,name,{size:17,weight:700});for(let i=0;i<5;i++){const g=atomEase((a-i*.14)/.4),x=490+i*72,heavy=fix&&kd==='O'&&(i===1||i===3);
+        o+=`<g opacity="${g.toFixed(2)}">`+atomBall(x,y+1.5*Math.sin(t*2+i),r*(heavy?1.06:1),kd)+(heavy?`<circle cx="${x}" cy="${(y+1.5*Math.sin(t*2+i)).toFixed(1)}" r="${r*1.06+3}" fill="none" stroke="${C.warn}" stroke-width="2" stroke-dasharray="4 4"/>`+T(x,y-r-12,'較重',{size:14,weight:700,anchor:'middle',fill:C.warn}):'')+`</g>`;}return o;};
+      h+=row(165,26,'O','氧原子')+row(280,16,'H','氫原子');
+      h+=`<path d="M464 206v8H804v-8" fill="none" stroke="${C.dim}" stroke-width="1.5"/><path d="M464 308v8H804v-8" fill="none" stroke="${C.dim}" stroke-width="1.5"/>`
+        +atomT(634,236,fix?'性質相同，但質量可能不完全相同':'質量相同、性質相同',{size:15,anchor:'middle',fill:fix?C.warn:C.muted})+atomT(634,338,'質量相同、性質相同',{size:15,anchor:'middle',fill:C.muted})
+        +atomT(634,382,'氧原子和氫原子是不同的原子：質量不同，性質也不同',{size:15,anchor:'middle',fill:C.muted});}
+    else if(k===3){const e=atomEase((a-.5)/1.5);
+      h+=atomBall(496,atomMix(268,226,e),26,'O')+atomBall(atomMix(430,468,e),atomMix(140,204,e),16,'H')+atomBall(atomMix(562,524,e),atomMix(140,204,e),16,'H');
+      h+=atomBall(atomMix(640,694,e),226,26,'O')+atomBall(atomMix(840,786,e),226,26,'O')+atomBall(740,226,22,'C');
+      h+=L(616,110,616,360,{stroke:C.line,w:1.5,dash:'4 6'});
+      h+=atomT(496,318,'氫：氧 ＝ 2：1',{size:19,weight:700,anchor:'middle'})+atomT(496,346,'水 H₂O',{size:16,anchor:'middle',fill:C.muted})
+        +atomT(740,318,'碳：氧 ＝ 1：2',{size:19,weight:700,anchor:'middle'})+atomT(740,346,'二氧化碳 CO₂',{size:16,anchor:'middle',fill:C.muted});
+      h+=atomT(430,112,'氫原子',{size:14,fill:C.muted,anchor:'middle'})+atomT(562,112,'氫原子',{size:14,fill:C.muted,anchor:'middle'})+atomT(740,186,'碳原子',{size:14,fill:C.muted,anchor:'middle'})
+        +`<g opacity="${(1-e).toFixed(2)}">`+atomT(496,308-4,'',{size:14})+`</g>`;}
+    else{const e=atomEase((a-1)/2.2),ph=a<1?0:e<1?1:2;
+      const AT=[['H',434,160,718,148],['H',468,160,774,148],['H',434,292,718,280],['H',468,292,774,280],['O',540,226,746,172],['O',592,226,746,304]];
+      AT.forEach(([kd,x0,y0,x1,y1])=>{const r=kd==='O'?28:18;h+=`<circle cx="${x0}" cy="${y0}" r="${r}" fill="none" stroke="${C.dim}" stroke-width="1.3" stroke-dasharray="3 5" opacity="${(e*.8).toFixed(2)}"/><circle cx="${x1}" cy="${y1}" r="${r}" fill="none" stroke="${C.dim}" stroke-width="1.3" stroke-dasharray="3 5" opacity="${((1-e)*.8).toFixed(2)}"/>`;});
+      h+=`<path d="M626 226H664M654 216l10 10l-10 10" fill="none" stroke="${C.dim}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+      h+=`<g opacity="${(1-atomEase((a-1)/.6)).toFixed(2)}">`+atomT(452,122,'氫分子 H₂',{size:15,anchor:'middle',fill:C.muted})+atomT(452,256,'氫分子 H₂',{size:15,anchor:'middle',fill:C.muted})+atomT(565,182,'氧分子 O₂',{size:15,anchor:'middle',fill:C.muted})+`</g>`;
+      h+=`<g opacity="${atomEase((a-2.9)/.5).toFixed(2)}">`+atomT(746,112,'水分子 H₂O',{size:15,anchor:'middle',fill:C.muted})+atomT(746,246,'水分子 H₂O',{size:15,anchor:'middle',fill:C.muted})+`</g>`;
+      [...AT].sort((p,q)=>(p[0]==='O'?0:1)-(q[0]==='O'?0:1)).forEach(([kd,x0,y0,x1,y1],i)=>{const bend=Math.sin(e*Math.PI)*(kd==='O'?0:(i%2?26:-26));h+=atomBall(atomMix(x0,x1,e),atomMix(y0,y1,e)+bend,kd==='O'?28:18,kd);});
+      const nH=AT.filter(q=>q[0]==='H').length,nO=AT.length-nH;
+      h+=atomT(616,340,['反應前：2 個氫分子 ＋ 1 個氧分子','原子重新排列中','反應後：2 個水分子'][ph],{size:17,weight:700,anchor:'middle',fill:ph===1?C.a:C.ink});
+      h+=`<rect x="436" y="354" width="172" height="34" rx="17" fill="#0e1d31" stroke="${C.line}"/><rect x="624" y="354" width="172" height="34" rx="17" fill="#0e1d31" stroke="${C.line}"/>`+atomBall(458,371,9,'H')+atomT(474,377,`氫原子 ${nH} 個`,{size:16,weight:700})+atomBall(646,371,10,'O')+atomT(662,377,`氧原子 ${nO} 個`,{size:16,weight:700});}
+    const cap=fix?D.fix:D.cap;h+=atomT(376,k===4?424:428,cap[0],{size:16,fill:fix&&k<3?C.ink:C.ink})+atomT(376,k===4?450:454,cap[1],{size:16,fill:C.muted});
+    return {svg:h,reads:[[`第 ${k} 項`,D.t],['現在的看法',fix?(k===1?'修正：原子可再分割':k===2?'修正：有同位素（延伸）':'化學反應中仍然成立'):'打開「後來的修正」查看'],...(k===4?[['氫原子、氧原子','4 個、2 個（前後不變）']]:[])],
+      note:fix?'後來修正的是第 1、2 項：原子裡還有<b>電子、質子、中子</b>；同種元素的原子質量可能不同（延伸：同位素）。<br>第 3、4 項在化學反應中仍然成立：原子只是<b>重新排列</b>，種類和個數不變。'
+        :'<b>道耳頓原子說</b>：物質由原子組成；同種元素的原子相同；不同元素的原子以簡單整數比結合成化合物；化學反應只是原子<b>重新排列</b>。'};},
+
+  /* ---------- 2 原子模型的演進 ---------- */
+  history(s){const C=ATOM_C,k=clamp(s.hsel,0,4),H=ATOM_HIS[k],t=s.t,cx=230,cy=212;let h=ATOM_DEFS;
+    h+=atomBox(20,20,420,372)+atomBox(456,20,424,372);
+    const leg=(x,kd,txt)=>(kd==='pud'?`<circle cx="${x}" cy="46" r="8" fill="${C.p}" fill-opacity=".35" stroke="${C.p}"/>`:atomBall(x,46,kd==='e'?6:7,kd))+atomT(x+14,52,txt,{size:15,fill:C.muted});
+    if(k===0){h+=atomBall(cx,cy,118,'D')+leg(40,'D','原子（實心球）');}
+    else if(k===1){h+=`<circle cx="${cx}" cy="${cy}" r="122" fill="url(#atom-pud)" stroke="${C.p}" stroke-opacity=".7" stroke-width="2"/>`;
+      for(let i=0;i<16;i++){const an=i*2.39996,r=28*Math.sqrt(i+.5);h+=T(cx+r*Math.cos(an),cy+r*Math.sin(an)+6,'＋',{size:17,anchor:'middle',fill:C.p,weight:700});}
+      for(let i=0;i<8;i++){const an=i*2.39996+1.2,r=36*Math.sqrt(i+.6);h+=atomElec(cx+r*Math.cos(an)+2*Math.sin(t*2+i*2),cy+r*Math.sin(an)+2*Math.cos(t*1.7+i*3),6);}
+      h+=leg(40,'pud','帶正電的部分')+leg(190,'e','電子（帶負電）');}
+    else{h+=`<circle cx="${cx}" cy="${cy}" r="128" fill="none" stroke="${C.dim}" stroke-width="1.5" stroke-dasharray="3 7"/>`;
+      [[66,2,.9],[112,4,-.55]].forEach(([r,n,w],j)=>{h+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${C.e}" stroke-opacity=".22" stroke-width="1.2"/>`;for(let i=0;i<n;i++){const an=t*w+i*2*Math.PI/n+j;h+=atomElec(cx+r*Math.cos(an),cy+r*Math.sin(an),6);}});
+      h+=`<circle cx="${cx}" cy="${cy}" r="20" fill="url(#atom-glow)"/>`+atomBall(cx,cy,5.5,'p');
+      h+=leg(40,'p','原子核（帶正電）')+leg(210,'e','電子（帶負電）');
+      if(k===2)h+=atomT(cx+62,cy-98,'大部分是空的',{size:15,fill:C.muted,anchor:'middle'});}
+    h+=atomT(cx,372,H.model,{size:16,weight:700,anchor:'middle',fill:C.a});
+    h+=atomT(478,58,`${H.who}：${H.what}`,{size:22,weight:700})+atomT(860,58,`${H.yr} 年`,{size:14,anchor:'end',fill:C.muted})+atomT(478,94,H.l[0],{size:16})+atomT(478,120,H.l[1],{size:16});
+    if(k===0){h+=atomBall(560,250,17,'H')+atomBall(668,250,27,'O')+atomBall(776,250,23,'C')+atomT(560,304,'氫原子',{size:15,anchor:'middle',fill:C.muted})+atomT(668,304,'氧原子',{size:15,anchor:'middle',fill:C.muted})+atomT(776,304,'碳原子',{size:15,anchor:'middle',fill:C.muted})
+      +atomT(668,186,'不同元素的原子，大小和質量不同',{size:15,anchor:'middle',fill:C.muted})+atomT(668,350,'那時還不知道原子裡面有什麼',{size:15,anchor:'middle',fill:C.muted});}
+    else if(k===1){const by=255,q=11/8100,ex=730,ey=by-11,sl=-2*q*90,endY=ey+sl*(832-ex);
+      h+=`<rect x="486" y="${by-52}" width="372" height="104" rx="44" fill="#7fb4e6" fill-opacity=".07" stroke="#7fa6c9" stroke-width="2"/><path d="M520 ${by-44}H780" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".18"/>`;
+      h+=`<rect x="502" y="${by-15}" width="9" height="30" rx="2" fill="#9aa9bb"/><rect x="556" y="${by-30}" width="7" height="24" rx="2" fill="#9aa9bb"/><rect x="556" y="${by+6}" width="7" height="24" rx="2" fill="#9aa9bb"/>`
+        +`<rect x="640" y="${by-30}" width="90" height="6" rx="3" fill="${C.p}"/><rect x="640" y="${by+24}" width="90" height="6" rx="3" fill="${C.e}"/>`
+        +atomT(685,by-36,'＋ 正極板',{size:14,anchor:'middle',fill:C.p,weight:700})+atomT(685,by+47,'− 負極板',{size:14,anchor:'middle',fill:C.e,weight:700});
+      h+=L(730,by,838,by,{stroke:C.dim,w:1.5,dash:'4 6'});
+      const d=`M511 ${by}H640Q685 ${by} ${ex} ${ey}L832 ${endY.toFixed(1)}`;
+      h+=`<path d="${d}" fill="none" stroke="#9dffb0" stroke-width="5" stroke-linecap="round" opacity=".25"/><path d="${d}" fill="none" stroke="#c9ffd4" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="10 8" stroke-dashoffset="${(-t*60%18).toFixed(1)}"/><circle cx="834" cy="${endY.toFixed(1)}" r="7" fill="#9dffb0" opacity=".8"/>`;
+      h+=atomT(506,by+38,'−',{size:17,anchor:'middle',fill:C.muted,weight:700})+atomT(600,by+26,'陰極射線',{size:14,fill:'#c9ffd4',anchor:'middle'})+atomT(668,186,'陰極射線管（側面）',{size:15,anchor:'middle',fill:C.muted});
+      h+=atomT(668,340,'射線偏向正極板 → 射線是帶負電的粒子',{size:15,anchor:'middle'})+atomT(668,366,'換不同金屬當電極都有 → 各種原子都含有電子',{size:15,anchor:'middle',fill:C.muted});}
+    else if(k===2){h+=`<rect x="686" y="172" width="7" height="150" rx="2" fill="url(#atom-gold)"/>`+atomT(690,164,'金箔',{size:14,anchor:'middle',fill:C.a});
+      const ar=(d,c,op=1)=>`<path d="${d}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arr)" opacity="${op}"/>`;
+      [182,206,318].forEach(y=>{h+=ar(`M510 ${y}H846`,C.a,.75);});h+=ar('M510 276H689L842 298',C.warn)+ar('M510 242H682L538 224','#ff8d9d');
+      h+=atomT(482,262,'α',{size:17,fill:C.a,weight:700})+atomT(668,350,'大多數穿過，少數偏折，極少數反彈',{size:15,anchor:'middle'})+atomT(668,374,'（第 3 分頁可以自己發射 α 粒子）',{size:14,anchor:'middle',fill:C.muted});}
+    else{h+=L(cx+5,cy-3,640,198,{stroke:C.dim,w:1.3,dash:'4 6'})+L(cx+5,cy+3,640,346,{stroke:C.dim,w:1.3,dash:'4 6'})+`<circle cx="668" cy="272" r="76" fill="${C.bg}" stroke="#5f7da3" stroke-width="2.5"/>`;
+      if(k===4)h+=atomNucleus(668,272,6,6,13);
+      else{for(let i=11;i>=0;i--){const rr=13*Math.sqrt(i+.35),an=i*2.39996+.6,x=668+rr*Math.cos(an),y=272+rr*Math.sin(an);h+=i%2?atomProton(x,y,13):`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="#0e1d31" stroke="${C.dim}" stroke-width="1.5" stroke-dasharray="3 4"/>`+T(x,y+5,'?',{size:15,anchor:'middle',fill:C.dim,weight:700});}}
+      h+=atomT(668,176,'原子核放大來看',{size:15,anchor:'middle',fill:C.muted});
+      h+=atomProton(772,236,9)+atomT(788,242,'質子',{size:16,weight:700})+atomT(762,264,'帶正電',{size:15,fill:C.muted});
+      if(k===4)h+=atomBall(772,300,9,'n')+atomT(788,306,'中子',{size:16,weight:700})+atomT(762,328,'不帶電',{size:15,fill:C.muted});
+      else h+=atomT(762,306,'還有別的',{size:15,fill:C.muted})+atomT(762,328,'粒子嗎？',{size:15,fill:C.muted});
+      h+=atomT(478,376,k===4?'質子 6 個、中子 6 個（以碳原子為例）':'只算質子，原子核的質量還不夠',{size:14,fill:C.muted});}
+    h+=L(104,420,796,420,{stroke:C.line,w:4})+L(104,420,104+173*k,420,{stroke:C.a,w:4});
+    ATOM_HIS.forEach((d,i)=>{const x=104+i*173,on=i===k,past=i<k;
+      h+=`<g data-tap="h${i}" tabindex="0" role="button" style="cursor:pointer" aria-label="${d.who}：${d.what}"><rect x="${x-86}" y="398" width="172" height="90" rx="12" fill="${on?'#1b3050':'#0f1b2d'}" fill-opacity="${on?.9:.01}" stroke="${on?C.a:'#0f1b2d'}" stroke-opacity="${on?1:0}" stroke-width="2"/>`
+        +`<circle cx="${x}" cy="420" r="${on?13:10}" fill="${on||past?C.a:'#263b59'}" stroke="${on?'#fff':C.line}" stroke-width="2"/>`+T(x,425,i+1,{size:14,weight:700,anchor:'middle',fill:on||past?'#1b2a33':C.ink})
+        +T(x,456,d.who,{size:17,weight:700,anchor:'middle',fill:on?C.a:C.ink})+T(x,478,`${d.yr}　${d.what}`,{size:14,anchor:'middle',fill:C.muted})+`</g>`;});
+    return {svg:h,reads:[['科學家',`${H.who}（${H.yr} 年）`],['發現',H.what],['那時的原子模型',k===0?'實心球':k===1?'正電均勻分布，電子嵌在裡面':k===2?'中心有原子核，電子在核外':k===3?'原子核裡有質子':'原子核 ＝ 質子 ＋ 中子']],
+      note:['<b>道耳頓</b>認為原子是不可分割的實心球。之後的發現一步步修正這個模型。','<b>湯姆森</b>發現<b>電子</b>（帶負電）：原子不是不可分割的。原子不帶電，所以還有等量的正電。','<b>拉塞福</b>由 α 粒子散射實驗發現<b>原子核</b>：體積很小、帶正電、集中了原子大部分的質量。','<b>拉塞福</b>發現原子核裡有帶正電的<b>質子</b>。','<b>查兌克</b>發現不帶電的<b>中子</b>。到這裡，原子的結構是：原子核（質子＋中子）和核外的電子。'][k]+'<br>圖中的原子核和粒子大小都已放大（示意）。'};},
+
+  /* ---------- 3 拉塞福散射實驗 ---------- */
+  scatter(s){const C=ATOM_C,SC=ATOM_SC,t=s.t,st=s.st,N=s.sn,foil=s.sview==='foil',pud=s.pud,col=[C.a,C.warn,'#ff8d9d'];let h=ATOM_DEFS;
+    const tr=['','',''],act=[];let flashes='',dots='';
+    const R=191,fx=300,fy=250,Lt=208+R;
+    for(let i=0;i<N;i++){const tau=st-i/SC.rate;if(tau<0)break;const sh=atomShot(i,pud),done=tau>=SC.T;
+      if(foil){const yb=sh.b/SC.B*9,a=rad(sh.th),hx=fx+R*Math.cos(a),hy=fy+R*Math.sin(a),dist=Math.min(tau/SC.T,1)*Lt;
+        if(done){tr[sh.cat]+=`M96 ${(fy+yb).toFixed(1)}H${fx}L${hx.toFixed(1)} ${hy.toFixed(1)}`;dots+=`<circle cx="${(fx+(R+4)*Math.cos(a)).toFixed(1)}" cy="${(fy+(R+4)*Math.sin(a)).toFixed(1)}" r="3" fill="${sh.cat?col[sh.cat]:'#c8ff9e'}" opacity=".85"/>`;
+          if(tau<SC.T+.4){const f=(tau-SC.T)/.4;flashes+=`<circle cx="${(fx+(R+4)*Math.cos(a)).toFixed(1)}" cy="${(fy+(R+4)*Math.sin(a)).toFixed(1)}" r="${(4+f*14).toFixed(1)}" fill="#eaffd0" opacity="${(.9*(1-f)).toFixed(2)}"/>`;}}
+        else{const p=dist<=208?[96+dist,fy+yb]:[fx+(dist-208)*Math.cos(a),fy+yb*(1-(dist-208)/R)+(dist-208)*Math.sin(a)];act.push([`M96 ${(fy+yb).toFixed(1)}`+(dist>208?`H${fx}`:'')+`L${p[0].toFixed(1)} ${p[1].toFixed(1)}`,p,sh.cat]);}}
+      else{const P=sh.pts,X=x=>(280+x).toFixed(1),Y=y=>(250+y).toFixed(1);
+        if(done)tr[sh.cat]+=P.map((q,j)=>(j?'L':'M')+X(q[0])+' '+Y(q[1])).join('');
+        else{const p=atomShotPos(sh,tau);let d='M'+X(P[0][0])+' '+Y(P[0][1]);for(let j=1;j<P.length&&P[j][2]<tau;j++)d+='L'+X(P[j][0])+' '+Y(P[j][1]);d+='L'+X(p[0])+' '+Y(p[1]);act.push([d,[280+p[0],250+p[1]],sh.cat]);}}}
+    const tracks=tr.map((d,c)=>d?`<path d="${d}" fill="none" stroke="${col[c]}" stroke-width="${c?2:1.2}" stroke-linejoin="round" opacity="${c===0?.3:c===1?.75:1}"/>`:'').join('');
+    const heads=act.map(([d,p,c])=>`<path d="${d}" fill="none" stroke="${col[c]}" stroke-width="1.6" opacity=".7" stroke-linejoin="round"/><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="8" fill="${C.a}" opacity=".25"/>`+atomBall(p[0],p[1],4,'a')).join('');
+    if(foil){h+=atomBox(20,30,520,440,{fill:C.bg});
+      h+=`<path d="M${(fx+199*Math.cos(rad(194))).toFixed(1)} ${(fy+199*Math.sin(rad(194))).toFixed(1)}A199 199 0 1 1 ${(fx+199*Math.cos(rad(166))).toFixed(1)} ${(fy+199*Math.sin(rad(166))).toFixed(1)}" fill="none" stroke="#1d5a45" stroke-width="12" stroke-linecap="round"/><path d="M${(fx+193.5*Math.cos(rad(194))).toFixed(1)} ${(fy+193.5*Math.sin(rad(194))).toFixed(1)}A193.5 193.5 0 1 1 ${(fx+193.5*Math.cos(rad(166))).toFixed(1)} ${(fy+193.5*Math.sin(rad(166))).toFixed(1)}" fill="none" stroke="#5fd49a" stroke-width="1.5" opacity=".7"/>`;
+      h+=L(96,fy,fx+186,fy,{stroke:C.dim,w:1,dash:'2 8',op:.6});
+      h+=tracks+heads+dots+flashes;
+      h+=`<rect x="26" y="222" width="70" height="56" rx="6" fill="#55657a" stroke="#8fa0b6" stroke-width="2"/><rect x="60" y="244" width="38" height="12" fill="${C.bg}"/><circle cx="54" cy="250" r="9" fill="url(#atom-glow)"/>`+atomBall(54,250,4,'a');
+      h+=`<rect x="${fx-3.5}" y="${fy-42}" width="7" height="84" rx="2" fill="url(#atom-gold)"/>`+atomT(fx,fy-52,'金箔',{size:15,anchor:'middle',fill:C.a,weight:700,halo:true});
+      h+=atomT(34,60,'俯視圖',{size:17,weight:700})+atomT(61,212,'α 粒子源',{size:15,anchor:'middle',fill:C.muted})+atomT(61,300,'α 粒子',{size:15,anchor:'middle',fill:C.a,weight:700})+atomT(61,320,'（帶正電）',{size:14,anchor:'middle',fill:C.a})
+        +atomT(452,430,'螢光屏',{size:15,fill:'#7fe0ae',weight:700})+atomT(452,450,'被打到會發光',{size:13,fill:C.muted})+atomT(fx+214,fy+5,'0°',{size:14,fill:C.muted})+atomT(fx,46,'90°',{size:14,fill:C.muted,anchor:'middle'})+atomT(fx,468,'90°',{size:14,fill:C.muted,anchor:'middle'});}
+    else{h+=atomBox(20,30,520,440,{fill:C.bg})+`<g clip-path="url(#atom-clipS)">`;
+      if(pud){h+=`<circle cx="280" cy="250" r="200" fill="url(#atom-pud)" stroke="${C.p}" stroke-opacity=".6" stroke-width="1.5"/>`;for(let i=0;i<40;i++){const an=i*2.39996,r=31*Math.sqrt(i+.5);h+=T(280+r*Math.cos(an),256+r*Math.sin(an),'＋',{size:15,anchor:'middle',fill:C.p});}
+        for(let i=0;i<12;i++){const an=i*2.39996+1,r=54*Math.sqrt(i+.7);h+=atomElec(280+r*Math.cos(an),250+r*Math.sin(an),4);}}
+      else{h+=`<circle cx="280" cy="250" r="200" fill="#12233a" fill-opacity=".5" stroke="${C.dim}" stroke-width="1.5" stroke-dasharray="3 7"/>`;
+        [[92,3,.5],[150,4,-.35],[188,5,.25]].forEach(([r,n,w],j)=>{for(let i=0;i<n;i++){const an=t*w+i*2*Math.PI/n+j*1.3;h+=`<g opacity=".55">`+atomElec(280+r*Math.cos(an),250+r*Math.sin(an),3.6)+`</g>`;}});}
+      h+=tracks+heads;
+      if(!pud)h+=`<circle cx="280" cy="250" r="16" fill="url(#atom-glow)"/>`+atomBall(280,250,2.2,'p');
+      h+=`</g>`;
+      h+=atomT(34,60,'放大看一個金原子',{size:17,weight:700,halo:true})+atomT(34,456,'α 粒子（帶正電）由左邊射入 →',{size:15,fill:C.a,halo:true});
+      if(pud)h+=atomT(526,60,'正電均勻分布，沒有原子核',{size:15,anchor:'end',fill:C.p,halo:true,weight:700});
+      else h+=L(288,242,334,196,{stroke:C.muted,w:1.2})+atomT(338,192,'原子核（帶正電）',{size:15,fill:C.p,weight:700,halo:true})+atomT(526,456,'電子很輕，幾乎不影響 α 粒子',{size:14,anchor:'end',fill:C.muted,halo:true});}
+    /* 右側：計數、長條圖、推論 */
+    const ty=atomTally(s),c=ty.c,pc=v=>ty.done?Math.round(v/ty.done*100):0,names=['直接穿過（偏折不到 5°）','小角度偏折','大角度偏折或反彈（90° 以上）'];
+    h+=atomBox(556,30,324,440)+atomT(574,62,`已到達 ${ty.done}／${N} 個`,{size:19,weight:700});
+    names.forEach((nm,i)=>{const y=92+i*46,w=ty.done?Math.max(c[i]?4:0,c[i]/N*288):0;
+      h+=atomT(574,y,nm,{size:15,fill:C.muted})+atomT(862,y,`${c[i]} 個`,{size:16,weight:700,anchor:'end',fill:col[i]})+`<rect x="574" y="${y+7}" width="288" height="10" rx="5" fill="#0c1829"/>`+(w?`<rect x="574" y="${y+7}" width="${w.toFixed(1)}" height="10" rx="5" fill="${col[i]}"/>`:'');});
+    if(pud){h+=atomBox(570,236,296,150,{fill:'#0e1d31',stroke:C.p})+atomT(586,266,'如果正電像布丁一樣均勻分布：',{size:15,weight:700,fill:C.p})+atomT(586,296,'正電分散，斥力很弱，',{size:16})+atomT(586,322,'α 粒子全部幾乎直線穿過。',{size:16})+atomT(586,356,'和實驗結果不合，所以不是這樣。',{size:16,weight:700,fill:C.warn});
+      h+=atomT(574,418,'實驗中確實有極少數 α 粒子',{size:15,fill:C.muted})+atomT(574,440,'大角度偏折，甚至反彈。',{size:15,fill:C.muted});}
+    else{[['絕大多數直接穿過','原子內部大部分是空的',c[0]>=5,C.a],['少數發生偏折','正電集中在很小的原子核',c[1]+c[2]>=1,C.warn],['極少數大角度偏折、反彈','原子核的質量很大',c[2]>=1,'#ff8d9d']].forEach(([ob,inf,on,cc],i)=>{const y=232+i*72;
+        h+=`<g opacity="${on?1:.38}">`+atomBox(570,y,296,62,{fill:'#0e1d31',stroke:on?cc:C.line,rx:10})+atomT(584,y+24,ob,{size:15,fill:on?cc:C.muted})+atomT(584,y+49,'→ '+inf,{size:17,weight:700})+`</g>`;});
+      h+=atomT(574,461,'原子核已放大很多倍（示意）',{size:13,fill:C.dim});}
+    return {svg:h,reads:[['已到達螢光屏',`${ty.done}／${N} 個`],['直接穿過',`${c[0]} 個（${pc(c[0])}%）`],['小角度偏折',`${c[1]} 個（${pc(c[1])}%）`],['大角度偏折或反彈',`${c[2]} 個（${pc(c[2])}%）`]],
+      note:pud?'<b>布丁模型</b>：同樣多的正電均勻分布在整個原子裡，α 粒子受到的斥力很弱，全部幾乎直線穿過，沒有大角度偏折。這和實驗結果不合。'
+        :`α 粒子帶正電，接近帶正電的原子核會被<b>排斥</b>，越接近偏折越大。絕大多數直接穿過 → 原子內部<b>大部分是空的</b>；極少數大角度偏折或反彈 → 正電和質量集中在很小的<b>原子核</b>。<br>示意：軌跡依斥力計算，每個 α 粒子只算遇到一個原子，原子核已放大，所以偏折的比例比真實實驗高很多。（α 粒子是氦的原子核）`};},
+
+  /* ---------- 4 組一個原子 ---------- */
+  build(s){const C=ATOM_C,A0=atomNow(s),{p,n,e,sym,name}=A0,A=p+n,t=s.t,cx=250,cy=250;let h=ATOM_DEFS;
+    h+=atomBox(20,20,460,460,{fill:C.bg});
+    const cap=[2,8,8,2],rad4=[84,124,164,204];let left=e;
+    cap.forEach((m,j)=>{const k=Math.min(m,left);left-=k;if(!k)return;const r=rad4[j],w=[.55,-.34,.24,-.17][j];
+      h+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${C.e}" stroke-opacity=".2" stroke-width="1.3"/>`;
+      for(let i=0;i<k;i++){const an=t*w+i*2*Math.PI/k+j*.7;h+=atomElec(cx+r*Math.cos(an),cy+r*Math.sin(an),6);}});
+    h+=`<circle cx="${cx}" cy="${cy}" r="66" fill="url(#atom-glow)" opacity=".22"/>`+atomNucleus(cx,cy,p,n);
+    h+=atomT(34,48,'原子核',{size:15,fill:C.muted})+atomT(34,468,'原子核已放大很多倍（示意）',{size:13,fill:C.dim})+atomT(466,468,'電子在原子核外運動',{size:13,fill:C.dim,anchor:'end'});
+    h+=L(84,44,cx-Math.min(40,10+Math.sqrt(A)*6),cy-Math.min(34,8+Math.sqrt(A)*5),{stroke:C.dim,w:1.2,dash:'3 5'});
+    /* 讀數卡 */
+    h+=atomBox(500,20,380,460);
+    h+=atomT(520,74,'質量數',{size:15,fill:C.a})+T(648,82,A,{size:32,weight:700,anchor:'end',fill:C.a})+atomT(520,134,'原子序',{size:15,fill:C.p})+T(648,142,p,{size:32,weight:700,anchor:'end',fill:C.p})
+      +atomT(656,138,sym,{size:84,weight:700})+atomT(820,112,name,{size:46,weight:700,anchor:'middle'})+atomT(820,142,'元素',{size:14,anchor:'middle',fill:C.muted});
+    h+=L(516,166,864,166,{stroke:C.line,w:1.5});
+    [['p','質子',p,'帶正電，在原子核內',C.p],['n','中子',n,'不帶電，在原子核內',C.n],['e','電子',e,'帶負電，在原子核外',C.e]].forEach(([kd,nm,v,ds,cc],i)=>{const y=198+i*32;
+      h+=(kd==='p'?atomProton(532,y-6,8):kd==='e'?atomElec(532,y-6,6):atomBall(532,y-6,8,'n'))+atomT(550,y,nm,{size:17,weight:700})+T(640,y+1,v,{size:23,weight:700,anchor:'end',fill:cc})+atomT(652,y,'個',{size:15,fill:C.muted})+atomT(688,y,ds,{size:15,fill:C.muted});});
+    h+=L(516,280,864,280,{stroke:C.line,w:1.5});
+    h+=atomT(520,310,`原子序 ＝ 質子數 ＝ ${p}`,{size:17})+atomT(520,340,`質量數 ＝ 質子數 ＋ 中子數 ＝ ${p} ＋ ${n} ＝ ${A}`,{size:17});
+    const dq=p-e,cc=dq===0?C.ok:C.warn,ch=dq===0?`電子數 ＝ 質子數 ＝ ${p} → 電中性`:dq>0?`電子比質子少 ${dq} 個 → 帶正電（稱為離子）`:`電子比質子多 ${-dq} 個 → 帶負電（稱為離子）`;
+    h+=`<rect x="514" y="358" width="352" height="44" rx="12" fill="${cc}" fill-opacity=".13" stroke="${cc}" stroke-width="1.5"/>`+T(690,386,ch,{size:17,weight:700,anchor:'middle',fill:cc});
+    const nat=A0.nat.includes(n),lo=Math.min(...A0.nat),hi=Math.max(...A0.nat);
+    h+=nat?atomT(520,432,`${name}的原子核一定有 ${p} 個質子。`,{size:15,fill:C.muted})+atomT(520,456,'改變中子或電子，都不會變成別種元素。',{size:15,fill:C.muted})
+      :atomT(520,432,`示意：自然界幾乎找不到這種原子`,{size:15,fill:C.warn})+atomT(520,456,`（${name}原子的中子數通常是 ${lo===hi?lo:lo+'～'+hi} 個）`,{size:15,fill:C.muted});
+    return {svg:h,reads:[['元素',`${name} ${sym}（原子序 ${p}）`],['質量數',`${p} ＋ ${n} ＝ ${A}`],['電性',dq===0?'電中性':dq>0?`帶正電（質子多 ${dq} 個）`:`帶負電（電子多 ${-dq} 個）`]],
+      note:`<b>原子序 ＝ 質子數</b>：質子數決定是哪一種元素，${p} 個質子就是${name}。<b>質量數 ＝ 質子數 ＋ 中子數</b> ＝ ${p} ＋ ${n} ＝ ${A}，是個數，沒有單位。<br>中子不帶電，不影響電性；${dq===0?'電子數 ＝ 質子數時，正負電一樣多，原子是<b>電中性</b>。':'電子數和質子數不同時，粒子帶電，稱為<b>離子</b>。'}（電子的排列方式為示意）`};},
+
+  /* ---------- 5 大小與質量 ---------- */
+  table(y){const C=ATOM_C;let h=atomBox(500,y,380,154)+`<path d="M500 ${y+34}H880" stroke="${C.line}" stroke-width="1.5"/>`;
+    ['粒子','位置','電性','質量（質子＝1）'].forEach((t,i)=>{h+=atomT([548,628,712,806][i],y+23,t,{size:14,fill:C.muted,anchor:'middle'});});
+    [['p','質子','原子核內','帶正電','1',C.p],['n','中子','原子核內','不帶電','約 1',C.n],['e','電子','原子核外','帶負電','約 1／1836',C.e]].forEach(([kd,nm,pos,ch,ms,cc],i)=>{const yy=y+62+i*36;
+      h+=(kd==='p'?atomProton(522,yy-6,7.5):kd==='e'?atomElec(522,yy-6,5.5):atomBall(522,yy-6,7.5,'n'))+atomT(556,yy,nm,{size:17,weight:700,anchor:'middle'})+atomT(628,yy,pos,{size:16,anchor:'middle'})+T(712,yy,ch,{size:16,anchor:'middle',fill:cc,weight:700})+atomT(806,yy,ms,{size:16,anchor:'middle',weight:700});});
+    return h;},
+  size(s){const C=ATOM_C,z=clamp(s.z,0,1),W=atomW(z),S=460/W,t=s.t,X=m=>250+m*S,Y=m=>250+m*S;let h=ATOM_DEFS;
+    h+=atomBox(20,20,460,460,{fill:'#0c1a14'})+`<g clip-path="url(#atom-clipZ)">`;
+    const big=S*50>4000;
+    if(big)h+=`<rect x="20" y="20" width="460" height="460" fill="#2d6a40"/>`;
+    else{h+=`<circle cx="250" cy="250" r="${(50*S).toFixed(1)}" fill="#14301f" stroke="${C.e}" stroke-opacity=".6" stroke-width="1.5" stroke-dasharray="4 7"/>`
+      +`<rect x="${X(-50).toFixed(1)}" y="${Y(-29).toFixed(1)}" width="${(100*S).toFixed(1)}" height="${(58*S).toFixed(1)}" rx="${(29*S).toFixed(1)}" fill="#b0563c"/>`
+      +`<rect x="${X(-50).toFixed(1)}" y="${Y(-29).toFixed(1)}" width="${(100*S).toFixed(1)}" height="${(58*S).toFixed(1)}" rx="${(29*S).toFixed(1)}" fill="none" stroke="#f1d9cf" stroke-opacity=".5" stroke-width="${clamp(S*.3,.6,2).toFixed(1)}"/>`
+      +`<rect x="${X(-41).toFixed(1)}" y="${Y(-20).toFixed(1)}" width="${(82*S).toFixed(1)}" height="${(40*S).toFixed(1)}" rx="${(20*S).toFixed(1)}" fill="#2d6a40" stroke="#f1d9cf" stroke-opacity=".5" stroke-width="${clamp(S*.3,.6,2).toFixed(1)}"/>`;
+      if(S*50<700)for(let i=0;i<5;i++){const an=t*.25+i*1.2566;h+=atomElec(250+50*S*Math.cos(an),250+50*S*Math.sin(an),5);}}
+    /* 草地紋理：放大時才看得出畫面在變 */
+    for(let lv=-3;lv<=1;lv++){const cell=Math.pow(10,lv),px=cell*S;if(px<28||px>360)continue;const op=clamp((px-28)/36,0,1)*clamp((360-px)/120,0,1)*.6,n=Math.ceil(240/px);
+      for(let i=-n;i<=n;i++)for(let j=-n;j<=n;j++){const k=(i*31+j*17+lv*101),x=250+(i+rnd(k)-.5)*px,y=250+(j+rnd(k+7)-.5)*px,l=clamp(px*.1,4,13);if(Math.abs(x-250)>240||Math.abs(y-250)>240)continue;if(Math.hypot((x-250)/S,(y-250)/S)>(big?1e9:19))continue;
+        h+=`<path d="M${(x-l*.45).toFixed(1)} ${(y-l).toFixed(1)}L${x.toFixed(1)} ${y.toFixed(1)}L${(x+l*.5).toFixed(1)} ${(y-l*.8).toFixed(1)}" fill="none" stroke="#58aa6e" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="${op.toFixed(2)}"/>`;}}
+    const vis=(mx,my,mr)=>{const pr=mr*S;return pr>1.2&&Math.abs(mx*S)-pr<250&&Math.abs(my*S)-pr<250&&pr<6000;};
+    const lab=(mx,my,mr,txt)=>{const pr=mr*S;return pr>5&&pr<150?atomT(X(mx),Y(my)+pr+20,txt,{size:15,anchor:'middle',halo:true,weight:700}):'';};
+    if(vis(1.25,.85,.3)){const x=X(1.25),y=Y(.85);h+=`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(.26*S).toFixed(1)}" ry="${(.12*S).toFixed(1)}" fill="#3f6fb5"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(.105*S).toFixed(1)}" fill="#2a2320"/>`+lab(1.25,.85,.2,'人（俯視）');}
+    if(vis(-.3,.2,.12)){const x=X(-.3),y=Y(.2),r=.12*S;h+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#e2803a"/><path d="M${(x-r).toFixed(1)} ${y.toFixed(1)}H${(x+r).toFixed(1)}M${x.toFixed(1)} ${(y-r).toFixed(1)}V${(y+r).toFixed(1)}" stroke="#6b3412" stroke-width="${clamp(r*.06,.6,4).toFixed(1)}" fill="none"/>`+lab(-.3,.2,.12,'籃球 24 cm');}
+    if(vis(.036,-.027,.013)){const x=X(.036),y=Y(-.027),r=.013*S;h+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="url(#atom-gold)" stroke="#8a6a1c" stroke-width="${clamp(r*.08,.6,5).toFixed(1)}"/>`+(r>12?T(x,y+r*.3,'10',{size:clamp(r*.8,13,80),anchor:'middle',fill:'#7a5b12',weight:700}):'')+lab(.036,-.027,.013,'10 元硬幣 2.6 cm');}
+    const gr=.0005*S;
+    if(gr>1.5)h+=`<ellipse cx="250" cy="${(250+gr*.5).toFixed(1)}" rx="${(gr*1.05).toFixed(1)}" ry="${(gr*.6).toFixed(1)}" fill="#000" opacity=".3"/>`+atomBall(250,250,gr,'S');
+    if(gr<9){const pr=10+2*Math.sin(t*3);h+=`<circle cx="250" cy="250" r="${pr.toFixed(1)}" fill="none" stroke="${C.a}" stroke-width="2"/><path d="M250 ${238-pr}v-22" stroke="${C.a}" stroke-width="2"/>`+atomT(250,250-pr-40,'原子核在這裡',{size:15,anchor:'middle',fill:C.a,weight:700,halo:true});}
+    else h+=atomT(250,250-gr-14,'原子核：直徑約 1 mm，像一粒沙',{size:16,anchor:'middle',fill:C.a,weight:700,halo:true});
+    if(z<.12)h+=atomT(250,52,'整個原子 ＝ 一座操場（寬約 100 m）',{size:16,anchor:'middle',weight:700,halo:true})+atomT(250,Y(-50)+ (Y(-50)>70?-8:0)+0,'',{size:13});
+    if(!big&&S*50<700&&S*50>180)h+=atomT(250,Y(50)-10>470?470:Y(50)+ -8,'電子在這麼遠的地方運動',{size:14,anchor:'middle',fill:C.e,halo:true});
+    h+=`</g>`;
+    /* 比例尺 */
+    const nice=[50,20,10,5,2,1,.5,.2,.1,.05,.02,.01,.005,.002,.001],Lb=nice.find(v=>v*S<=150)||.001,bw=Lb*S;
+    h+=`<rect x="34" y="428" width="${(bw+24).toFixed(1)}" height="40" rx="8" fill="#0f1b2d" fill-opacity=".82"/><path d="M46 456v-8M46 452H${(46+bw).toFixed(1)}M${(46+bw).toFixed(1)} 456v-8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>`+T(46+bw/2,444,atomLen(Lb),{size:15,weight:700,anchor:'middle',fill:'#fff'});
+    h+=atomBox(500,20,380,290)+atomT(520,56,'把原子放大成一座操場',{size:20,weight:700});
+    h+=atomT(520,92,'原子的直徑',{size:15,fill:C.muted})+atomT(520,118,'約 10<tspan dy="-8" font-size="14">−10</tspan><tspan dy="8"> m</tspan>',{size:19,weight:700})+atomT(676,118,'→ 放大成 100 m',{size:17,fill:C.e,weight:700});
+    h+=atomT(520,152,'原子核的直徑',{size:15,fill:C.muted})+atomT(520,178,'約為原子的 10 萬分之一',{size:19,weight:700})+atomT(520,204,'→ 放大後只有 1 mm，像操場中央的一粒沙',{size:16,fill:C.a,weight:700});
+    h+=L(516,222,864,222,{stroke:C.line,w:1.5})+atomT(520,252,'現在畫面的寬度',{size:15,fill:C.muted})+T(864,256,'約 '+atomLen(W),{size:24,weight:700,anchor:'end',fill:C.ink});
+    {const f=z,x0=520,x1=864;h+=`<rect x="${x0}" y="276" width="${x1-x0}" height="6" rx="3" fill="#0c1829"/><rect x="${x0}" y="276" width="${((x1-x0)*f).toFixed(1)}" height="6" rx="3" fill="${C.a}"/>`+atomT(x0,300,'操場',{size:13,fill:C.muted})+atomT(x1,300,'原子核',{size:13,fill:C.muted,anchor:'end'});}
+    h+=this.table(326);
+    return {svg:h,reads:[['畫面寬度','約 '+atomLen(W)],['放大倍率（和整個操場相比）',`約 ${Math.round(140/W).toLocaleString('en-US')} 倍`],['原子核：原子（直徑）','約 1：100000']],
+      note:'原子的直徑約 10<sup>−10</sup> m，原子核的直徑大約只有原子的 <b>10 萬分之一</b>。把原子放大成 100 m 寬的操場，原子核只像中央一粒 1 mm 的沙，電子在很遠的外圍運動，所以原子內部<b>大部分是空的</b>。<br>示意：操場、籃球、硬幣只是用來比較大小。'};},
+  mass(s){const C=ATOM_C,ne=s.me,A0=atomNow(s),th=rad(clamp((1836-ne)/1836*13,-13,13)),px=250,py=118,bl=150;let h=ATOM_DEFS;
+    h+=atomBox(20,20,460,332,{fill:C.bg});
+    const lx=px-bl*Math.cos(th),ly=py+bl*Math.sin(th),rx=px+bl*Math.cos(th),ry=py-bl*Math.sin(th);
+    h+=`<path d="M${px-9} ${py}L${px-16} 318H${px+16}L${px+9} ${py}Z" fill="#5d6d82"/><rect x="${px-70}" y="316" width="140" height="14" rx="5" fill="#7c8da3"/>`;
+    h+=`<path d="M${lx.toFixed(1)} ${ly.toFixed(1)}L${rx.toFixed(1)} ${ry.toFixed(1)}" stroke="#c9d4e2" stroke-width="8" stroke-linecap="round"/><circle cx="${px}" cy="${py}" r="9" fill="#e8eef6" stroke="#5d6d82" stroke-width="3"/>`;
+    const pan=(x,y)=>`<path d="M${x.toFixed(1)} ${y.toFixed(1)}L${(x-62).toFixed(1)} ${(y+96).toFixed(1)}M${x.toFixed(1)} ${y.toFixed(1)}L${(x+62).toFixed(1)} ${(y+96).toFixed(1)}" stroke="#8fa0b6" stroke-width="1.5" fill="none"/><path d="M${(x-70).toFixed(1)} ${(y+96).toFixed(1)}H${(x+70).toFixed(1)}q-6 14 -24 14H${(x-46).toFixed(1)}q-18 0 -24 -14Z" fill="#8fa0b6"/>`;
+    h+=pan(lx,ly)+pan(rx,ry)+`<circle cx="${lx.toFixed(1)}" cy="${(ly+72).toFixed(1)}" r="30" fill="url(#atom-glow)" opacity=".3"/>`+atomProton(lx,ly+72,23);
+    const dots=Math.ceil(ne/12);let k=0;for(let row=0;k<dots;row++){const m=24-row;for(let i=0;i<m&&k<dots;i++,k++)h+=`<circle cx="${(rx+(i-(m-1)/2)*5).toFixed(1)}" cy="${(ry+92-row*4.5).toFixed(1)}" r="2.5" fill="${C.e}"/>`;}
+    h+=atomT(lx,ly+134,'1 個質子',{size:17,weight:700,anchor:'middle',fill:C.p})+atomT(rx,ry+134,`${ne} 個電子`,{size:17,weight:700,anchor:'middle',fill:C.e});
+    const stt=ne===1836?'一樣重：1 個質子 ≈ 1836 個電子':ne<1836?'質子這一邊比較重':'電子這一邊比較重';
+    h+=atomT(250,56,stt,{size:20,weight:700,anchor:'middle',fill:ne===1836?C.ok:C.ink})+atomT(34,338,'每一個藍點代表 12 個電子',{size:13,fill:C.dim})+atomT(466,338,'天平為示意',{size:13,fill:C.dim,anchor:'end'});
+    /* 質量分配長條 */
+    const {p,n,e,name}=A0,mN=(p+n)*1836,fe=e/(mN+e)*100,bwid=420;
+    h+=atomBox(20,364,460,116)+atomT(40,394,`${name}原子（質子 ${p}、中子 ${n}、電子 ${e}）的質量分配`,{size:16,weight:700});
+    h+=`<rect x="40" y="408" width="${bwid}" height="26" rx="6" fill="${C.p}"/><rect x="40" y="408" width="${(bwid*p/(p+n)).toFixed(1)}" height="26" rx="6" fill="${C.p}"/><rect x="${(40+bwid*p/(p+n)).toFixed(1)}" y="408" width="${(bwid*n/(p+n)).toFixed(1)}" height="26" fill="${C.n}"/>`+(e?`<rect x="${40+bwid-3}" y="404" width="3" height="34" fill="${C.e}"/>`:'')+T(40+bwid*p/(p+n)/2,427,'質子',{size:15,weight:700,anchor:'middle',fill:'#4a1009'})+(n?T(40+bwid*p/(p+n)+bwid*n/(p+n)/2,427,'中子',{size:15,weight:700,anchor:'middle',fill:'#25303f'}):'');
+    h+=atomT(40,462,`原子核（質子＋中子）約 ${(100-fe).toFixed(2)}%`,{size:16,weight:700})+T(460,462,`電子 約 ${fe.toFixed(2)}%`,{size:16,weight:700,anchor:'end',fill:C.e});
+    h+=atomBox(500,20,380,290)+atomT(520,56,'誰比較重？',{size:20,weight:700});
+    h+=atomT(520,96,'1 個質子的質量',{size:17})+atomT(520,124,'≈ 1 個中子的質量',{size:17})+atomT(520,152,'≈ 1836 個電子的質量',{size:17,weight:700,fill:C.e});
+    h+=L(516,172,864,172,{stroke:C.line,w:1.5})+atomT(520,202,'電子太輕，質量可以忽略：',{size:16,fill:C.muted})+atomT(520,232,'原子的質量幾乎都在原子核',{size:19,weight:700,fill:C.a});
+    h+=atomT(520,268,'質量數 ＝ 質子數 ＋ 中子數',{size:18,weight:700})+atomT(520,294,'（只數個數，不是幾公克）',{size:15,fill:C.muted});
+    h+=this.table(326);
+    return {svg:h,reads:[['左盤','1 個質子'],['右盤',`${ne} 個電子`],['結果',ne===1836?'一樣重':ne<1836?`質子較重（還差 ${1836-ne} 個電子）`:'電子這邊較重'],[`${name}原子的質量`,`原子核約 ${(100-fe).toFixed(2)}%`]],
+      note:`1 個質子的質量 ≈ 1 個中子 ≈ <b>1836 個電子</b>。${name}原子有 ${p} 個質子、${n} 個中子、${e} 個電子，電子只占質量的約 ${fe.toFixed(2)}%，所以原子的質量幾乎都在<b>原子核</b>，質量數只算質子數＋中子數。<br>下方長條用的是第 4 分頁組好的原子；中子的質量以和質子相同計算。`};}
+};
+/* 這一頁每一格都在重畫，滑鼠按下到放開之間圖形已被換掉，瀏覽器不會送出 click；所以卡片、時間軸改在 pointerdown 就處理。 */
+const ATOM_TAP={t:0};
+
+/* ===== 6-2、6-4 元素與週期表 ===== */
+/* ===== 6-2 生活中常見的元素、6-4 週期表 ===== */
+/* 週期、族由原子序算出；鑭系、錒系（f＝1～15）另外排在下方兩列 */
+function ptPos(z){const ends=[0,2,10,18,36,54,86,118];let p=1;while(z>ends[p])p++;const i=z-ends[p-1];let g,f=0;
+  if(p===1)g=i===1?1:18;else if(p<4)g=i<=2?i:i+10;else if(p<6)g=i;else if(i<=2)g=i;else if(i<=17){g=3;f=i-2;}else g=i-14;
+  return {p,g,f};}
+const PT_SYM='H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og'.split(' ');
+/* 臺灣標準譯名；? 表示用字罕見（一般字型可能顯示不出來），只列符號 */
+const PT_NAME=('氫氦'+'鋰鈹硼碳氮氧氟氖'+'鈉鎂鋁矽磷硫氯氬'+'鉀鈣鈧鈦釩鉻錳鐵鈷鎳銅鋅鎵鍺砷硒溴氪'+'銣鍶釔鋯鈮鉬鎝釕銠鈀銀鎘銦錫銻碲碘氙'
+  +'銫鋇鑭鈰鐠釹鉕釤銪釓鋱鏑鈥鉺銩鐿鎦鉿鉭鎢錸鋨銥鉑金汞鉈鉛鉍釙砈氡'+'鍅鐳錒釷鏷鈾錼鈽鋂鋦鉳鉲鑀鐨鍆鍩鐒鑪?????鐽錀鎶鉨鈇鏌鉝??').split('');
+const PT_NM=[1,2,6,7,8,9,10,15,16,17,18,34,35,36,53,54,85,86,117,118],PT_ML=[5,14,32,33,51,52],PT_GAS=[1,2,7,8,9,10,17,18,36,54,86];
+const PT_E=[0];for(let z=1;z<=118;z++){const o=ptPos(z);PT_E.push({z,sym:PT_SYM[z-1],name:PT_NAME[z-1]==='?'?'':PT_NAME[z-1],p:o.p,g:o.g,f:o.f,
+  cat:PT_NM.includes(z)?'n':PT_ML.includes(z)?'ml':'m',st:PT_GAS.includes(z)?'g':z===35||z===80?'l':z>=104?'u':'s'});}
+const PT_CATN={m:'金屬',ml:'類金屬',n:'非金屬'},PT_STN={s:'固態',l:'液態',g:'氣態',u:'未確定'};
+const PT_C={m:['#dbe7f1','#7f9fbb'],ml:['#f6dfa2','#c79a2e'],n:['#cfe9d6','#5fa67c'],s:['#ebe5d6','#a79f8a'],l:['#9cc5f0','#3f7fbe'],g:['#f9d2c4','#d47a5c'],u:['#ffffff','#b9b3a4'],hi:['#bfe6e0','#0f766e'],dim:['#f6f3ea','#e4dece']};
+const PT_GN={1:'鹼金屬',2:'鹼土金屬',17:'鹵素',18:'鈍氣（惰性氣體）'};
+const ptFam=e=>e.f?(e.p===6?'鑭系元素':'錒系元素'):e.z===1?'':e.g===18?'鈍氣':PT_GN[e.g]||'';
+const PT_USE={1:'最輕的元素。氫氣可燃，燃燒後只產生水。',2:'密度小又不可燃，用來填充氣球、飛船。',3:'質輕的金屬，用來做鋰電池。',6:'鑽石最硬；石墨可導電，做筆芯和電極。',7:'約占空氣的 4/5，化性不活潑，食品包裝常充氮氣。',8:'約占空氣的 1/5，可助燃；地殼中含量最多的元素。',9:'淡黃色氣體，活性很大；牙膏中含有氟化物。',10:'通電後發出紅橘色的光，用於霓虹燈。',
+  11:'質軟，遇水劇烈反應，要保存在石油中。',12:'燃燒時發出強烈白光，用於煙火。',13:'質輕，表面的氧化層保護內部；地殼中含量最多的金屬。',14:'半導體材料，做晶片、太陽能電池；地殼中含量第二多。',15:'火柴盒側面含有紅磷；磷也是肥料的成分。',16:'黃色固體，用於製造火藥、硫酸。',17:'黃綠色的有毒氣體，用於自來水消毒、漂白。',18:'化性很不活潑，充入燈泡可保護燈絲。',19:'比鈉更活潑，要保存在石油中；也是肥料的成分。',20:'骨骼、牙齒含鈣；石灰石、大理石是鈣的化合物。',
+  22:'質輕、堅固、耐腐蝕，做人工關節、眼鏡架。',24:'鍍在金屬表面可防鏽；不鏽鋼含有鉻。',25:'乾電池裡的二氧化錳是錳的化合物。',26:'用途最廣的金屬，煉成鋼用於建築、機械。',27:'符號是 Co；CO 則是一氧化碳，大小寫不同。',28:'用於硬幣、電池、不鏽鋼。',29:'紅色金屬，導電性僅次於銀，用來做電線。',30:'乾電池的外殼是鋅；鍍在鐵上可防鏽。',35:'暗紅色液體，常溫下唯一呈液態的非金屬。',47:'導電、導熱最好的金屬，做飾品、餐具。',50:'熔點低，用於焊接（焊錫）。',53:'紫黑色固體；碘酒可消毒，碘液遇澱粉變藍黑色。',
+  74:'熔點最高的金屬，做燈泡的燈絲。',78:'又稱白金，活性小，做飾品。',79:'黃色金屬，活性小、延展性最好，做飾品。',80:'俗稱水銀，常溫下唯一呈液態的金屬，有毒。',82:'質軟、密度大，用於鉛蓄電池；有毒。',92:'核能發電的燃料。'};
+const ptUse=e=>PT_USE[e.z]||((e.z===43||e.z===61||e.z>=93)?'主要由人工合成的元素'+(e.z>=104?'，性質還不完全清楚。':'。'):'')+(e.name?'':'中文名用字罕見，這裡只列符號。');
+const ptWrap=(t,n)=>{const out=[];let cur='',w=0;for(const c of t){const cw=c.charCodeAt(0)<256?.56:1;if(w+cw>n+.01&&!'，。、；）」'.includes(c)){out.push(cur);cur='';w=0;}cur+=c;w+=cw;}if(cur)out.push(cur);return out;};
+const ptLines=(x,y,arr,o={})=>{const{size=15,gap=22}=o;return arr.map((t,i)=>T(x,y+i*gap,t,{...o,size})).join('');};
+const ptMix=(a,b,f)=>{const h=c=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16)),x=h(a),y=h(b);return '#'+x.map((v,i)=>Math.round(v+(y[i]-v)*f).toString(16).padStart(2,'0')).join('');};
+const ptPanel=(x,y,w,h,o={})=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.rx||14}" fill="${o.fill||'#fffdf8'}" stroke="${o.stroke||'#ddd7c9'}" stroke-width="${o.sw||1.5}"/>`;
+const ptBtn=(id,x,y,w,h,label,o={})=>`<g data-tap="${id}" tabindex="0" role="button" aria-label="${o.aria||label}" style="cursor:pointer"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.rx||10}" fill="${o.fill||'#fffdf8'}" stroke="${o.stroke||P.accent}" stroke-width="${o.sw||2}"/>${T(x+w/2,y+h/2+(o.size||18)*.36,label,{size:o.size||18,weight:700,anchor:'middle',fill:o.ink||P.accent})}</g>`;
+const PT_DEFS=`<defs><radialGradient id="ptGlow"><stop offset="0" stop-color="#ffe680" stop-opacity=".95"/><stop offset=".45" stop-color="#ffd24a" stop-opacity=".45"/><stop offset="1" stop-color="#ffd24a" stop-opacity="0"/></radialGradient>
+<radialGradient id="ptWhite"><stop offset="0" stop-color="#ffffff"/><stop offset=".3" stop-color="#ffffff" stop-opacity=".8"/><stop offset="1" stop-color="#eaf6ff" stop-opacity="0"/></radialGradient>
+<linearGradient id="ptSteel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b97a1"/><stop offset="1" stop-color="#48545d"/></linearGradient>
+<linearGradient id="ptWood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8b988"/><stop offset="1" stop-color="#b8935c"/></linearGradient>
+<linearGradient id="ptFlame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#5aa0e6"/><stop offset=".45" stop-color="#ffb347"/><stop offset="1" stop-color="#ffe9a3"/></linearGradient>
+<radialGradient id="ptPink"><stop offset="0" stop-color="#e23d74" stop-opacity=".42"/><stop offset="1" stop-color="#e23d74" stop-opacity="0"/></radialGradient>
+<clipPath id="ptWater"><path d="M96 240H464V412Q464 426 450 426H110Q96 426 96 412Z"/></clipPath></defs>`;
+
+/* 6-2 卡片：前 20 號、常見金屬、全部常見 */
+const PT_DECK={f20:[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],metal:[11,12,13,19,20,22,24,25,26,27,28,29,30,47,50,74,78,79,80,82],all:[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,22,24,25,26,27,28,29,30,35,47,50,53,74,78,79,80,82]};
+const ptDeck=s=>{const d=PT_DECK[s.nf]||PT_DECK.f20;return s.nsh?d.slice().sort((a,b)=>rnd(a*7+s.nsh*13)-rnd(b*7+s.nsh*13)):d;};
+/* 部首：0 金、1 石、2 气、3 氵／水 */
+const ptRad=e=>e.st==='g'?[2,'「气」字頭','常溫為氣態的非金屬']:e.z===80?[3,'下方是「水」','常溫為液態的金屬（例外）']:e.z===35?[3,'「氵」字旁','常溫為液態的非金屬']:e.cat==='m'?[0,e.z===79?'就是「金」字':'「金」字旁','常溫為固態的金屬']:[1,'「石」字旁',e.cat==='ml'?'常溫為固態（類金屬）':'常溫為固態的非金屬'];
+
+/* 金屬與非金屬的樣品：el 能否導電、kt 熱傳導率（W/m·K，用來排導熱快慢）、br 1 易碎 0 有延展性 −1 不適用、lu 光澤 */
+const PT_SAMP=[
+  {k:'cu',n:'銅',z:29,form:'s',cat:'m',col:'#c8693a',cn:'紅色',lu:2,el:1,kt:401,br:0},{k:'fe',n:'鐵',z:26,form:'s',cat:'m',col:'#a3abb3',cn:'銀白色',lu:2,el:1,kt:80,br:0},
+  {k:'al',n:'鋁',z:13,form:'s',cat:'m',col:'#cdd3d8',cn:'銀白色',lu:2,el:1,kt:237,br:0},{k:'au',n:'金',z:79,form:'s',cat:'m',col:'#e3b53c',cn:'黃色',lu:2,el:1,kt:318,br:0},
+  {k:'ag',n:'銀',z:47,form:'s',cat:'m',col:'#dde1e5',cn:'銀白色',lu:2,el:1,kt:429,br:0},{k:'mg',n:'鎂',z:12,form:'s',cat:'m',col:'#c4cacf',cn:'銀白色',lu:2,el:1,kt:156,br:0},
+  {k:'zn',n:'鋅',z:30,form:'s',cat:'m',col:'#b4bfc9',cn:'銀白色',lu:2,el:1,kt:116,br:0},{k:'hg',n:'汞',z:80,form:'l',cat:'m',col:'#bfc6cc',cn:'銀白色',lu:2,el:1,kt:0,br:-1},
+  {k:'si',n:'矽',z:14,form:'s',cat:'ml',col:'#6b7480',cn:'灰黑色',lu:2,el:0,kt:150,br:1},{k:'gr',n:'石墨',z:6,form:'s',cat:'n',col:'#474d54',cn:'灰黑色',lu:1,el:1,kt:130,br:1},
+  {k:'di',n:'鑽石',z:6,form:'s',cat:'n',col:'#d3ecf6',cn:'無色透明',lu:0,el:0,kt:0,br:1},{k:'s',n:'硫',z:16,form:'s',cat:'n',col:'#e6cd3c',cn:'黃色',lu:0,el:0,kt:.2,br:1},
+  {k:'i',n:'碘',z:53,form:'s',cat:'n',col:'#43305a',cn:'紫黑色',lu:1,el:0,kt:.45,br:1},{k:'br',n:'溴',z:35,form:'l',cat:'n',col:'#7a1c14',cn:'暗紅色',lu:0,el:0,kt:0,br:-1},
+  {k:'o',n:'氧',z:8,form:'g',cat:'n',col:'#ffffff',cn:'無色',lu:0,el:0,kt:0,br:-1},{k:'n',n:'氮',z:7,form:'g',cat:'n',col:'#ffffff',cn:'無色',lu:0,el:0,kt:0,br:-1}];
+const PT_SM={};PT_SAMP.forEach(m=>{PT_SM[m.k]=m;});
+const PT_LU=['無金屬光澤','略有光澤','有金屬光澤'],PT_FORM={s:'固態',l:'液態',g:'氣態'};
+const ptHeatOK=m=>m.form==='s'&&m.kt>0,ptTm=m=>2.2+420/m.kt;
+const ptDur=s=>{const m=PT_SM[s.ps]||PT_SAMP[0];return s.ptest==='elec'?1.5:s.ptest==='heat'?(!ptHeatOK(m)?.4:m.kt>=50?ptTm(m)+1.8:10):s.ptest==='ham'?(m.br<0?.4:m.br?1.9:3.1):.9;};
+/* 紀錄表的一格：[文字, 顏色] */
+const ptRes=(m,t)=>t==='elec'?(m.el?['✓ 亮',P.accent]:['✗ 不亮',P.red]):t==='heat'?(!ptHeatOK(m)?['—',P.muted]:m.kt>=50?[ptTm(m).toFixed(1)+' 秒',P.accent]:['未熔',P.red]):t==='ham'?(m.br<0?['—',P.muted]:m.br?['碎裂',P.red]:['延展',P.accent]):[(m.cn.length===3?m.cn.slice(0,2):m.cn)+(m.lu===2?' ✦':''),P.ink];
+
+/* 生活中常見的元素 16 種 */
+const PT_U16=[26,29,13,79,47,22,74,80,6,14,16,8,7,2,10,17];
+const PT_UT={26:'用途最廣，煉成鋼',29:'電線',13:'鋁箔、門窗',79:'飾品',47:'導電導熱最好',22:'人工關節、眼鏡架',74:'燈絲',80:'溫度計（有毒）',6:'鑽石、石墨筆芯',14:'晶片、太陽能電池',16:'火藥、硫酸',8:'助燃、呼吸',7:'食品包裝充氮',2:'氣球、飛船',10:'霓虹燈',17:'自來水消毒'};
+const PT_UD={26:'用途最廣的金屬。鐵礦煉成鐵，再煉成鋼，用於建築、橋梁、機械。地殼中含量第二多的金屬。',29:'紅色金屬，導電性僅次於銀，價格較低，所以電線大多用銅。',13:'質輕。表面會生成一層緻密的氧化鋁，保護內部不再氧化。用於鋁箔、鋁罐、門窗。地殼中含量最多的金屬。',79:'黃色金屬，活性小，不易和其他物質反應，能長久保持光澤；延展性最好。',47:'銀白色金屬，導電、導熱都是金屬中最好的。做飾品、餐具。',22:'質輕、堅固、耐腐蝕，做人工關節、人工牙根、眼鏡架。',
+  74:'熔點最高的金屬（約 3400°C），高溫下不易熔化，做燈泡的燈絲。',80:'俗稱水銀，常溫下唯一的液態金屬，可做溫度計、氣壓計。汞和汞的蒸氣有毒。',6:'鑽石和石墨都是碳。鑽石是最硬的物質，不導電；石墨質軟、可導電，做鉛筆芯和電極。',14:'半導體材料，做晶片、太陽能電池。砂和玻璃的主要成分是二氧化矽。地殼中含量第二多的元素。',16:'黃色固體，用於製造火藥、硫酸。火山口、溫泉區常見。',8:'無色氣體，約占空氣的 1/5。可助燃，生物呼吸需要氧。地殼中含量最多的元素。',
+  7:'無色氣體，約占空氣的 4/5。化性不活潑，食品包裝充氮可防止變質；液態氮用於冷凍。',2:'密度比空氣小，而且不可燃，比氫氣安全，用來填充氣球、飛船。',10:'裝在玻璃管中通電，會發出紅橘色的光，用於霓虹燈。',17:'黃綠色、有毒的氣體。用於自來水和游泳池的消毒，也用於漂白。'};
+const PT_UQ=[['熔點最高的金屬，做燈泡的燈絲',74],['約占空氣 4/5 的氣體',7],['導電、導熱最好的金屬',47],['半導體材料，做晶片',14],['常溫下是液態的金屬',80],['密度小又不可燃，填充氣球',2],['質輕，表面有氧化層保護內部',13],['用於自來水消毒的黃綠色氣體',17],['鑽石和石墨都由它組成',6],['導電性僅次於銀，做電線',29],['可助燃，約占空氣 1/5',8],['質輕堅固耐腐蝕，做人工關節',22],['黃色固體，製造火藥、硫酸',16],['活性小的黃色金屬，做飾品',79],['通電後發出紅橘色的光',10],['用途最廣的金屬，煉成鋼',26]];
+/* 小圖示：畫在 44×44 的框內 */
+function ptIcon(z,x,y){const S='stroke-linecap="round" stroke-linejoin="round"';let d='';
+  if(z===26)d=`<path d="M6 8H38V14H26V30H38V36H6V30H18V14H6Z" fill="#9aa5ae" stroke="#5c6770" stroke-width="1.5" ${S}/>`;
+  else if(z===29)d=`<path d="M4 31C12 8 18 40 25 22S36 12 40 15" fill="none" stroke="#c8693a" stroke-width="4" ${S}/><path d="M4 31C7 23 9 20 12 21" fill="none" stroke="#2f3a40" stroke-width="8" ${S}/>`;
+  else if(z===13)d=`<rect x="12" y="6" width="20" height="33" rx="4" fill="#d5dade" stroke="#8b97a1" stroke-width="1.5"/><ellipse cx="22" cy="9" rx="8" ry="2.2" fill="#eef1f3" stroke="#8b97a1"/><rect x="12" y="19" width="20" height="9" fill="#df7c44" opacity=".85"/>`;
+  else if(z===79)d=`<circle cx="22" cy="27" r="12" fill="none" stroke="#e3b53c" stroke-width="5"/><path d="M22 5L28 11L22 17L16 11Z" fill="#fff3c4" stroke="#b98a14" stroke-width="1.5" ${S}/>`;
+  else if(z===47)d=`<rect x="20" y="20" width="4" height="20" rx="2" fill="#dfe3e7" stroke="#8b97a1"/><ellipse cx="22" cy="14" rx="8" ry="11" fill="#eef1f3" stroke="#8b97a1" stroke-width="1.5"/><path d="M18 9Q20 6 23 6" fill="none" stroke="#fff" stroke-width="2" ${S}/>`;
+  else if(z===22)d=`<circle cx="12" cy="25" r="8" fill="#eaf4f8" stroke="#6f7f8c" stroke-width="3"/><circle cx="32" cy="25" r="8" fill="#eaf4f8" stroke="#6f7f8c" stroke-width="3"/><path d="M20 24Q22 21 24 24M4 23L2 14M40 23L42 14" fill="none" stroke="#6f7f8c" stroke-width="3" ${S}/>`;
+  else if(z===74)d=`<circle cx="22" cy="17" r="13" fill="#fff6c9" stroke="#b59b3a" stroke-width="1.5"/><rect x="16" y="29" width="12" height="10" rx="2" fill="#8d99a3"/><path d="M17 29L19 18l2 4 2-4 2 4 2-4L27 29" fill="none" stroke="#c8553d" stroke-width="1.5" ${S}/>`;
+  else if(z===80)d=`<rect x="18.500" y="3" width="7" height="30" rx="3.500" fill="#fbfdff" stroke="#8fa3a8" stroke-width="1.5"/><circle cx="22" cy="35" r="6.500" fill="#aab3bc" stroke="#8fa3a8" stroke-width="1.5"/><rect x="20.500" y="14" width="3" height="18" fill="#aab3bc"/>`;
+  else if(z===6)d=`<path d="M8 36L12 26L30 8L36 14L18 32Z" fill="#f2c14e" stroke="#8a6d1a" stroke-width="1.5" ${S}/><path d="M8 36L12 26L18 32Z" fill="#3d4248"/><path d="M27 11L33 17" stroke="#8a6d1a" stroke-width="1.5"/>`;
+  else if(z===14)d=`<path d="M8 15H36M8 22H36M8 29H36M15 8V36M22 8V36M29 8V36" stroke="#8d99a3" stroke-width="2" ${S}/><rect x="11" y="11" width="22" height="22" rx="3" fill="#2f3a40"/><rect x="17" y="17" width="10" height="10" rx="1.5" fill="#5d6d77"/>`;
+  else if(z===16)d=`<path d="M5 37L12 20L20 37Z" fill="#e6cd3c" stroke="#a8921c" stroke-width="1.5" ${S}/><path d="M15 37L25 10L35 37Z" fill="#f0da55" stroke="#a8921c" stroke-width="1.5" ${S}/><path d="M28 37L35 24L41 37Z" fill="#e6cd3c" stroke="#a8921c" stroke-width="1.5" ${S}/>`;
+  else if(z===8)d=`<path d="M22 4Q34 18 31 29Q29 39 22 39Q15 39 13 29Q11 20 18 13Q19 19 22 19Q23 12 22 4Z" fill="#f2884b"/><path d="M22 20Q28 27 26 33Q25 37 22 37Q19 37 18 33Q17 28 22 20Z" fill="#ffd66b"/>`;
+  else if(z===7)d=`<path d="M10 8L13 5L16 8L19 5L22 8L25 5L28 8L31 5L34 8V36L31 39L28 36L25 39L22 36L19 39L16 36L13 39L10 36Z" fill="#7fb6d9" stroke="#4c85bb" stroke-width="1.5" ${S}/><ellipse cx="22" cy="22" rx="8" ry="6" fill="#fdf6d8" stroke="#4c85bb"/>`;
+  else if(z===2)d=`<ellipse cx="22" cy="16" rx="11" ry="13" fill="#f2a3b3" stroke="#c8697c" stroke-width="1.5"/><path d="M19 9Q16 12 16 16" fill="none" stroke="#fff" stroke-width="2" ${S}/><path d="M22 29L20 32H24ZM22 32Q18 36 23 41" fill="none" stroke="#8b6a70" stroke-width="1.5" ${S}/>`;
+  else if(z===10)d=`<rect x="4" y="9" width="36" height="26" rx="6" fill="#22303a"/><path d="M10 29V15L18 29V15M24 22H33Q33 15 28.500 15T24 22T29 29Q32 29 33 27" fill="none" stroke="#ff9478" stroke-width="5" opacity=".35" ${S}/><path d="M10 29V15L18 29V15M24 22H33Q33 15 28.500 15T24 22T29 29Q32 29 33 27" fill="none" stroke="#ff6a45" stroke-width="2" ${S}/>`;
+  else d=`<path d="M22 5Q35 22 35 28A13 13 0 0 1 9 28Q9 22 22 5Z" fill="#8ccbe6" stroke="#4c85bb" stroke-width="1.5"/><path d="M15 27Q15 33 21 35" fill="none" stroke="#fff" stroke-width="2.5" ${S}/>`;
+  return `<g transform="translate(${x} ${y})">${d}</g>`;}
+/* 燒杯（鹼金屬、鈣）：回傳 [水, 玻璃]，反應物畫在兩者之間 */
+function ptBeaker(pink,cloud){const W='M96 240H464V412Q464 426 450 426H110Q96 426 96 412Z';
+  let back=`<path d="${W}" fill="#d7ecf4"/>`;if(pink>0)back+=`<path d="${W}" fill="#e23d74" opacity="${(pink*.5).toFixed(3)}"/>`;if(cloud>0)back+=`<path d="${W}" fill="#ffffff" opacity="${(cloud*.35).toFixed(3)}"/>`;
+  let front=`<path d="M90 150V414Q90 432 108 432H452Q470 432 470 414V150" fill="none" stroke="#83999d" stroke-width="4" stroke-linecap="round"/><path d="M80 150H98M462 150H480" stroke="#83999d" stroke-width="4" stroke-linecap="round"/>`+L(96,240,464,240,{stroke:'#8fc4d6',w:2.5})
+    +`<path d="M108 172V404" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".75"/><path d="M120 180V300" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".6"/>`;
+  for(let i=0;i<5;i++)front+=L(446,400-i*45,i%2?454:462,400-i*45,{stroke:'#9db0b4',w:1.5});
+  return [back,front];}
+/* 同族頁右側：小週期表（標出這一族）＋重點 */
+function ptFamSide(g,rows,sel,cap,bul,y0){let h=ptPanel(584,16,300,468);
+  for(let z=1;z<=118;z++){const e=PT_E[z];if(e.f)continue;const on=e.g===g,strong=on&&rows.includes(e.p),isSel=on&&e.p===sel;
+    h+=`<rect x="${(600+(e.g-1)*15.4).toFixed(1)}" y="${(32+(e.p-1)*14).toFixed(1)}" width="13.6" height="12.2" rx="2" fill="${isSel?P.accent:strong?'#55b3a8':on?(z===1?'#cfe9d6':'#bfe6e0'):'#ebe6d9'}"${z===1&&g===1?' stroke="#5fa67c"':''}/>`;}
+  h+=T(600,150,cap,{size:15,weight:700,fill:P.accent});
+  bul.forEach((t,i)=>{const c=t[0]==='　';h+=(c?'':`<circle cx="606" cy="${y0+i*25-5}" r="3" fill="${P.accent}"/>`)+T(618,y0+i*25,c?t.slice(1):t,{size:15});});
+  h+=`<rect x="600" y="436" width="268" height="34" rx="17" fill="${P.accent}"/>`+T(734,459,'同一族的元素，化學性質相似',{size:16,weight:700,anchor:'middle',fill:'#fff'});
+  return h;}
+
+const PT_Q={
+  names:['「汞」是金屬，為什麼中文名稱沒有「金」字旁？','元素的中文名稱是依<b>常溫下的狀態</b>造字的：固態金屬用「金」字旁，固態非金屬用「石」字旁，氣態用「气」字頭，液態用「氵（水）」。汞是常溫下<b>唯一呈液態的金屬</b>，所以用「水」作部首；溴則是唯一呈液態的非金屬。'],
+  props:['石墨和鑽石都是碳，為什麼一個質軟、能導電，另一個是最硬的物質、不導電？','兩者是<b>同一種元素</b>，但碳原子的<b>排列方式不同</b>，性質就不同。所以「能導電的一定是金屬」是錯的：石墨是非金屬，卻能導電。（在測試台分別測石墨和鑽石比較看看）'],
+  table:['門得列夫的週期表留了一些空格，他為什麼敢預言還沒被發現的元素？','他把當時已知的元素依<b>原子量</b>由小到大排列，發現性質會<b>週期性</b>地重複，於是把性質相似的排在同一行。排不下去的地方就留空格，並依周圍元素的性質，預測空格裡元素的性質；後來發現的鎵、鍺等元素和預測很接近。現在的週期表改依<b>原子序</b>排列。'],
+  family:['鈉和鉀為什麼要保存在石油（礦物油）中？可以泡在水裡嗎？','<b>不可以泡在水裡</b>。鈉、鉀的活性很大，會和空氣中的氧、水氣反應，遇水更會劇烈反應並產生氫氣。泡在石油中可以<b>隔絕空氣和水</b>。'],
+  uses:['鋁的活性比鐵大，為什麼鋁門窗反而不容易鏽蝕？','鋁的表面會很快生成一層<b>緻密的氧化鋁</b>，緊緊蓋住表面，裡面的鋁就不再接觸空氣。鐵鏽質地疏鬆、容易剝落，內部的鐵會繼續生鏽。']};
+const PT_QUIZ=[
+  {q:'只看中文名稱，下列哪一種元素在常溫常壓下是液態？',opts:['碘','溴','氯','鎂'],ans:1,
+    sol:'「溴」是「氵」字旁 → 常溫為<b>液態</b>。碘是「石」字旁（固態非金屬），氯是「气」字頭（氣態），鎂是「金」字旁（固態金屬）。',go:s=>{s.mode='names';s.nv='state';s.nf='all';s.nsh=0;s.ni=28;s.nflip=false;s.nfa=0;s.ng='';},goLabel:'看「溴」這張卡片'},
+  {q:'下列元素符號的寫法，何者正確？',opts:['鈷 CO','鎂 mg','鈉 Na','氯 CL'],ans:2,
+    sol:'元素符號的<b>第一個字母大寫，第二個字母小寫</b>：鈷 Co、鎂 Mg、鈉 Na、氯 Cl。CO 是一氧化碳（碳和氧的化合物），不是鈷。',go:s=>{s.mode='names';s.nv='name';s.nf='f20';s.nsh=0;s.ni=10;s.nflip=true;s.nfa=1;s.ng='';},goLabel:'看「鈉」這張卡片'},
+  {q:'某固體有光澤、可以導電，用鐵鎚敲打會碎裂。它最可能是：',opts:['銅','石墨','硫','鋁'],ans:1,
+    sol:'銅、鋁是金屬，敲打會延展、不會碎裂；硫不導電。<b>石墨</b>是非金屬，質脆，卻能導電。',go:s=>{s.mode='props';s.ps='gr';s.ptest='ham';s.pp=0;},goLabel:'敲敲看石墨'},
+  {q:'關於金屬元素的敘述，下列何者正確？',opts:['常溫下都是固體','都是銀白色','都能導電、導熱','都能被磁鐵吸引'],ans:2,
+    sol:'金屬都是<b>電和熱的良導體</b>。汞在常溫下是液體；銅是紅色、金是黃色；能被磁鐵吸引的只有鐵、鈷、鎳等少數金屬。',go:s=>{s.mode='props';s.ps='hg';s.ptest='elec';s.pp=0;},goLabel:'測汞能不能導電'},
+  {q:'現在的週期表，元素是依照什麼順序排列的？',opts:['元素被發現的先後','原子的質量大小','在地殼中的含量','原子序（質子數）'],ans:3,
+    sol:'現在的週期表依<b>原子序</b>（質子數）由小到大排列。門得列夫當年是依原子量排列。',go:s=>{s.mode='table';s.tc='f20';s.tsel=1;},goLabel:'看前 20 號元素'},
+  {q:'下列哪一組元素的化學性質最相似？',opts:['鈉、鎂、鋁','鋰、鈉、鉀','碳、氮、氧','氫、氦、鋰'],ans:1,
+    sol:'<b>同一族</b>（同一直行）的元素化學性質相似。鋰、鈉、鉀都在第 1 族（鹼金屬）；鈉、鎂、鋁是同一週期（同一橫列）。',go:s=>{s.mode='table';s.tc='fam';s.tg=1;s.tsel=11;},goLabel:'標出第 1 族'},
+  {q:'常溫常壓下呈液態的元素有哪些？',opts:['汞、溴和氯','溴和碘','只有汞','汞和溴'],ans:3,
+    sol:'只有<b>汞</b>（金屬）和<b>溴</b>（非金屬）兩種。氯是氣體，碘是固體。',go:s=>{s.mode='table';s.tc='state';s.tsel=35;},goLabel:'依常溫狀態上色'},
+  {q:'把一小塊鈉投入滴有酚酞的水中，下列敘述何者<b>錯誤</b>？',opts:['產生的氣體是氧氣','鈉浮在水面上游動','水溶液使酚酞變紅','反應比鋰劇烈、比鉀緩和'],ans:0,
+    sol:'鈉和水反應產生的是<b>氫氣</b>，同時生成氫氧化鈉，水溶液呈鹼性，所以酚酞變紅。活性：鉀 ＞ 鈉 ＞ 鋰。',go:s=>{s.mode='family';s.fam='alk';s.am='na';s.fp=0;},goLabel:'把鈉投入水中'},
+  {q:'某元素位於週期表的第 3 週期、第 17 族，它是：',opts:['鈉','硫','氯','氬'],ans:2,
+    sol:'第 3 週期由左到右是鈉、鎂、鋁、矽、磷、硫、氯、氬；第 17 族（鹵素）是<b>氯</b>。',go:s=>{s.mode='table';s.tc='fam';s.tg=17;s.tsel=17;},goLabel:'在週期表上找'},
+  {q:'地殼中含量最多的元素，和含量最多的金屬元素，依序是：',opts:['氧、鋁','矽、鐵','氧、鐵','氮、鋁'],ans:0,
+    sol:'地殼中的含量：<b>氧</b> ＞ 矽 ＞ <b>鋁</b> ＞ 鐵。氧和矽是非金屬與類金屬，含量最多的金屬是鋁。氮是空氣中含量最多的。',go:s=>{s.mode='uses';s.uq=false;s.usel=13;},goLabel:'看含量長條圖'}];
+
+LABS.ptable={group:5,n:'6-4',keep:['mode'],steps:'mode',
+  tasks:{names:'先看卡片正面想答案，再點卡片翻面。換成「猜常溫狀態」：只看部首，猜得出它是固態、液態還是氣態嗎？',
+    props:'在上面一排點一種樣品，再換不同的測試。哪些樣品會讓燈泡亮？有沒有非金屬也會亮？',
+    table:'點任何一格看它的資料。換不同的上色方式：金屬集中在哪一邊？常溫下是液態的有幾種？',
+    family:'把鋰、鈉、鉀分別投入水中：哪些現象一樣？劇烈的程度怎麼排？再看其他三族。',
+    uses:'點一張卡片看這種元素的用途。打開「配對小測驗」，看用途找元素。'},
+  name:'元素與週期表',subtitle:'元素用符號表示，中文名稱的部首表示常溫下的狀態。週期表依原子序排列：橫列是週期，直行是族，同一族的元素化學性質相似。',
+  q:s=>({html:qBlockHTML(PT_Q[s.mode]||PT_Q.names)+quizHTML(s,PT_QUIZ)}),
+  qAction(s,v){quizAction(s,v,PT_QUIZ);},
+  state:{mode:'names',t:0,nv:'sym',nf:'f20',ni:0,nflip:false,nfa:0,ng:'',nsh:0,nok:0,ntry:0,ps:'cu',ptest:'elec',pp:0,pdone:{},tc:'cat',tg:1,tsel:11,fam:'alk',am:'na',aem:'mg',fp:0,hsel:1,gsel:0,usel:26,uq:false,uqi:0,uqp:0,uqs:0,uqn:0,qi:0,qp:null,qc:false,qs:false},
+  controls:[
+    {type:'seg',key:'mode',label:'主題',options:[['names','元素符號與命名'],['props','金屬與非金屬'],['table','週期表'],['family','同族元素性質相似'],['uses','生活中常見的元素']],onChange:s=>{s.pp=0;s.fp=0;}},
+    {type:'seg',key:'nv',label:'練習方式',options:[['sym','看符號想名稱'],['name','看名稱想符號'],['state','猜常溫狀態']],show:s=>s.mode==='names',onChange:s=>{LABS.ptable.nreset(s);}},
+    {type:'seg',key:'nf',label:'卡片範圍',options:[['f20','前 20 號'],['metal','常見金屬'],['all','全部常見']],show:s=>s.mode==='names',onChange:s=>{LABS.ptable.nreset(s);}},
+    {type:'buttons',label:'換卡片',items:[['上一張',s=>{LABS.ptable.ngo(s,-1);}],['下一張',s=>{LABS.ptable.ngo(s,1);}],['洗牌',s=>{s.nsh=(s.nsh||0)+1;LABS.ptable.nreset(s);}],['照原子序',s=>{s.nsh=0;LABS.ptable.nreset(s);}]],show:s=>s.mode==='names'},
+    {type:'seg',key:'ptest',label:'測試',options:[['elec','導電'],['heat','導熱'],['ham','敲打'],['look','外觀']],show:s=>s.mode==='props',onChange:s=>{s.pp=0;}},
+    {type:'buttons',label:'操作',items:[['再測一次',s=>{s.pp=0;}],['清空紀錄表',s=>{s.pdone={};s.pp=0;}]],show:s=>s.mode==='props'},
+    {type:'seg',key:'tc',label:'上色方式',options:[['cat','金屬／非金屬'],['state','常溫狀態'],['fam','標出一族'],['f20','前 20 號']],show:s=>s.mode==='table'},
+    {type:'seg',key:'tg',label:'哪一族',options:[[1,'第 1 族'],[2,'第 2 族'],[17,'第 17 族'],[18,'第 18 族']],show:s=>s.mode==='table'&&s.tc==='fam'},
+    {type:'buttons',label:'選元素（也可以直接點格子）',items:[['← 上一個',s=>{s.tsel=s.tsel>1?s.tsel-1:118;}],['下一個 →',s=>{s.tsel=s.tsel<118?s.tsel+1:1;}]],show:s=>s.mode==='table'},
+    {type:'seg',key:'fam',label:'哪一族',options:[['alk','鹼金屬'],['ae','鹼土金屬'],['hal','鹵素'],['noble','鈍氣']],show:s=>s.mode==='family',onChange:s=>{s.fp=0;}},
+    {type:'seg',key:'am',label:'投入水中的金屬',options:[['li','鋰 Li'],['na','鈉 Na'],['k','鉀 K']],show:s=>s.mode==='family'&&s.fam==='alk',onChange:s=>{s.fp=0;}},
+    {type:'seg',key:'aem',label:'實驗',options:[['mg','鎂帶燃燒'],['ca','鈣投入水中']],show:s=>s.mode==='family'&&s.fam==='ae',onChange:s=>{s.fp=0;}},
+    {type:'buttons',label:'操作',items:[['重新播放',s=>{s.fp=0;}],['直接看結果',s=>{s.fp=40;}]],show:s=>s.mode==='family'&&(s.fam==='alk'||s.fam==='ae')},
+    {type:'toggle',key:'uq',label:'配對小測驗（看用途找元素）',show:s=>s.mode==='uses',onChange:s=>{s.uqp=0;}},
+    {type:'buttons',label:'小測驗',items:[['下一題',s=>{s.uqi=(s.uqi+1)%PT_UQ.length;s.uqp=0;}],['重新計分',s=>{s.uqi=0;s.uqp=0;s.uqs=0;s.uqn=0;}]],show:s=>s.mode==='uses'&&s.uq}],
+  nreset(s){s.ni=0;s.nflip=false;s.nfa=0;s.ng='';s.nok=0;s.ntry=0;},
+  ngo(s,d){const n=ptDeck(s).length;s.ni=((clamp(s.ni,0,n-1)+d)%n+n)%n;s.nflip=false;s.nfa=0;s.ng='';},
+  tick(s,dt){s.t+=dt;const tg=s.nflip?1:0;s.nfa=reduceMotion?tg:(s.nfa<tg?Math.min(tg,s.nfa+dt*4):Math.max(tg,s.nfa-dt*4));
+    if(s.mode==='props'){const d=ptDur(s);s.pp=reduceMotion?d:Math.min(d,s.pp+dt);if(s.pp>=d-1e-6){if(!s.pdone[s.ps])s.pdone[s.ps]={};s.pdone[s.ps][s.ptest]=1;}}
+    if(s.mode==='family')s.fp=reduceMotion?40:Math.min(40,s.fp+dt);},
+  tap(s,id){const [k,v]=id.split(':');
+    if(id==='flip'){s.nflip=!s.nflip;}
+    else if(id==='prev')this.ngo(s,-1);else if(id==='next')this.ngo(s,1);
+    else if(k==='g'){if(!s.ng){const e=PT_E[ptDeck(s)[clamp(s.ni,0,ptDeck(s).length-1)]];s.ng=v;s.ntry++;if(v===e.st)s.nok++;s.nflip=true;}}
+    else if(k==='d'){const n=ptDeck(s).length;s.ni=clamp(+v,0,n-1);s.nflip=false;s.nfa=0;s.ng='';}
+    else if(k==='e'){s.tsel=clamp(+v,1,118);}
+    else if(k==='p'){if(PT_SM[v]){s.ps=v;s.pp=0;}}
+    else if(k==='h'){s.hsel=clamp(+v,0,3);}else if(k==='n'){s.gsel=clamp(+v,0,2);}
+    else if(k==='u'){const z=+v;if(s.uq){if(!s.uqp){s.uqp=z;s.uqn++;if(z===PT_UQ[s.uqi%PT_UQ.length][1])s.uqs++;}}else s.usel=z;}
+    else if(id==='uqn'){s.uqi=(s.uqi+1)%PT_UQ.length;s.uqp=0;}},
+  render(s){const m=s.mode;return m==='props'?this.props(s):m==='table'?this.table(s):m==='family'?this.family(s):m==='uses'?this.uses(s):this.names(s);},
+
+  /* ---------- 1 元素符號與命名 ---------- */
+  names(s){const deck=ptDeck(s),n=deck.length,i=clamp(s.ni,0,n-1),e=PT_E[deck[i]],[ri,rl,rd]=ptRad(e),sv=s.nv==='state',back=s.nfa>.5,sx=Math.max(.02,Math.abs(1-2*s.nfa)).toFixed(3),seen=s.nflip;
+    let h=PT_DEFS,c='';
+    if(!back){c+=`<rect x="40" y="44" width="300" height="320" rx="24" fill="${P.accent}"/><rect x="52" y="56" width="276" height="296" rx="16" fill="none" stroke="#ffffff" stroke-opacity=".35" stroke-width="2"/>`
+        +T(190,96,s.nv==='sym'?'元素符號':'中文名稱',{size:17,anchor:'middle',fill:'#d6f0ec'})
+        +T(190,s.nv==='sym'?252:256,s.nv==='sym'?e.sym:e.name,{size:s.nv==='sym'?128:136,anchor:'middle',weight:700,fill:'#ffffff'})
+        +T(190,326,sv?'常溫下是固態、液態還是氣態？':s.nv==='sym'?'中文名稱是什麼？':'元素符號怎麼寫？',{size:17,anchor:'middle',fill:'#d6f0ec'});}
+    else{const ok=s.ng===e.st;c+=`<rect x="40" y="44" width="300" height="320" rx="24" fill="#fffdf8" stroke="${P.accent}" stroke-width="3"/>`
+        +T(190,84,`原子序 ${e.z}`,{size:17,anchor:'middle',fill:P.muted})+T(122,178,e.sym,{size:76,anchor:'middle',weight:700})+T(262,176,e.name,{size:76,anchor:'middle',weight:700,fill:P.accent})
+        +L(70,206,310,206,{stroke:P.faint,w:1.5})+T(190,244,rl,{size:22,anchor:'middle',weight:700})+T(190,278,rd,{size:20,anchor:'middle',weight:700,fill:e.z===80?P.red:P.accent})
+        +(sv&&s.ng?T(190,330,ok?'✓ 答對了':`✗ 你選的是${PT_STN[s.ng]}`,{size:19,anchor:'middle',weight:700,fill:ok?P.accent:P.red}):T(190,330,e.sym.length===2?'第一個字母大寫，第二個小寫':'只有一個字母：大寫',{size:16,anchor:'middle',fill:P.muted}));}
+    h+=`<g data-tap="flip" tabindex="0" role="button" aria-label="翻面" style="cursor:pointer" transform="translate(190 0) scale(${sx} 1) translate(-190 0)">${c}</g>`;
+    if(sv)[['s','固態'],['l','液態'],['g','氣態']].forEach(([k,t],j)=>{const done=!!s.ng,right=done&&k===e.st,wrong=done&&k===s.ng&&k!==e.st;
+      h+=ptBtn('g:'+k,40+j*104,378,92,44,t,{fill:right?'#cfe9d6':wrong?'#f6d5cf':'#fffdf8',stroke:right?'#2e8b57':wrong?P.red:P.accent,ink:right?'#1d6b41':wrong?P.red:P.accent});});
+    else h+=T(190,406,seen?'再點一次翻回正面':'先想答案，再點卡片翻面',{size:16,anchor:'middle',fill:P.muted});
+    const nav=(id,x,d,a)=>`<g data-tap="${id}" tabindex="0" role="button" aria-label="${a}" style="cursor:pointer"><circle cx="${x}" cy="458" r="21" fill="#fffdf8" stroke="${P.accent}" stroke-width="2"/><path d="${d}" fill="none" stroke="${P.accent}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+    h+=nav('prev',64,'M69 448L59 458L69 468','上一張')+nav('next',316,'M311 448L321 458L311 468','下一張')+T(190,464,`第 ${i+1} / ${n} 張`,{size:18,anchor:'middle',weight:700});
+    /* 右側：部首規則 */
+    h+=T(386,38,'中文名稱：看部首就知道常溫下的狀態',{size:18,weight:700});
+    [['金','常溫為固態的金屬','銅、鐵、鈉…（汞例外）'],['石','常溫為固態的非金屬','碳、硫、碘、矽'],['气','常溫為氣態','氫、氧、氮、氯、氖'],['氵','常溫為液態','只有溴（非金屬）、汞（金屬）']].forEach(([r,d,ex],k)=>{const y=52+k*47,on=seen&&k===ri;
+      h+=`<rect x="386" y="${y}" width="488" height="41" rx="10" fill="${on?'#e2f3f0':'#fffdf8'}" stroke="${on?P.accent:'#ddd7c9'}" stroke-width="${on?2.5:1.5}"/><rect x="394" y="${y+5}" width="34" height="31" rx="7" fill="${on?P.accent:'#efe9db'}"/>`
+        +T(411,y+29,r,{size:23,anchor:'middle',weight:700,fill:on?'#fff':P.ink})+T(440,y+27,d,{size:17,weight:700})+T(864,y+27,ex,{size:15,anchor:'end',fill:P.muted});});
+    h+=ptPanel(386,248,488,76,{rx:12})+T(400,274,'元素符號：第一個字母大寫，第二個字母小寫',{size:16,weight:700})
+      +T(400,305,'Co　鈷（一種元素）',{size:16,weight:700,fill:P.accent})+T(578,305,'CO　一氧化碳（碳和氧的化合物）',{size:16,weight:700,fill:P.red});
+    h+=T(386,346,'這一組的卡片（點一下可以跳到那一張）',{size:14,fill:P.muted});
+    deck.forEach((z,j)=>{const d=PT_E[z],x=386+(j%13)*37.5,y=356+Math.floor(j/13)*39,on=j===i;
+      h+=`<g data-tap="d:${j}" tabindex="0" role="button" aria-label="第 ${j+1} 張" style="cursor:pointer"><rect x="${x}" y="${y}" width="34" height="34" rx="7" fill="${on?P.accent:'#fffdf8'}" stroke="${on?P.accent:'#cfc9ba'}" stroke-width="1.5"/>${T(x+17,y+(s.nv==='sym'?23:23.5),s.nv==='sym'?d.sym:d.name,{size:s.nv==='sym'?15:17,anchor:'middle',weight:700,fill:on?'#fff':P.ink})}</g>`;});
+    const reads=[['卡片',`第 ${i+1} / ${n} 張`],['正面',s.nv==='sym'?e.sym:e.name],['背面',seen?`${e.sym}　${e.name}`:'先想再翻']];if(sv)reads.push(['答對',`${s.nok} / ${s.ntry} 張`]);
+    const note=seen?`<b>${e.name}（${e.sym}）</b>：${rl} → <b>${rd}</b>。`+(e.z===80?'汞是常溫下唯一呈液態的金屬，所以不是「金」字旁。':e.z===35?'溴是常溫下唯一呈液態的非金屬。':e.z===79?'':e.cat==='ml'?'在週期表上，'+e.name+'屬於類金屬。':'')+`<br>符號 ${e.sym}：${e.sym.length===2?'第一個字母大寫、第二個字母小寫。':'只有一個字母，要大寫。'}`
+      :'中文名稱的部首表示<b>常溫下的狀態</b>：「金」固態金屬、「石」固態非金屬、「气」氣態、「氵」液態。<br>元素符號取自拉丁文或英文名稱：<b>第一個字母大寫，第二個字母小寫</b>。';
+    return {svg:h,reads,note};},
+
+  /* ---------- 2 金屬與非金屬：測試台 ---------- */
+  props(s){const sm=PT_SM[s.ps]||PT_SAMP[0],t=s.ptest,dur=ptDur(s),pp=Math.min(s.pp,dur),done=pp>=dur-1e-6,dark=ptMix(sm.col,'#000000',.4);
+    let h=PT_DEFS+`<defs><linearGradient id="ptS" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${ptMix(sm.col,'#ffffff',sm.lu===2?.7:sm.lu?.35:.2)}"/><stop offset=".45" stop-color="${sm.col}"/><stop offset="1" stop-color="${ptMix(sm.col,'#000000',.32)}"/></linearGradient></defs>`;
+    /* 樣品架 */
+    PT_SAMP.forEach((m,j)=>{const x=18+j*54.2,on=m.k===s.ps,cc=PT_C[m.cat];
+      h+=`<g data-tap="p:${m.k}" tabindex="0" role="button" aria-label="${m.n}" style="cursor:pointer"><rect x="${x.toFixed(1)}" y="14" width="50" height="52" rx="9" fill="${on?'#e2f3f0':'#fffdf8'}" stroke="${on?P.accent:'#d5cfc0'}" stroke-width="${on?3:1.5}"/><rect x="${(x+8).toFixed(1)}" y="18" width="34" height="5" rx="2.5" fill="${cc[1]}"/>`
+        +`<circle cx="${(x+25).toFixed(1)}" cy="36" r="8" fill="${m.col}" stroke="${m.form==='g'?'#9aa3ad':ptMix(m.col,'#000000',.35)}" stroke-width="1.5"${m.form==='g'?' stroke-dasharray="3 2"':''}/>${m.lu===2?`<circle cx="${(x+22.5).toFixed(1)}" cy="33.500" r="2.500" fill="#fff" opacity=".85"/>`:''}`
+        +T(x+25,60,m.n,{size:14,anchor:'middle',weight:700})+`</g>`;});
+    h+=`<rect x="18" y="372" width="524" height="14" rx="4" fill="url(#ptWood)"/><rect x="18" y="372" width="524" height="3" rx="1.5" fill="#ecd6b0"/>`;
+    const A=t==='elec'?this.pElec(s,sm,pp):t==='heat'?this.pHeat(s,sm,pp):t==='ham'?this.pHam(s,sm,pp):this.pLook(s,sm,pp);h+=A;
+    /* 結果文字 */
+    let r1,r2,rc=P.accent;const mt=sm.cat==='m';
+    if(t==='elec'){r1=sm.el?`${sm.n}：燈泡亮 → 能導電`:`${sm.n}：燈泡不亮 → 不易導電`;rc=sm.el?P.accent:P.red;
+      r2=sm.k==='gr'?'石墨是非金屬，卻能導電（常考的例外）。':sm.k==='di'?'鑽石和石墨都是碳，但鑽石不導電。':sm.k==='hg'?'汞是液體，仍然是金屬，能導電。':sm.k==='si'?'矽是類金屬，導電性介於金屬和非金屬之間（半導體）。':mt?'金屬都是電的良導體。':'大部分非金屬不易導電。';}
+    else if(t==='heat'){if(!ptHeatOK(sm)){r1=sm.k==='di'?'鑽石太小，做不成棒子，這裡不測':`${sm.n}是${PT_FORM[sm.form][0]}體，這個裝置只測固體棒`;rc=P.muted;r2=sm.k==='di'?'延伸：鑽石不導電，導熱卻比金屬還快。':sm.k==='hg'?'汞是金屬，也是熱的良導體。':'換一種固體樣品試試看。';}
+      else if(sm.kt>=50){r1=`${sm.n}：蠟在 ${ptTm(sm).toFixed(1)} 秒熔化 → 導熱快`;r2=mt?'金屬都是熱的良導體；這幾種以銀最快，銅次之。':sm.k==='gr'?'石墨是非金屬，導電、導熱卻都不錯。':'矽是類金屬，導熱比一般非金屬好。';}
+      else{r1=`${sm.n}：10 秒後蠟仍未熔化 → 導熱慢`;rc=P.red;r2='大部分非金屬不易導熱。';}}
+    else if(t==='ham'){if(sm.br<0){r1=`${sm.n}是${PT_FORM[sm.form][0]}體，沒有固定形狀，不能敲打`;rc=P.muted;r2='敲打只比較固體：金屬有延展性，固態非金屬大多易碎。';}
+      else if(sm.br){r1=`${sm.n}：碎裂 → 沒有延展性`;rc=P.red;r2=sm.k==='di'?'鑽石是最硬的物質，但質脆，重擊會碎裂。':sm.k==='si'?'矽有金屬光澤，但質脆、沒有延展性。':'固態非金屬大多質脆，一敲就碎。';}
+      else{r1=`${sm.n}：敲扁了、沒有碎裂 → 有延展性`;r2=sm.k==='au'?'金的延展性是金屬中最好的，可以打成很薄的金箔。':'金屬可以打成薄片、抽成細絲，稱為延展性。';}}
+    else{r1=`${sm.n}：${sm.cn}、${PT_LU[sm.lu]}`;rc=P.ink;
+      r2=sm.k==='hg'?'汞是常溫下唯一呈液態的金屬。':sm.k==='br'?'溴是常溫下唯一呈液態的非金屬，容易揮發。':(sm.k==='gr'||sm.k==='di')?'鑽石和石墨都是碳：同一種元素，原子排列不同，性質不同。':mt?'金屬都有金屬光澤，大多是銀白色；銅是紅色、金是黃色。':sm.k==='si'?'矽是類金屬，有金屬光澤。':'非金屬大多沒有金屬光澤，顏色各不相同。';}
+    h+=done?T(26,424,r1,{size:21,weight:700,fill:rc})+T(26,454,r2,{size:15.5,fill:P.ink}):T(26,424,'測試中…',{size:21,weight:700,fill:P.muted});
+    /* 紀錄表 */
+    const X=[562,626,680,744,806],tx=556,keys=['elec','heat','ham','look'],rows=PT_SAMP.filter(m=>s.pdone[m.k]);
+    h+=ptPanel(tx,76,330,410,{rx:12})+`<path d="M${tx} 104V88Q${tx} 76 ${tx+12} 76H${tx+318}Q${tx+330} 76 ${tx+330} 88V104Z" fill="#efe9db"/>`;
+    ['樣品','導電','導熱','敲打','外觀'].forEach((c,j)=>{h+=T(X[j]+(j?0:4),96,c,{size:14,weight:700,fill:j&&keys[j-1]===t?P.accent:P.ink});});
+    if(!rows.length)h+=T(tx+165,250,'還沒有紀錄',{size:16,anchor:'middle',fill:P.muted})+T(tx+165,276,'選樣品、選測試，結果會記在這裡',{size:14,anchor:'middle',fill:P.muted});
+    rows.forEach((m,j)=>{const y=104+j*22;if(m.k===s.ps)h+=`<rect x="${tx+2}" y="${y+1}" width="326" height="21" rx="4" fill="#e2f3f0"/>`;
+      h+=`<rect x="${tx+6}" y="${y+5}" width="5" height="13" rx="2" fill="${PT_C[m.cat][1]}"/>`+T(X[0]+10,y+17,m.n,{size:14,weight:700});
+      keys.forEach((k,q)=>{const d=s.pdone[m.k][k];const [v,c]=d?ptRes(m,k):['·',P.faint];h+=T(X[q+1],y+17,v,{size:14,fill:c,weight:d&&k!=='look'?700:400});});});
+    h+=T(tx+12,476,'✦ 有金屬光澤　　— 不適用',{size:13,fill:P.muted});[['m','金屬'],['ml','類金屬'],['n','非金屬']].forEach(([k,t2],j)=>{h+=`<rect x="${22+j*78}" y="76" width="22" height="6" rx="3" fill="${PT_C[k][1]}"/>`+T(48+j*78,84,t2,{size:13,fill:P.muted});});
+    const nT=Object.keys(s.pdone).length;
+    return {svg:h,reads:[['樣品',`${sm.n}（${PT_CATN[sm.cat]}，${PT_FORM[sm.form]}）`],['這項測試',done?ptRes(sm,t)[0].replace('✦','').replace('—','不適用'):'測試中'],['已記錄的樣品',`${nT} 種`]],
+      note:'<b>金屬</b>：有金屬光澤、導電和導熱良好、有延展性，大多是銀白色（銅紅色、金黃色）。<b>非金屬</b>大多相反。<br>例外要記：<b>汞</b>是唯一的液態金屬，<b>溴</b>是唯一的液態非金屬，<b>石墨</b>是非金屬卻能導電。（熔化時間為示意，快慢順序依實際的導熱能力）'};},
+  /* 裝液體或氣體的小燒杯／集氣瓶 */
+  pVessel(sm,cx,by,w,hh){const x1=cx-w/2,x2=cx+w/2,top=by-hh;let h='';
+    if(sm.form==='l'){const ly=by-hh*.5;h+=`<path d="M${x1+3} ${ly}H${x2-3}V${by-8}Q${x2-3} ${by-3} ${x2-8} ${by-3}H${x1+8}Q${x1+3} ${by-3} ${x1+3} ${by-8}Z" fill="${sm.k==='hg'?'url(#ptS)':sm.col}"/>`+(sm.k==='br'?`<rect x="${x1+3}" y="${top+6}" width="${w-6}" height="${ly-top-6}" fill="#b5452f" opacity=".3"/>`:`<path d="M${x1+12} ${ly+5}H${x2-30}" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>`);}
+    else{h+=`<rect x="${x1+3}" y="${top+6}" width="${w-6}" height="${hh-9}" rx="5" fill="#eef6f8" opacity=".7"/>`;for(let i=0;i<9;i++)h+=`<circle cx="${(x1+14+rnd(i+3)*(w-28)).toFixed(1)}" cy="${(top+16+rnd(i+11)*(hh-30)).toFixed(1)}" r="2.5" fill="none" stroke="#9db8c2" stroke-width="1.2"/>`;}
+    h+=`<path d="M${x1} ${top}V${by-10}Q${x1} ${by} ${x1+10} ${by}H${x2-10}Q${x2} ${by} ${x2} ${by-10}V${top}" fill="none" stroke="#83999d" stroke-width="3.5" stroke-linecap="round"/><path d="M${x1+8} ${top+12}V${by-16}" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/>`;
+    if(sm.form==='g'||sm.k==='br')h+=`<rect x="${x1-6}" y="${top-7}" width="${w+12}" height="8" rx="3" fill="#cfe0e5" stroke="#83999d" stroke-width="1.5"/>`;
+    return h;},
+  pElec(s,sm,pp){const cl=clamp((pp-.3)/.4,0,1),on=cl>=1&&!!sm.el,glow=on?clamp((pp-.7)/.4,0,1):0,W='#4a5860',solid=sm.form==='s';
+    const wire=d=>`<path d="${d}" fill="none" stroke="${W}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    let h=wire('M100 330H70V200H150')+wire('M210 200H316')+wire(solid?'M344 200H500V330H438':'M344 200H500V250H386V268')+wire(solid?'M194 330H262':'M194 330H250V250H314V268');
+    /* 開關 */
+    const a=rad(-32*(1-cl));h+=L(150,200,150+60*Math.cos(a),200+60*Math.sin(a),{stroke:'#c8553d',w:5})+`<circle cx="150" cy="200" r="6" fill="#fffdf8" stroke="${W}" stroke-width="2.5"/><circle cx="210" cy="200" r="6" fill="#fffdf8" stroke="${W}" stroke-width="2.5"/>`+T(180,230,cl>=1?'開關：通路':'開關',{size:14,anchor:'middle',fill:P.muted});
+    /* 電池 */
+    h+=`<rect x="100" y="312" width="86" height="36" rx="6" fill="#2f3a40"/><rect x="100" y="312" width="30" height="36" rx="6" fill="#d08a2e"/><rect x="124" y="312" width="8" height="36" fill="#d08a2e"/><rect x="186" y="322" width="8" height="16" rx="2" fill="#9aa3ad"/>`+T(170,336,'＋',{size:15,anchor:'middle',fill:'#fff',weight:700})+T(114,336,'−',{size:16,anchor:'middle',fill:'#fff',weight:700})+T(143,366,'電池',{size:14,anchor:'middle',fill:P.muted});
+    /* 燈泡 */
+    if(glow>0){h+=`<circle cx="330" cy="142" r="72" fill="url(#ptGlow)" opacity="${glow.toFixed(2)}"/>`;for(let i=0;i<10;i++){const b=rad(-90+(i-4.5)*30),r1=46,r2=58+5*Math.sin(s.t*3+i);h+=L(330+r1*Math.cos(b),142+r1*Math.sin(b),330+r2*Math.cos(b),142+r2*Math.sin(b),{stroke:'#f0b429',w:3,op:(glow*.8).toFixed(2)});}}
+    h+=`<path d="M318 170Q296 156 298 138A32 32 0 0 1 362 138Q364 156 342 170V184H318Z" fill="${glow>0?ptMix('#f7fbfd','#fff0a8',glow):'#f7fbfd'}" stroke="#8fa3a8" stroke-width="2" stroke-linejoin="round"/><path d="M322 184L325 152Q330 138 335 152L338 184" fill="none" stroke="${glow>0?'#f08c1a':'#6b777e'}" stroke-width="${glow>0?2.5:1.8}" stroke-linejoin="round"/>`
+      +`<rect x="316" y="182" width="28" height="20" rx="3" fill="#8d99a3"/><path d="M316 188H344M316 194H344" stroke="#6b777e" stroke-width="1.5"/>`+T(388,128,'燈泡',{size:14,fill:P.muted});
+    if(pp>=1.1)h+=T(388,156,sm.el?'亮了':'不亮',{size:22,weight:700,fill:sm.el?'#c47a00':P.red});
+    /* 樣品 */
+    if(solid){h+=`<rect x="270" y="319" width="160" height="22" rx="${sm.k==='di'?3:7}" fill="url(#ptS)" stroke="${ptMix(sm.col,'#000000',.4)}" stroke-width="1.5"/>`+(sm.lu?`<path d="M280 324H400" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity="${sm.lu===2?.8:.35}"/>`:'')
+        +`<rect x="255" y="320" width="20" height="20" rx="4" fill="#6b777e"/><rect x="425" y="320" width="20" height="20" rx="4" fill="#6b777e"/>`+T(350,364,sm.n+'棒',{size:15,anchor:'middle',weight:700});}
+    else{h+=`<rect x="310" y="262" width="8" height="${sm.form==='l'?92:70}" rx="2" fill="#3d4248"/><rect x="382" y="262" width="8" height="${sm.form==='l'?92:70}" rx="2" fill="#3d4248"/>`+this.pVessel(sm,350,372,124,92)+T(446,330,sm.n,{size:15,weight:700})+T(446,350,sm.form==='l'?'（液體）':'（氣體）',{size:14,fill:P.muted});}
+    return h;},
+  pHeat(s,sm,pp){const ok=ptHeatOK(sm);let h='';
+    /* 鐵架 */
+    h+=`<rect x="50" y="360" width="110" height="12" rx="4" fill="url(#ptSteel)"/><rect x="96" y="120" width="9" height="242" rx="3" fill="url(#ptSteel)"/><rect x="92" y="240" width="62" height="10" rx="3" fill="#6b777e"/><rect x="140" y="233" width="14" height="34" rx="4" fill="#4a5860"/>`;
+    /* 酒精燈 */
+    const lit=ok&&pp>0,fl=6*Math.sin(s.t*11)+3*Math.sin(s.t*23);
+    h+=`<path d="M186 372Q170 372 172 356L184 326Q188 316 202 316H234Q248 316 252 326L264 356Q266 372 250 372Z" fill="#dff0f5" stroke="#83999d" stroke-width="2.5"/><path d="M178 352L186 334H250L258 352Q262 368 248 368H188Q174 368 178 352Z" fill="#9fd0e6" opacity=".7"/><rect x="208" y="302" width="20" height="16" rx="3" fill="#8d99a3"/><rect x="215" y="294" width="6" height="10" fill="#f3efe4" stroke="#b9b3a4"/>`+T(272,364,'酒精燈',{size:14,fill:P.muted});
+    if(lit)h+=`<path d="M207 296Q200 280 ${(218+fl*.4).toFixed(1)} ${(258+fl*.3).toFixed(1)}Q236 280 229 296Q218 302 207 296Z" fill="url(#ptFlame)" opacity=".92"/>`;
+    if(!ok){h+=`<rect x="150" y="241" width="320" height="18" rx="6" fill="#efe9db" stroke="#cfc9ba" stroke-width="1.5" stroke-dasharray="6 5"/>`+T(310,222,'（沒有固體棒可以測）',{size:15,anchor:'middle',fill:P.muted});
+      h+=`<g transform="translate(0 0)">${sm.form!=='s'?this.pVessel(sm,440,372,90,74):''}</g>`+(sm.form!=='s'?T(440,290,sm.n,{size:15,anchor:'middle',weight:700}):'');return h;}
+    const good=sm.kt>=50,tm=good?ptTm(sm):600,fr=clamp(pp/tm,0,1),xf=200+270*fr,mlt=good?clamp((pp-tm)/1.3,0,1):0;
+    h+=`<rect x="150" y="241" width="320" height="18" rx="${sm.k==='di'?3:6}" fill="url(#ptS)" stroke="${ptMix(sm.col,'#000000',.4)}" stroke-width="1.5"/>`;
+    if(pp>0){const gid='ptH';h+=`<defs><linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="186" y1="0" x2="${Math.max(232,xf).toFixed(1)}" y2="0"><stop offset="0" stop-color="#ff4b2b" stop-opacity=".1"/><stop offset=".12" stop-color="#ff4b2b" stop-opacity="${(.45+.4*Math.min(1,pp/1.2)).toFixed(2)}"/><stop offset="1" stop-color="#ff7a2b" stop-opacity="0"/></linearGradient></defs><rect x="186" y="242" width="${(Math.max(232,xf)-186).toFixed(1)}" height="16" rx="5" fill="url(#${gid})"/>`;
+      if(good&&fr<1)h+=`<path d="M${xf.toFixed(1)} 232v-12m-5 6l5-6l5 6" fill="none" stroke="${P.red}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" transform="rotate(90 ${xf.toFixed(1)} 224)"/>`+T(Math.min(xf,440),212,'熱',{size:15,anchor:'middle',weight:700,fill:P.red});}
+    /* 蠟 */
+    const rx=16+8*mlt,ry=12-9*mlt;h+=`<path d="M${445-rx} 241A${rx} ${ry} 0 0 1 ${445+rx} 241Z" fill="#f2d264" stroke="#b9972e" stroke-width="1.5"/>`;
+    if(mlt>0){const ph=(pp-tm)*1.4%1,dy=259+ph*ph*105;if(pp<tm+1.7)h+=`<path d="M445 ${(dy-7).toFixed(1)}q5 8 0 11q-5-3 0-11Z" fill="#f1dc8c" stroke="#c9b56a"/>`;h+=`<path d="M463 250v${(6+6*mlt).toFixed(1)}" stroke="#f1dc8c" stroke-width="5" stroke-linecap="round"/><ellipse cx="445" cy="371" rx="${(6+16*mlt).toFixed(1)}" ry="3" fill="#f1dc8c" stroke="#c9b56a"/>`;}
+    h+=L(445,196,445,224,{stroke:P.muted,w:1.5})+T(445,190,mlt>0?'蠟熔化了':'蠟',{size:15,anchor:'middle',weight:700,fill:mlt>0?P.red:P.ink})+T(310,284,sm.n+'棒',{size:15,anchor:'middle',weight:700});
+    /* 計時 */
+    const shown=good?Math.min(pp,tm):pp;h+=ptPanel(396,84,140,62,{rx:12})+T(466,106,'加熱時間',{size:14,anchor:'middle',fill:P.muted})+T(466,136,shown.toFixed(1)+' 秒',{size:24,anchor:'middle',weight:700,fill:mlt>0?P.red:P.ink});
+    return h;},
+  pHam(s,sm,pp){let h='';
+    h+=`<path d="M176 300H384Q392 300 386 308L352 330V352H372V372H188V352H208V330L174 308Q168 300 176 300Z" fill="url(#ptSteel)" stroke="#3b454c" stroke-width="1.5" stroke-linejoin="round"/><path d="M182 303H378" stroke="#c4ced6" stroke-width="2" stroke-linecap="round"/>`+T(280,352,'鐵砧',{size:14,anchor:'middle',fill:'#e8eef2'});
+    if(sm.br<0){h+=this.pVessel(sm,450,372,96,80)+T(450,280,sm.n,{size:15,anchor:'middle',weight:700})
+        +`<g transform="rotate(28 480 270)"><rect x="302" y="262" width="178" height="9" rx="4" fill="#b98b55"/><rect x="258" y="250" width="44" height="32" rx="5" fill="url(#ptSteel)"/></g>`;return h;}
+    const H=sm.br?[.9]:[.9,1.7,2.5],hits=H.filter(x=>pp>=x).length,since=hits?pp-H[hits-1]:1,f=clamp(since/.1,0,1);
+    const RX=[30,45,60,74],RY=[17,11,7,4.5],k0=Math.max(0,hits-1);let rx=30,ry=17,ytop;
+    if(!sm.br){rx=RX[k0]+(RX[hits]-RX[k0])*f;ry=RY[k0]+(RY[hits]-RY[k0])*f;}
+    if(sm.br&&hits){const f2=clamp(since/.4,0,1),e2=1-(1-f2)*(1-f2);for(let i=0;i<11;i++){const dx=(rnd(i+2)-.5)*230,land=Math.abs(dx)<96?300:372,x=280+dx*e2,y=(300-12)+(land-6-(300-12))*f2*f2-40*Math.sin(Math.PI*f2)*rnd(i+8),r=5+rnd(i+5)*8,a=rnd(i)*360+f2*200*(rnd(i+1)-.5);
+        h+=`<path d="M${-r} ${r*.6}L${-r*.2} ${-r}L${r} ${r*.5}Z" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a.toFixed(0)})" fill="${i%3?sm.col:ptMix(sm.col,'#ffffff',.3)}" stroke="${ptMix(sm.col,'#000000',.4)}" stroke-width="1.2" stroke-linejoin="round"/>`;}
+      ytop=300-34+28*f;}
+    else{h+=`<ellipse cx="280" cy="${(300-ry).toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="url(#ptS)" stroke="${ptMix(sm.col,'#000000',.4)}" stroke-width="1.5"/>`+(sm.lu?`<path d="M${(280-rx*.6).toFixed(1)} ${(300-ry*1.5).toFixed(1)}Q280 ${(300-ry*1.95).toFixed(1)} ${(280+rx*.4).toFixed(1)} ${(300-ry*1.6).toFixed(1)}" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity="${sm.lu===2?.8:.3}"/>`:'');ytop=300-2*ry;}
+    let ang;if(hits>=H.length)ang=Math.min(30,(pp-H[H.length-1])*150);else{const t1=H[hits],u=clamp((pp-(t1-.8))/.8,0,1);ang=u<.6?44*Math.sin(u/.6*Math.PI/2):44*(1-Math.pow((u-.6)/.4,2));}
+    h+=`<g transform="rotate(${ang.toFixed(1)} 486 ${(ytop-15).toFixed(1)})"><rect x="300" y="${(ytop-20).toFixed(1)}" width="186" height="10" rx="5" fill="#b98b55" stroke="#8a6238"/><rect x="432" y="${(ytop-23).toFixed(1)}" width="58" height="16" rx="8" fill="#8a6238"/><rect x="258" y="${(ytop-32).toFixed(1)}" width="46" height="32" rx="5" fill="url(#ptSteel)" stroke="#3b454c" stroke-width="1.5"/></g>`;
+    if(hits&&since<.14)for(let i=0;i<7;i++){const b=rad(-170+i*27),r1=44,r2=62;h+=L(280+r1*Math.cos(b),290+r1*.6*Math.sin(b),280+r2*Math.cos(b),290+r2*.6*Math.sin(b),{stroke:'#f0b429',w:3});}
+    h+=T(40,134,sm.n+'：'+(sm.br?(hits?'碎了':'敲一下'):`敲了 ${hits} 下`),{size:21,weight:700,fill:sm.br&&hits?P.red:P.ink})+T(40,162,sm.br?(hits?'碎成小塊':''):hits?'越敲越薄、越寬，沒有裂開':'',{size:15,fill:P.muted});
+    return h;},
+  pLook(s,sm,pp){let h='';
+    /* 檯燈 */
+    h+=`<path d="M70 372V190Q70 120 130 112" fill="none" stroke="#4a5860" stroke-width="7" stroke-linecap="round"/><rect x="40" y="362" width="62" height="10" rx="4" fill="#4a5860"/><path d="M120 92L176 112L160 146L112 128Z" fill="#df7c44" stroke="#a85628" stroke-width="1.5" stroke-linejoin="round"/><path d="M136 137L160 146L330 360H150Z" fill="#ffe680" opacity=".2"/>`;
+    h+=`<ellipse cx="270" cy="352" rx="150" ry="16" fill="#eef6f8" stroke="#83999d" stroke-width="2.5"/>`;
+    const dk=ptMix(sm.col,'#000000',.4);
+    if(sm.form==='g'){h+=`<g transform="translate(0 -24)">${this.pVessel(sm,270,372,120,150)}</g>`+T(270,180,'無色的氣體，看不見',{size:14,anchor:'middle',fill:P.muted});}
+    else if(sm.k==='br'){h+=`<path d="M254 196H286V226Q318 236 318 262V330Q318 344 304 344H236Q222 344 222 330V262Q222 236 254 226Z" fill="#b5452f" fill-opacity=".28" stroke="#83999d" stroke-width="3" stroke-linejoin="round"/><path d="M225 296H315V330Q315 341 304 341H236Q225 341 225 330Z" fill="${sm.col}"/><rect x="250" y="182" width="40" height="18" rx="5" fill="#c9a877" stroke="#8a6238"/><path d="M232 262V322" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".6"/>`+T(212,254,'紅棕色蒸氣',{size:14,anchor:'end',fill:P.muted})+T(212,322,'暗紅色液體',{size:14,anchor:'end',fill:P.muted});}
+    else if(sm.k==='hg'){[[230,334,38,13],[300,338,26,10],[268,318,16,7],[336,330,12,6],[196,340,10,5]].forEach(([x,y,a,b])=>{h+=`<ellipse cx="${x}" cy="${y}" rx="${a}" ry="${b}" fill="url(#ptS)" stroke="${dk}" stroke-width="1.2"/><ellipse cx="${x-a*.35}" cy="${y-b*.4}" rx="${a*.3}" ry="${b*.22}" fill="#fff" opacity=".9"/>`;});h+=T(270,290,'會聚成小圓珠的液體',{size:14,anchor:'middle',fill:P.muted});}
+    else if(sm.k==='di'){h+=`<path d="M210 262L240 228H300L330 262L270 344Z" fill="#e4f6fd" stroke="#6fa8c0" stroke-width="2" stroke-linejoin="round"/><path d="M210 262H330M240 228L252 262L270 344L288 262L300 228M252 262L270 228L288 262" fill="none" stroke="#6fa8c0" stroke-width="1.3" stroke-linejoin="round"/><path d="M240 228L252 262H210Z" fill="#fff" opacity=".7"/>`;
+      for(let i=0;i<4;i++){const tw=.5+.5*Math.sin(s.t*3+i*1.7),x=[226,300,270,318][i],y=[240,246,300,270][i],r=7*tw;h+=`<path d="M${x} ${y-r}L${x+r*.25} ${y-r*.25}L${x+r} ${y}L${x+r*.25} ${y+r*.25}L${x} ${y+r}L${x-r*.25} ${y+r*.25}L${x-r} ${y}L${x-r*.25} ${y-r*.25}Z" fill="#fff" stroke="#9fd0e6" stroke-width=".8"/>`;}}
+    else{const d='M196 318L214 262L262 236L318 244L348 286L336 334L270 346L212 340Z';
+      h+=`<defs><clipPath id="ptLk"><path d="${d}"/></clipPath><linearGradient id="ptS2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${ptMix(sm.col,'#ffffff',sm.lu===2?.6:sm.lu?.25:.18)}"/><stop offset=".5" stop-color="${sm.col}"/><stop offset="1" stop-color="${ptMix(sm.col,'#000000',.38)}"/></linearGradient></defs>`
+        +`<path d="${d}" fill="url(#ptS2)" stroke="${dk}" stroke-width="2" stroke-linejoin="round"/><path d="M214 262L250 290L262 236M250 290L318 244M250 290L270 346M250 290L196 318M318 244L310 300L348 286M310 300L336 334M310 300L270 346" fill="none" stroke="${dk}" stroke-width="1" opacity=".35"/>`;
+      if(sm.lu){const sx=150+((s.t*90)%330);h+=`<g clip-path="url(#ptLk)"><path d="M${sx.toFixed(1)} 220l26 0l-50 140l-26 0Z" fill="#fff" opacity="${sm.lu===2?.6:.22}"/><path d="M${(sx+38).toFixed(1)} 220l8 0l-50 140l-8 0Z" fill="#fff" opacity="${sm.lu===2?.4:.12}"/></g>`;}}
+    h+=T(270,392-0,'',{size:14});
+    [['顏色',sm.cn],['光澤',PT_LU[sm.lu]],['常溫狀態',PT_FORM[sm.form]]].forEach(([a,b],j)=>{const y=96+j*74;h+=ptPanel(408,y,128,62,{rx:12})+T(420,y+22,a,{size:14,fill:P.muted})+T(420,y+49,b,{size:19,weight:700,fill:j===1&&sm.lu===2?P.accent:P.ink});});
+    h+=T(270,104,sm.n,{size:24,anchor:'middle',weight:700})+T(270,130,`${PT_CATN[sm.cat]}　原子序 ${sm.z}`,{size:15,anchor:'middle',fill:P.muted});
+    return h;},
+
+  /* ---------- 3 週期表 ---------- */
+  table(s){const tc=s.tc,E=PT_E.slice(1),sel=PT_E[clamp(s.tsel,1,118)],CW=46.5,CH=48;
+    const XY=e=>e.f?[30+(e.f+1)*47.5,385+(e.p-6)*49]:[30+(e.g-1)*47.5,30+(e.p-1)*49];
+    const sty=e=>tc==='cat'?PT_C[e.cat]:tc==='state'?PT_C[e.st]:tc==='fam'?(e.g===s.tg&&!e.f?(e.z===1?PT_C.n:PT_C.hi):PT_C.dim):(e.z<=20?PT_C[e.cat]:PT_C.dim);
+    let h='';
+    for(let g=1;g<=18;g++)h+=T(30+(g-1)*47.5+CW/2,24,g,{size:14,anchor:'middle',weight:700,fill:tc==='fam'&&g===s.tg?P.accent:P.muted});
+    for(let p=1;p<=7;p++)h+=T(19,30+(p-1)*49+30,p,{size:14,anchor:'middle',weight:700,fill:P.muted});
+    for(const e of E){const [x,y]=XY(e),c=sty(e),dim=c===PT_C.dim;
+      h+=`<g data-tap="e:${e.z}" tabindex="0" role="button" aria-label="${e.z} ${e.sym} ${e.name}" style="cursor:pointer"><rect x="${x}" y="${y}" width="${CW}" height="${CH}" rx="5" fill="${c[0]}" stroke="${c[1]}" stroke-width="1.3"${c===PT_C.u?' stroke-dasharray="4 3"':''}/>`
+        +T(x+4,y+14,e.z,{size:13,fill:dim?'#aaa392':P.muted})+(e.name?T(x+CW-4,y+15,e.name,{size:13,anchor:'end',fill:dim?'#aaa392':P.ink}):'')+T(x+CW/2,y+40,e.sym,{size:21,anchor:'middle',weight:700,fill:dim?'#aaa392':P.ink})+`</g>`;}
+    /* 鑭系、錒系的位置 */
+    [[6,'57–71','鑭系'],[7,'89–103','錒系']].forEach(([p,r,nm])=>{const x=30+2*47.5,y=30+(p-1)*49;h+=`<rect x="${x}" y="${y}" width="${CW}" height="${CH}" rx="5" fill="#fbf8f0" stroke="#cfc9ba" stroke-width="1.3" stroke-dasharray="4 3"/>`+T(x+CW/2,y+21,r,{size:13,anchor:'middle',fill:P.muted})+T(x+CW/2,y+39,nm,{size:13,anchor:'middle',fill:P.muted})
+      +T(116,385+(p-6)*49+22,nm,{size:15,anchor:'end',weight:700,fill:P.muted})+T(116,385+(p-6)*49+40,r,{size:13,anchor:'end',fill:P.muted});});
+    h+=`<path d="M${30+2*47.5+CW/2} ${30+7*49-1}V${379}" stroke="#cfc9ba" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+    /* 選取框 */
+    {const [x,y]=XY(sel);h+=`<rect x="${x-1.5}" y="${y-1.5}" width="${CW+3}" height="${CH+3}" rx="6" fill="none" stroke="${P.ink}" stroke-width="3" pointer-events="none"/>`;}
+    /* 資料卡：放在過渡元素上方的空位 */
+    {const e=sel,x=129,y=33,c=PT_C[e.cat],fam=ptFam(e),use=ptWrap(ptUse(e),21).slice(0,3);
+      h+=ptPanel(x,y,467,140,{rx:12,stroke:'#b9b3a4'})+`<rect x="${x+10}" y="${y+10}" width="100" height="120" rx="10" fill="${c[0]}" stroke="${c[1]}" stroke-width="2"/>`+T(x+20,y+32,e.z,{size:17,weight:700,fill:P.muted})+T(x+60,y+84,e.sym,{size:44,weight:700,anchor:'middle'})+T(x+60,y+117,e.name,{size:24,anchor:'middle'});
+      h+=T(x+124,y+30,`原子序 ${e.z}　第 ${e.p} 週期　${e.f?(e.p===6?'鑭系':'錒系'):'第 '+e.g+' 族'}`,{size:17,weight:700});
+      h+=T(x+124,y+56,(fam?fam+'｜':'')+PT_CATN[e.cat]+'｜常溫：'+PT_STN[e.st],{size:16,fill:P.accent,weight:700});
+      h+=ptLines(x+124,y+82,use,{size:15,gap:21});
+      if(e.z===1)h+=T(x+124,y+124,'氫在第 1 族，但它是非金屬，不是鹼金屬。',{size:14,fill:P.red});}
+    /* 圖例 */
+    const leg=tc==='cat'||tc==='f20'?[['m','金屬'],['ml','類金屬'],['n','非金屬']]:tc==='state'?[['s','固態'],['l','液態'],['g','氣態'],['u','未確定']]:[['hi','第 '+s.tg+' 族：'+(s.tg===18?'鈍氣':PT_GN[s.tg])],...(s.tg===1?[['n','氫：非金屬']]:[])];
+    leg.forEach(([k,t],j)=>{const wide=tc==='fam',x=606+(wide?0:(j%2)*112),y=47+(wide?j:Math.floor(j/2))*23;h+=`<rect x="${x}" y="${y-13}" width="15" height="15" rx="3" fill="${PT_C[k][0]}" stroke="${PT_C[k][1]}" stroke-width="1.5"${k==='u'?' stroke-dasharray="3 2"':''}/>`+T(x+21,y,t,{size:14});});
+    /* 讀數 */
+    const cnt=(arr,f)=>arr.filter(f).length;let reads,note;
+    if(tc==='cat'){reads=[['金屬',cnt(E,e=>e.cat==='m')+' 種'],['類金屬',cnt(E,e=>e.cat==='ml')+' 種'],['非金屬',cnt(E,e=>e.cat==='n')+' 種']];
+      note='<b>金屬</b>在左邊和中間，占大多數；<b>非金屬</b>集中在右上角（氫例外，在左上角）；<b>類金屬</b>（硼、矽、鍺、砷、銻、碲）在兩者的交界。';}
+    else if(tc==='state'){reads=[['固態',cnt(E,e=>e.st==='s')+' 種'],['液態',cnt(E,e=>e.st==='l')+' 種（汞、溴）'],['氣態',cnt(E,e=>e.st==='g')+' 種'],['未確定',cnt(E,e=>e.st==='u')+' 種']];
+      note='常溫常壓下，液態的只有<b>汞</b>（金屬）和<b>溴</b>（非金屬）；氣態的有氫、氮、氧、氟、氯和第 18 族的鈍氣；其餘都是固態。<br>104 號以後是人工合成的元素，數量極少，狀態還不確定。';}
+    else if(tc==='fam'){const G=E.filter(e=>e.g===s.tg&&!e.f),nm=s.tg===18?'鈍氣':PT_GN[s.tg];reads=[['第 '+s.tg+' 族',PT_GN[s.tg]],['這一直行',G.length+' 種元素'],['金屬／非金屬',`${cnt(G,e=>e.cat==='m')} ／ ${cnt(G,e=>e.cat!=='m')} 種`]];
+      note=`<b>同一族（同一直行）的元素，化學性質相似。</b><br>第 ${s.tg} 族：`+G.map(e=>e.name||e.sym).join('、')+'。'+(s.tg===1?'氫以外的 6 種是<b>鹼金屬</b>，都很活潑，遇水劇烈反應。':s.tg===2?'都是金屬，稱為<b>鹼土金屬</b>。':s.tg===17?'稱為<b>鹵素</b>，是活潑的非金屬。':'稱為<b>'+nm+'</b>，幾乎不和其他物質反應。');}
+    else{const F=E.filter(e=>e.z<=20);reads=[['前 20 號：金屬',cnt(F,e=>e.cat==='m')+' 種'],['類金屬',cnt(F,e=>e.cat==='ml')+' 種'],['非金屬',cnt(F,e=>e.cat==='n')+' 種']];
+      note='前 20 號：氫氦｜鋰鈹硼碳氮氧氟氖｜鈉鎂鋁矽磷硫氯氬｜鉀鈣。每個週期由左到右原子序加 1。<br>第 1 週期 2 種、第 2 和第 3 週期各 8 種；第 4 週期從鉀、鈣開始。';}
+    if(tc==='cat'||tc==='state')note+=`<br>週期表依<b>原子序</b>排列：橫列是<b>週期</b>（共 7 個），直行是<b>族</b>（第 1～18 族）。現在選的 ${sel.name||sel.sym} 在第 ${sel.p} 週期${sel.f?'':'、第 '+sel.g+' 族'}。`;
+    return {svg:h,reads,note};},
+
+  /* ---------- 4 同族元素性質相似 ---------- */
+  family(s){return s.fam==='ae'?(s.aem==='ca'?this.fCa(s):this.fMg(s)):s.fam==='hal'?this.fHal(s):s.fam==='noble'?this.fNoble(s):this.fAlk(s);},
+  fAlk(s){const M={li:{n:'鋰',D:14,A:34,w:.8,col:'#aeb6bd',oh:'氫氧化鋰',p:2,nb:6,say:'浮在水面，慢慢冒出氣泡'},na:{n:'鈉',D:7,A:118,w:2.3,col:'#d3d8dc',oh:'氫氧化鈉',p:3,nb:10,say:'熔成小球，在水面快速游動'},k:{n:'鉀',D:3.5,A:122,w:4.4,col:'#c9cfd4',oh:'氫氧化鉀',p:4,nb:14,say:'反應最劇烈，冒出紫色火焰'}}[s.am]||{};
+    const t0=.9,fp=s.fp,tr=fp-t0,q=clamp(tr/M.D,0,1),X=t=>280+M.A*(.62*Math.sin(M.w*t)+.38*Math.sin(1.7*M.w*t+1)),x0=X(0),[back,front]=ptBeaker(q,0);
+    let h=PT_DEFS+T(30,44,'第 1 族　鹼金屬',{size:22,weight:700})+T(30,72,'平常保存在石油中；質軟，用小刀切一小塊來做實驗',{size:15,fill:P.muted})+back;
+    /* 酚酞變紅的痕跡 */
+    if(tr>0&&q<1){let g='';for(let j=1;j<=12;j++){const tj=tr-j*M.D/18;if(tj<0)break;g+=`<circle cx="${X(tj).toFixed(1)}" cy="${252+j*8}" r="${22+j*8}" fill="url(#ptPink)"/>`;}h+=`<g clip-path="url(#ptWater)">${g}</g>`;}
+    if(tr<0){const y=fp<.3?158:158+78*Math.pow((fp-.3)/.6,2);h+=L(x0-16,118,x0-6,150,{stroke:'#8d99a3',w:4})+L(x0+16,118,x0+6,150,{stroke:'#8d99a3',w:4})+`<rect x="${(x0-11).toFixed(1)}" y="${(y-9).toFixed(1)}" width="22" height="18" rx="4" fill="${M.col}" stroke="#7b858d" stroke-width="1.5"/>`;}
+    else if(q<1){const r=12*Math.sqrt(1-q)+2,x=X(tr),cy=240-r*.3+1.5*Math.sin(s.t*9);
+      for(let i=0;i<M.nb;i++){const ph=(tr*(1.6+rnd(i)*1.6)+rnd(i+9))%1;h+=`<circle cx="${(x+(rnd(i+3)-.5)*(2*r+26)).toFixed(1)}" cy="${(240-ph*(8+rnd(i+5)*22)).toFixed(1)}" r="${(1.6+rnd(i+7)*2.6).toFixed(1)}" fill="#fff" stroke="#7fb2c4" stroke-width="1.2" opacity="${(1-ph).toFixed(2)}"/>`;}
+      if(s.am==='k'){const fh=30+7*Math.sin(s.t*19),y=cy-r*.4;h+=`<path d="M${(x-10).toFixed(1)} ${y.toFixed(1)}Q${(x-13).toFixed(1)} ${(y-16).toFixed(1)} ${x.toFixed(1)} ${(y-fh).toFixed(1)}Q${(x+13).toFixed(1)} ${(y-16).toFixed(1)} ${(x+10).toFixed(1)} ${y.toFixed(1)}Z" fill="#b592ee" opacity=".9"/><path d="M${(x-5).toFixed(1)} ${y.toFixed(1)}Q${(x-6).toFixed(1)} ${(y-9).toFixed(1)} ${x.toFixed(1)} ${(y-fh*.55).toFixed(1)}Q${(x+6).toFixed(1)} ${(y-9).toFixed(1)} ${(x+5).toFixed(1)} ${y.toFixed(1)}Z" fill="#f1e8ff"/>`;}
+      h+=s.am==='li'?`<rect x="${(x-r).toFixed(1)}" y="${(cy-r*.8).toFixed(1)}" width="${(2*r).toFixed(1)}" height="${(1.6*r).toFixed(1)}" rx="3" fill="${M.col}" stroke="#7b858d" stroke-width="1.5"/>`:`<circle cx="${x.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${M.col}" stroke="#7b858d" stroke-width="1.5"/><circle cx="${(x-r*.35).toFixed(1)}" cy="${(cy-r*.35).toFixed(1)}" r="${(r*.28).toFixed(1)}" fill="#fff" opacity=".9"/>`;
+      h+=T(x,cy-r-(s.am==='k'?46:16),'氫氣',{size:14,anchor:'middle',fill:P.muted,weight:700});}
+    h+=front+T(280,106,tr<0?`把一小塊${M.n}投入滴有酚酞的水中`:q<1?`${M.n}：${M.say}`:'反應結束：水溶液變成紅色',{size:18,anchor:'middle',weight:700,fill:q>=1?'#b3144f':P.ink});
+    h+=q>=1?T(280,340,'酚酞變紅 → 水溶液呈鹼性',{size:21,anchor:'middle',weight:700,fill:'#8f0f3f'}):T(280,408,q>.02?'酚酞遇到鹼性溶液變紅':'水＋酚酞（無色）',{size:15,anchor:'middle',fill:'#4f6b76'});
+    h+=T(280,468,`${M.n} ＋ 水 → ${M.oh} ＋ 氫氣`,{size:18,anchor:'middle',weight:700});
+    h+=ptFamSide(1,[2,3,4],M.p,'第 1 族（氫除外）：鹼金屬',['質軟，可以用小刀切開','密度比水小，浮在水面上','和水反應，產生氫氣','水溶液呈鹼性（酚酞變紅）','鈉、鉀要保存在石油中'],300);
+    h+=T(600,176,'和水反應的劇烈程度（示意）',{size:14,fill:P.muted});
+    [['li','鋰',1],['na','鈉',2],['k','鉀',3]].forEach(([k,n,v],j)=>{const y=186+j*25,on=k===s.am;h+=T(600,y+15,n,{size:16,weight:700,fill:on?P.accent:P.ink})+`<rect x="628" y="${y+2}" width="${v*76}" height="15" rx="7.500" fill="${on?P.accent:'#d7d1c2'}"/>`;});
+    return {svg:h,reads:[['金屬',`${M.n}（第 ${M.p} 週期、第 1 族）`],['反應進度',tr<0?'還沒放入':q<1?Math.round(q*100)+'%':'反應完畢'],['反應所需時間',M.D+' 秒（示意）']],
+      note:`鋰、鈉、鉀同在第 1 族，和水反應的結果<b>相似</b>：都浮在水面、產生<b>氫氣</b>、水溶液呈<b>鹼性</b>（酚酞變紅）。<br>劇烈程度不同：<b>鉀 ＞ 鈉 ＞ 鋰</b>。在週期表上的位置，可以用來預測元素的性質。`};},
+  fCa(s){const fp=s.fp,D=12,q=clamp((fp-.9)/D,0,1),[back,front]=ptBeaker(q,q);
+    let h=PT_DEFS+T(30,44,'第 2 族　鹼土金屬',{size:22,weight:700})+T(30,72,'和同週期的鉀比一比：鈣的反應緩和得多',{size:15,fill:P.muted})+back;
+    const r=10*Math.sqrt(1-q)+2,gy=fp<.3?158:fp<.9?158+82*Math.pow((fp-.3)/.6,2):Math.min(424-r,240+(fp-.9)*150);
+    if(fp<.9)h+=L(264,118,274,150,{stroke:'#8d99a3',w:4})+L(296,118,286,150,{stroke:'#8d99a3',w:4});
+    if(fp>=.9&&q<1)for(let i=0;i<16;i++){const ph=(fp*.55+rnd(i)*7)%1,by=gy-ph*(gy-244);if(by<gy-4)h+=`<circle cx="${(280+(rnd(i+3)-.5)*34+6*Math.sin(ph*9+i)).toFixed(1)}" cy="${by.toFixed(1)}" r="${(2+rnd(i+7)*3).toFixed(1)}" fill="#fff" fill-opacity=".8" stroke="#7fb2c4" stroke-width="1.2"/>`;}
+    if(q<1)h+=`<rect x="${(280-r).toFixed(1)}" y="${(gy-r*.8).toFixed(1)}" width="${(2*r).toFixed(1)}" height="${(1.6*r).toFixed(1)}" rx="4" fill="#c2c8cd" stroke="#7b858d" stroke-width="1.5"/>`;
+    h+=front+T(280,106,fp<.9?'把一小塊鈣投入滴有酚酞的水中':q<1?'鈣沉到杯底，持續冒出氫氣的氣泡':'反應結束：水溶液變紅，而且有些混濁',{size:18,anchor:'middle',weight:700,fill:q>=1?'#b3144f':P.ink});
+    h+=q>=1?T(280,340,'酚酞變紅 → 水溶液呈鹼性',{size:21,anchor:'middle',weight:700,fill:'#8f0f3f'}):T(190,404,q>.02?'酚酞遇到鹼性溶液變紅':'水＋酚酞（無色）',{size:15,anchor:'middle',fill:'#4f6b76'});
+    h+=T(280,468,'鈣 ＋ 水 → 氫氧化鈣 ＋ 氫氣',{size:18,anchor:'middle',weight:700});
+    h+=ptFamSide(2,[3,4],4,'第 2 族：鹼土金屬',['鈹、鎂、鈣、鍶、鋇、鐳','都是銀白色的金屬','活性比同週期的鹼金屬小','鈣和水反應產生氫氣，','　水溶液呈鹼性，但比鈉緩和','鎂帶燃燒發出強烈白光，','　生成白色的氧化鎂','鈣的密度比水大，會沉下去'],184);
+    return {svg:h,reads:[['金屬','鈣（第 4 週期、第 2 族）'],['反應進度',fp<.9?'還沒放入':q<1?Math.round(q*100)+'%':'反應完畢'],['反應所需時間',D+' 秒（示意）']],
+      note:'鈣和水反應也產生<b>氫氣</b>，水溶液呈<b>鹼性</b>，但比同週期的鉀（第 1 族）緩和。<br>鎂、鈣同在第 2 族，化學性質相似，都能在空氣中燃燒，也都能和酸反應產生氫氣。'};},
+  fMg(s){const fp=s.fp,b=clamp((fp-.7)/6.3,0,1),lit=fp>.7&&b<1,A=[150,172],B=[440,262],Pt=u=>[B[0]+(A[0]-B[0])*u*.82,B[1]+(A[1]-B[1])*u*.82],[px,py]=Pt(b);
+    let h=PT_DEFS+T(30,44,'第 2 族　鹼土金屬',{size:22,weight:700})+T(290,74,fp<.7?'用坩堝鉗夾住鎂帶，在酒精燈上點燃':lit?'鎂帶燃燒：發出強烈的白光（不可直視）':'燒完後留下白色粉末：氧化鎂',{size:18,anchor:'middle',weight:700,fill:lit?P.red:P.ink});
+    h+=`<rect x="30" y="88" width="520" height="350" rx="16" fill="#26333b"/>`;
+    h+=`<ellipse cx="330" cy="408" rx="96" ry="12" fill="#dfe6ea" stroke="#9aa9b1" stroke-width="2"/><ellipse cx="330" cy="405" rx="80" ry="8" fill="#c9d3d9"/>`;
+    /* 氧化鎂粉末 */
+    const N=26,cnt=Math.floor(b*N+1e-6);for(let i=0;i<cnt;i++){const age=(fp-.7)-i/N*6.3,[sx,sy]=Pt(i/N),tx=330+(rnd(i+4)-.5)*120,ty=402-rnd(i+2)*9,f=clamp(age/.8,0,1),x=sx+(tx-sx)*f,y=sy+(ty-sy)*f*f;h+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(3+rnd(i)*3).toFixed(1)}" fill="#f6f8f9" stroke="#cfd8dd" stroke-width=".8"/>`;}
+    if(b<1)h+=L(A[0],A[1],px,py,{stroke:'#b7bec4',w:8})+L(A[0]+2,A[1]-2,px,py-2.5,{stroke:'#eef1f3',w:2});
+    h+=L(48,122,160,178,{stroke:'#8d99a3',w:6})+L(66,104,156,168,{stroke:'#aab5bd',w:6})+`<circle cx="100" cy="132" r="5" fill="#5c6770"/>`;
+    if(lit){const fk=.86+.14*Math.sin(s.t*23);h+=`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(130*fk).toFixed(1)}" fill="url(#ptWhite)"/>`;for(let i=0;i<14;i++){const a=rad(i*360/14+s.t*20),r2=64+16*Math.sin(s.t*9+i*2);h+=L(px+24*Math.cos(a),py+24*Math.sin(a),px+r2*Math.cos(a),py+r2*Math.sin(a),{stroke:'#ffffff',w:3,op:.75});}h+=`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="13" fill="#fff"/>`;}
+    h+=T(206,160,'鎂帶（銀白色）',{size:15,fill:'#dfe7ea'})+T(470,392,'氧化鎂',{size:15,fill:'#fff',weight:700})+T(470,412,'白色粉末',{size:14,fill:'#dfe7ea'});
+    h+=T(290,468,'鎂 ＋ 氧 → 氧化鎂',{size:18,anchor:'middle',weight:700});
+    h+=ptFamSide(2,[3,4],3,'第 2 族：鹼土金屬',['鈹、鎂、鈣、鍶、鋇、鐳','都是銀白色的金屬','活性比同週期的鹼金屬小','鎂帶燃燒發出強烈白光，','　生成白色的氧化鎂','鈣和水反應產生氫氣，','　水溶液呈鹼性，但比鈉緩和','鎂用於煙火和質輕的合金'],184);
+    return {svg:h,reads:[['金屬','鎂（第 3 週期、第 2 族）'],['燃燒進度',fp<.7?'還沒點燃':b<1?Math.round(b*100)+'%':'燒完了'],['產物','氧化鎂（白色粉末）']],
+      note:'鎂帶在空氣中燃燒，發出<b>強烈白光</b>，生成白色的<b>氧化鎂</b>。強光會傷眼睛，實驗時不可直視。<br>鎂、鈣同在第 2 族（鹼土金屬），化學性質相似。'};},
+  fHal(s){const sel=clamp(s.hsel,0,3),IT=[['氟','F','淡黃色','氣體','#efe58a',.5,'活性最大的非金屬；牙膏裡的氟化物可以預防蛀牙。'],['氯','Cl','黃綠色','氣體','#c3d95f',.62,'有毒的氣體；自來水和游泳池用氯消毒，也用於漂白。'],['溴','Br','暗紅色','液體','#7a1c14',1,'常溫下唯一呈液態的非金屬，容易揮發成紅棕色氣體。'],['碘','I','紫黑色','固體','#43305a',1,'紫黑色固體；溶在酒精裡就是碘酒，可以消毒。']];
+    let h=PT_DEFS+T(30,44,'第 17 族　鹵素',{size:22,weight:700})+T(30,72,'點一種看說明。由上到下，狀態和顏色怎麼變？',{size:15,fill:P.muted});
+    h+=L(60,112,516,112,{stroke:P.accent,w:3,arrow:true})+T(288,102,'原子序增加：氣體 → 液體 → 固體，顏色越來越深',{size:15,anchor:'middle',fill:P.accent,weight:700});
+    IT.forEach(([n,sy,cn,st,col,op],j)=>{const cx=95+j*130,on=j===sel;let g=`<rect x="${cx-60}" y="126" width="120" height="312" rx="14" fill="${on?'#e2f3f0':'#fffdf8'}" stroke="${on?P.accent:'#ddd7c9'}" stroke-width="${on?3:1.5}"/>`;
+      if(j<2){g+=`<rect x="${cx-39}" y="166" width="78" height="170" rx="8" fill="${col}" opacity="${op}"/>`;for(let i=0;i<10;i++){const a=s.t*(.5+rnd(i+j*20)*.6)+rnd(i+j*20+5)*6.28;g+=`<circle cx="${(cx+(rnd(i+j*20+1)-.5)*56+5*Math.cos(a)).toFixed(1)}" cy="${(250+(rnd(i+j*20+2)-.5)*140+5*Math.sin(a*1.3)).toFixed(1)}" r="2.2" fill="${ptMix(col,'#6b6b10',.4)}" opacity=".4"/>`;}
+        g+=`<path d="M${cx-42} 162V328Q${cx-42} 340 ${cx-30} 340H${cx+30}Q${cx+42} 340 ${cx+42} 328V162" fill="none" stroke="#83999d" stroke-width="3.5" stroke-linecap="round"/><rect x="${cx-50}" y="152" width="100" height="9" rx="3" fill="#cfe0e5" stroke="#83999d" stroke-width="1.5"/><path d="M${cx-33} 176V318" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".7"/>`;}
+      else if(j===2){g+=`<path d="M${cx-14} 176H${cx+14}V214Q${cx+40} 224 ${cx+40} 248V326Q${cx+40} 340 ${cx+26} 340H${cx-26}Q${cx-40} 340 ${cx-40} 326V248Q${cx-40} 224 ${cx-14} 214Z" fill="#b5452f" fill-opacity=".3" stroke="#83999d" stroke-width="3.5" stroke-linejoin="round"/><path d="M${cx-37} 292H${cx+37}V326Q${cx+37} 337 ${cx+26} 337H${cx-26}Q${cx-37} 337 ${cx-37} 326Z" fill="${col}"/><rect x="${cx-18}" y="160" width="36" height="18" rx="5" fill="#c9a877" stroke="#8a6238"/><path d="M${cx-30} 250V320" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".55"/>`;}
+      else{g+=`<ellipse cx="${cx}" cy="332" rx="50" ry="9" fill="#eef6f8" stroke="#83999d" stroke-width="2.5"/>`;for(let i=0;i<11;i++){const x=cx+(rnd(i+60)-.5)*66,y=326-rnd(i+70)*14,r=5+rnd(i+80)*6;g+=`<path d="M${(x-r).toFixed(1)} ${(y+r*.5).toFixed(1)}L${(x-r*.3).toFixed(1)} ${(y-r).toFixed(1)}L${(x+r).toFixed(1)} ${(y-r*.2).toFixed(1)}L${(x+r*.5).toFixed(1)} ${(y+r*.6).toFixed(1)}Z" fill="${i%3?col:'#5a4375'}" stroke="#2a1d3a" stroke-width="1"/>`;}}
+      g+=T(cx,372,`${n}　${sy}`,{size:21,anchor:'middle',weight:700})+T(cx,398,cn,{size:16,anchor:'middle',fill:P.ink})+T(cx,422,st,{size:16,anchor:'middle',weight:700,fill:P.accent});
+      h+=`<g data-tap="h:${j}" tabindex="0" role="button" aria-label="${n}" style="cursor:pointer">${g}</g>`;});
+    h+=T(30,470,`${IT[sel][0]}：${IT[sel][6]}`,{size:16,weight:700});
+    h+=ptFamSide(17,[2,3,4,5],sel+2,'第 17 族：鹵素',['氟、氯、溴、碘…','都是活潑的非金屬','都有顏色，也都有毒','由上到下：氣體 → 液體','　→ 固體，顏色越來越深','容易和金屬化合成鹽類，','　例如氯化鈉（食鹽）','氯：自來水消毒、漂白','碘：碘酒'],184);
+    return {svg:h,reads:[['元素',`${IT[sel][0]}（${IT[sel][1]}）`],['常溫下',`${IT[sel][2]}${IT[sel][3]}`],['位置',`第 ${sel+2} 週期、第 17 族`]],
+      note:'鹵素都是<b>活潑的非金屬</b>，容易和金屬化合。常溫下氟、氯是氣體，溴是液體，碘是固體。<br><b>氯</b>用於自來水消毒；食鹽（氯化鈉）是氯和鈉的化合物，性質和氯、鈉都不同。'};},
+  fNoble(s){const sel=clamp(s.gsel,0,2),IT=[['氦','He','氣球、飛船','密度比空氣小，而且不可燃，比氫氣安全。'],['氖','Ne','霓虹燈','玻璃管裡的氖氣通電後，發出紅橘色的光。'],['氬','Ar','充入燈泡','化性不活潑，燈絲在氬氣中不容易燒斷。']];
+    let h=PT_DEFS+T(30,44,'第 18 族　鈍氣（惰性氣體）',{size:22,weight:700})+T(30,72,'都是無色的氣體，幾乎不和其他物質反應。點一種看用途',{size:15,fill:P.muted});
+    IT.forEach(([n,sy,use],j)=>{const cx=105+j*175,on=j===sel;let g=`<rect x="${cx-80}" y="96" width="160" height="340" rx="14" fill="${on?'#e2f3f0':'#fffdf8'}" stroke="${on?P.accent:'#ddd7c9'}" stroke-width="${on?3:1.5}"/>`;
+      if(j===0){const by=206+7*Math.sin(s.t*1.3),sw=6*Math.sin(s.t*1.3+1);g+=`<path d="M${cx} ${(by+66).toFixed(1)}Q${(cx+14+sw).toFixed(1)} ${(by+100).toFixed(1)} ${cx} 300T${cx} 340" fill="none" stroke="#8b6a70" stroke-width="2"/><ellipse cx="${cx}" cy="${by.toFixed(1)}" rx="52" ry="62" fill="#f2a3b3" stroke="#c8697c" stroke-width="2"/><path d="M${cx-8} ${(by+61).toFixed(1)}L${cx} ${(by+72).toFixed(1)}L${cx+8} ${(by+61).toFixed(1)}Z" fill="#e48a9c" stroke="#c8697c"/><path d="M${cx-28} ${(by-34).toFixed(1)}Q${cx-40} ${(by-14).toFixed(1)} ${cx-36} ${(by+6).toFixed(1)}" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".8"/>`+T(cx,by+8,'He',{size:24,anchor:'middle',weight:700,fill:'#fff'})+`<rect x="${cx-12}" y="338" width="24" height="10" rx="3" fill="#8d99a3"/>`;}
+      else if(j===1){const gl=.8+.2*Math.sin(s.t*2.2),d=`M${cx-46} 268V196L${cx-10} 268V196M${cx+12} 240H${cx+48}Q${cx+48} 214 ${cx+30} 214T${cx+12} 240T${cx+32} 268Q${cx+44} 268 ${cx+48} 258`;
+        g+=`<rect x="${cx-68}" y="160" width="136" height="150" rx="12" fill="#1f2b33"/><path d="${d}" fill="none" stroke="#ff7a52" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" opacity="${(.22*gl).toFixed(2)}"/><path d="${d}" fill="none" stroke="#ff8a63" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity="${(.45*gl).toFixed(2)}"/><path d="${d}" fill="none" stroke="#ffd9cc" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M${cx-40} 160V140M${cx+40} 160V140" stroke="#6b777e" stroke-width="3"/>`;}
+      else{const gl=.85+.15*Math.sin(s.t*1.7);g+=`<circle cx="${cx}" cy="226" r="78" fill="url(#ptGlow)" opacity="${(.8*gl).toFixed(2)}"/><path d="M${cx-17} 276Q${cx-52} 256 ${cx-50} 222A50 50 0 0 1 ${cx+50} 222Q${cx+52} 256 ${cx+17} 276V298H${cx-17}Z" fill="#fff6c9" fill-opacity=".85" stroke="#8fa3a8" stroke-width="2.5" stroke-linejoin="round"/><path d="M${cx-9} 298L${cx-6} 246Q${cx} 226 ${cx+6} 246L${cx+9} 298" fill="none" stroke="#f08c1a" stroke-width="2.5"/><rect x="${cx-19}" y="296" width="38" height="30" rx="4" fill="#8d99a3"/><path d="M${cx-19} 305H${cx+19}M${cx-19} 314H${cx+19}" stroke="#6b777e" stroke-width="2"/>`+T(cx+26,216,'Ar',{size:17,anchor:'middle',weight:700,fill:'#8a6d1a'});}
+      g+=T(cx,376,`${n}　${sy}`,{size:21,anchor:'middle',weight:700})+T(cx,404,use,{size:16,anchor:'middle',weight:700,fill:P.accent});
+      h+=`<g data-tap="n:${j}" tabindex="0" role="button" aria-label="${n}" style="cursor:pointer">${g}</g>`;});
+    h+=T(30,468,`${IT[sel][0]}：${IT[sel][3]}`,{size:16,weight:700});
+    h+=ptFamSide(18,[1,2,3],sel+1,'第 18 族：鈍氣（惰性氣體）',['氦、氖、氬、氪、氙、氡','都是無色、無味的氣體','化性非常不活潑，','　幾乎不和其他物質反應','氦：填充氣球、飛船','氖：霓虹燈','氬：充入燈泡保護燈絲','空氣中約有 1% 的氬'],184);
+    return {svg:h,reads:[['元素',`${IT[sel][0]}（${IT[sel][1]}）`],['用途',IT[sel][2]],['位置',`第 ${sel+1} 週期、第 18 族`]],
+      note:'第 18 族的元素都是<b>無色氣體</b>，化性非常不活潑，稱為<b>鈍氣</b>（惰性氣體）。<br>用途都和「不容易反應」有關：氦不可燃，氬可以保護燈絲。'};},
+
+  /* ---------- 5 生活中常見的元素 ---------- */
+  uses(s){const qz=s.uq,Q=PT_UQ[s.uqi%PT_UQ.length],ans=Q[1],pk=s.uqp,sel=PT_E[PT_U16.includes(s.usel)?s.usel:26];let h='';
+    PT_U16.forEach((z,i)=>{const e=PT_E[z],x=16+(i%4)*149,y=18+Math.floor(i/4)*116,c=PT_C[e.cat];let fill='#fffdf8',st='#d5cfc0',sw=1.5;
+      if(qz){if(pk&&z===ans){fill='#cfe9d6';st='#2e8b57';sw=3;}else if(pk&&z===pk){fill='#f6d5cf';st=P.red;sw=3;}}else if(z===sel.z){fill='#e2f3f0';st=P.accent;sw=3;}
+      let g=`<rect x="${x}" y="${y}" width="143" height="110" rx="12" fill="${fill}" stroke="${st}" stroke-width="${sw}"/><rect x="${x+10}" y="${y+101}" width="123" height="4" rx="2" fill="${c[1]}" opacity=".8"/>`;
+      if(qz)g+=T(x+71.5,y+58,e.sym,{size:36,anchor:'middle',weight:700})+T(x+71.5,y+88,e.name,{size:20,anchor:'middle'});
+      else{g+=ptIcon(z,x+10,y+10)+T(x+64,y+42,e.sym,{size:28,weight:700})+T(x+133,y+41,e.name,{size:22,anchor:'end',weight:700,fill:P.accent});g+=T(x+11,y+84,PT_UT[z],{size:15});}
+      h+=`<g data-tap="u:${z}" tabindex="0" role="button" aria-label="${e.name}" style="cursor:pointer">${g}</g>`;});
+    let reads,note;
+    if(qz){const okc=pk===ans,ae=PT_E[ans];h+=ptPanel(622,18,262,464)+T(636,46,`配對小測驗　第 ${s.uqi%PT_UQ.length+1} / ${PT_UQ.length} 題`,{size:15,fill:P.muted})+T(636,78,'哪一種元素？',{size:16,weight:700,fill:P.accent})+ptLines(636,112,ptWrap(Q[0],11.5),{size:19,gap:28,weight:700});
+      if(!pk)h+=T(636,212,'點左邊的元素卡作答',{size:15,fill:P.muted});
+      else h+=T(636,212,okc?`✓ 答對了：${ae.name} ${ae.sym}`:`✗ 答案是 ${ae.name} ${ae.sym}`,{size:19,weight:700,fill:okc?'#1d6b41':P.red})+ptLines(636,242,ptWrap(PT_UD[ans],14.5).slice(0,6),{size:15,gap:22});
+      h+=ptBtn('uqn',636,390,234,44,'下一題',{fill:P.accent,ink:'#fff'})+T(753,462,`答對 ${s.uqs} / ${s.uqn} 題`,{size:16,anchor:'middle',weight:700});
+      reads=[['題號',`第 ${s.uqi%PT_UQ.length+1} / ${PT_UQ.length} 題`],['答對',`${s.uqs} / ${s.uqn} 題`]];note='看用途或性質，找出是哪一種元素。答完會顯示這種元素的說明。';}
+    else{const e=sel,c=PT_C[e.cat];h+=ptPanel(622,18,262,238)+`<rect x="636" y="30" width="76" height="76" rx="10" fill="${c[0]}" stroke="${c[1]}" stroke-width="2"/>`+T(674,81,e.sym,{size:38,anchor:'middle',weight:700})+T(724,60,e.name,{size:30,weight:700})+T(724,84,`原子序 ${e.z}`,{size:15,fill:P.muted})+T(724,104,`${PT_CATN[e.cat]}・常溫${PT_STN[e.st]}`,{size:15,fill:P.accent,weight:700})
+        +ptLines(636,134,ptWrap(PT_UD[e.z],14.5).slice(0,6),{size:15,gap:22});
+      h+=ptPanel(622,264,262,218)+T(636,287,'地殼中的含量（質量）',{size:15,weight:700});
+      [[8,'氧',46],[14,'矽',28],[13,'鋁',8],[26,'鐵',5]].forEach(([z,n,v],k)=>{const y=296+k*21,on=z===e.z;h+=T(636,y+15,n,{size:15,weight:700,fill:on?P.accent:P.ink})+`<rect x="660" y="${y+3}" width="${v*3}" height="14" rx="4" fill="${on?P.accent:PT_C[PT_E[z].cat][1]}"/>`+T(666+v*3,y+15,`約 ${v}%`,{size:14,fill:on?P.accent:P.muted,weight:on?700:400});});
+      h+=T(636,403,'空氣中的含量（體積）',{size:15,weight:700});
+      [[7,'氮',78,'約 78%（4/5）'],[8,'氧',21,'約 21%（1/5）'],[18,'氬',1,'約 1%（氬、二氧化碳等）']].forEach(([z,n,v,t],k)=>{const y=411+k*21,on=z===e.z;h+=T(636,y+15,k===2?'其他':n,{size:15,weight:700,fill:on?P.accent:P.ink})+`<rect x="${k===2?674:660}" y="${y+3}" width="${Math.max(4,v*1.4)}" height="14" rx="4" fill="${on?P.accent:'#5fa67c'}"/>`+T((k===2?680:666)+Math.max(4,v*1.4),y+15,t,{size:14,fill:on?P.accent:P.muted,weight:on?700:400});});
+      reads=[['元素',`${e.name}（${e.sym}）`],['類別',PT_CATN[e.cat]],['常溫狀態',PT_STN[e.st]]];
+      note='<b>地殼</b>中含量：氧 ＞ 矽 ＞ 鋁 ＞ 鐵；含量最多的金屬是<b>鋁</b>，其次是鐵。<b>空氣</b>中含量最多的是<b>氮</b>（約 4/5），其次是氧（約 1/5）。<br>卡片下緣的色條：藍色是金屬、黃色是類金屬、綠色是非金屬。';}
+    return {svg:h,reads,note};}
+};
+
 function setCounts(s,c){for(const k of Object.keys(SPECIES))s.counts[k]=c[k]||0;}
 function lamMark(x1,x2,y,lam,c,label){return L(x1,y,x2,y,{stroke:c,w:2})+L(x1,y-8,x1,y+8,{stroke:c,w:2})+L(x2,y-8,x2,y+8,{stroke:c,w:2})+T((x1+x2)/2,y-10,label||`λ = ${lam.toFixed(2)} m`,{size:15,fill:c,anchor:'middle',weight:700});}
 
@@ -2368,5 +4748,5 @@ window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';fitStage();};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>4-4 以後的頁面：上方的編號分頁是各個小實驗，下面一行「試試看」告訴學生這一步要觀察什麼；每改一個條件，圖上會用大字顯示「改了什麼 → 變成什麼」，右側對應的控制項也會閃一下。不常用的開關收在「更多選項」。</p><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，另外先做了 5-1 溫度與溫度計、5-2 熱量與熱平衡。第三次範圍也還沒公告：5-3～6-5 依翰林第三冊目錄（5-3 比熱、5-4 熱量的傳播、5-5 熱對物質的影響、6-1 元素與化合物、6-2 生活中常見的元素、6-3 物質結構與原子、6-4 週期表、6-5 分子與化學式）預備到第三冊結束。側欄的段考分組是預估，實際範圍以學校公告為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>光路圖以「看得清楚」為先，不一定完全照真實比例：「透鏡成像 → 為什麼會偏折」把透鏡畫得比較厚，光在兩個表面各轉折一次（白點標出轉折處），每條平行光都畫成正好經過焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」和課本一樣理想化：平行光反射後都正好經過焦點 F（凸面鏡是反向延長線）。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>4-4 以後的頁面：上方的編號分頁是各個小實驗，下面一行「試試看」告訴學生這一步要觀察什麼；每改一個條件，圖上會用大字顯示「改了什麼 → 變成什麼」，右側對應的控制項也會閃一下。不常用的開關收在「更多選項」。</p><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，另外先做了 5-1 溫度與溫度計、5-2 熱量與熱平衡。第三次範圍也還沒公告：5-3～6-5 依翰林第三冊目錄（5-3 比熱、5-4 熱對物質的影響、5-5 熱的傳播方式、6-1 元素與化合物、6-2 生活中常見的元素、6-3 物質結構與原子、6-4 週期表、6-5 分子與化學式）預備到第三冊結束。側欄的段考分組是預估，實際範圍以學校公告為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>光路圖以「看得清楚」為先，不一定完全照真實比例：「透鏡成像 → 為什麼會偏折」把透鏡畫得比較厚，光在兩個表面各轉折一次（白點標出轉折處），每條平行光都畫成正好經過焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」和課本一樣理想化：平行光反射後都正好經過焦點 F（凸面鏡是反向延長線）。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>5-3 比熱：熱源每分鐘 1000 cal，不計散熱與容器吸熱；海陸溫度曲線與熱平衡的快慢為示意。液體 X、金屬甲、金屬乙是為了讓計算得到整數而設的假想物質。</li><li>5-4 熱對物質的影響：加熱曲線只畫到部分汽化；膨脹量與湖水溫度分布的圖示已放大；硫酸銅、暖暖包等的溫度數值為示意。</li><li>5-5 熱的傳播方式：金屬棒的溫度依熱傳導計算，其餘的時間、溫度與散熱快慢為示意，動畫已加快。</li><li>第 6 章：粒子圖、分子形狀與電解水的氣體量為示意；金屬、鑽石、食鹽不是一個個分子。原子核與粒子的大小都已放大；α 粒子散射的軌跡依電的排斥力計算，但每個 α 粒子只算遇到一個原子核；電子的排列為示意。週期表中 104 號以後元素的常溫狀態標為未確定；導熱與鹼金屬反應的時間為示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
 activate(location.hash.slice(1)||'lens');
