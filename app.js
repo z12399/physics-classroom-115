@@ -4723,7 +4723,7 @@ function activate(h){
   route={view:r.view,mode};const key=lab;
   cancelAnimationFrame(raf);audioSync(false);current=key;cfg=LABS[key];state=structuredClone(cfg.state);
   document.querySelectorAll('nav a').forEach(a=>{const on=a.dataset.view===r.view;a.classList.toggle('active',on);on?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');if(on){const d=a.closest('details');if(d)d.open=true;}});
-  document.getElementById('secno').textContent=V.n;document.getElementById('title').textContent=V.name;document.title=V.n+' '+V.name+'｜理化實驗室';
+  let sn=document.getElementById('secno');if(!sn){sn=document.createElement('span');sn.id='secno';sn.className='secno';const t=document.getElementById('title');t.parentNode.insertBefore(sn,t);}sn.textContent=V.n;const sub=document.getElementById('subtitle');if(sub)sub.remove();document.getElementById('title').textContent=V.name;document.title=V.n+' '+V.name+'｜理化實驗室';
   const si=cfg.steps?cfg.controls.findIndex(c=>c.type==='seg'&&c.key===cfg.steps):-1,st=cfg.controls[si],guided=!!(cfg.steps||cfg.tasks);
   if(st&&st.options.some(([v])=>v===mode)){state[cfg.steps]=mode;if(st.onChange)st.onChange(state);}
   const basic=cfg.controls.map((c,i)=>i===si||c.adv?'':controlHTML(c,i)).join(''),adv=cfg.controls.map((c,i)=>c.adv?controlHTML(c,i):'').join('');
@@ -4771,4 +4771,6 @@ document.getElementById('focus').onclick=()=>{const on=document.body.classList.t
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
 document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li>上方分頁是這一節的幾個小實驗，依序上即可。</li><li>黃色那一行是這一步要觀察的事；先讓學生預測，再操作。</li><li>每改一個條件，圖上會短暫顯示「改了什麼 → 變成什麼」。</li><li>圖下方有「想一想」和例題，答案預設收起來。</li></ol><p>投影時按右上角「投影模式」，側欄會收起、字放大。教室網路不穩可以下載「離線版」，雙擊 HTML 就能用。</p><h3>範圍</h3><p>第三次段考：5-2 熱量～6-5 分子與化學式（翰林第三冊結束）。第六章依課本節次排列，6-1、6-2、6-4、6-5 是同一組互動拆成各節。前兩次段考的單元收在側欄下方。</p><h3>模型說明</h3><ul><li>各單元是理想模型，圖示不等於實物比例；除了標明「考慮散熱」的地方，都不計散熱與容器吸熱。</li><li>熱源每分鐘 1000 cal；熱平衡、熱傳導、輻射的快慢已加快，數值為示意。液體 X、金屬甲、金屬乙是為了讓計算得到整數的假想物質。</li><li>膨脹量、湖水溫度分布已放大；加熱曲線只畫到部分汽化。</li><li>第六章的粒子圖、分子形狀、電解水的氣體量為示意；金屬、鑽石、食鹽不是一個個分子。原子核與粒子大小已放大，電子排列為示意。</li><li>光學為幾何光學，透鏡與面鏡採近軸近似；實線是實際光路，虛線是反向延長線。</li><li>右側實物圖是 AI 生成的示意插圖，點一下可以放大。</li></ul>`;dialog.showModal();};
-activate(location.hash.slice(1)||'5-2');
+/* 舊書籤（#lens 或沒有 #）第一次打開時一律進第三次段考的 5-2；同一個分頁之後重新整理才保留原單元 */
+(()=>{let h=location.hash.slice(1),seen=false;try{seen=sessionStorage.getItem('v3')==='1';sessionStorage.setItem('v3','1');}catch(e){}
+  if(!h||(!seen&&h==='lens')){h='5-2';history.replaceState(null,'','#5-2');}activate(h);})();
