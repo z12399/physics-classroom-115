@@ -2217,7 +2217,7 @@ heat:{group:3,n:'5-2',keep:['mode'],steps:'mode',
       +`<path d="M170 222V410H310V222" fill="none" stroke="#7e8b92" stroke-width="5"/>`;
     h+=glassTherm(285,385,150,365-a*2.1,{c:ALC,br:9,w:4})+glassTherm(365,402,150,382-b*2.1,{c:ALC,br:9,w:4});
     {const ca=Math.abs(a-b)<.2?P.accent:a>b?P.red:P.blue,cb=Math.abs(a-b)<.2?P.accent:a>b?P.blue:P.red;h+=T(222,330,tnum(a)+'°C',{size:22,anchor:'middle',weight:700,fill:ca})+T(130,350,tnum(b)+'°C',{size:20,anchor:'middle',weight:700,fill:cb});}
-    h+=T(240,212,`A（內杯）${s.ma} g`,{size:16,anchor:'middle',weight:700})+T(240,456,`B（外杯）${s.mb} g`,{size:16,anchor:'middle',weight:700});
+    h+=T(212,212,`A（內杯）${s.ma} g`,{size:16,anchor:'middle',weight:700})+T(240,456,`B（外杯）${s.mb} g`,{size:16,anchor:'middle',weight:700});
     if(!eq){const out=a>b;h+=out?L(176,300,108,300,{stroke:P.red,w:4,arrow:true})+L(304,300,338,300,{stroke:P.red,w:4,arrow:true}):L(108,300,176,300,{stroke:P.red,w:4,arrow:true})+L(338,300,304,300,{stroke:P.red,w:4,arrow:true});
       h+=T(140,292,'熱',{size:15,anchor:'middle',fill:P.red,weight:700});}
     if(s.loss&&Math.abs(b-25)>.5){const o=b>25;[[86,340,50,340],[394,340,430,340]].forEach(([x1,y1,x2,y2])=>{h+=o?L(x1,y1,x2,y2,{stroke:P.muted,w:2.5,arrow:true}):L(x2,y2,x1,y1,{stroke:P.muted,w:2.5,arrow:true});});h+=T(40,322,o?'散熱':'吸熱',{size:14,fill:P.muted});}
@@ -4705,29 +4705,46 @@ const PHOTO_OF={
 let lastPhoto;
 function setPhoto(){const f=PHOTO_OF[current],k=f?f(state):null,fig=labEl.querySelector('.photo');if(k===lastPhoto||!fig)return;lastPhoto=k;fig.hidden=!k;if(k){fig.querySelector('img').src=PHOTOS[k][0];fig.querySelector('figcaption').innerHTML=PHOTOS[k][1];}}
 function openPhoto(k){document.getElementById('info-content').innerHTML=`<img class="photo-big" src="${PHOTOS[k][0]}" alt=""><p>${PHOTOS[k][1]}</p><p class="small">插圖由 AI 生成，僅供示意。</p>`;dialog.showModal();}
-function activate(key){
-  if(!LABS[key])key='lens';cancelAnimationFrame(raf);audioSync(false);current=key;cfg=LABS[key];state=structuredClone(cfg.state);
-  document.querySelectorAll('nav a').forEach(a=>{const on=a.dataset.key===key;a.classList.toggle('active',on);on?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');});
-  document.getElementById('title').textContent=cfg.name;document.getElementById('subtitle').textContent=cfg.subtitle;document.title=cfg.name+'｜理化實驗室';
-  /* 引導版面（4-4、4-5）：子實驗變成圖上方的分頁＋「試試看」，進階選項收進「更多選項」 */
+/* ---------- 單元（導覽的一格）：多數一格就是一個實驗；第六章依課本節次，從幾個實驗裡挑分頁組成 ---------- */
+const VIEWS={
+  '6-1':{n:'6-1',name:'元素與化合物',tabs:[['compound','sort'],['compound','split'],['ptable','names']]},
+  '6-2':{n:'6-2',name:'生活中常見的元素',tabs:[['ptable','props'],['ptable','uses']]},
+  '6-4':{n:'6-4',name:'週期表',tabs:[['ptable','table'],['ptable','family']]},
+  '6-5':{n:'6-5',name:'分子與化學式',tabs:[['compound','kinds'],['compound','formula'],['compound','build']]}};
+const VIEW_OF_LAB={heat:'5-2',spec:'5-3',phase:'5-4',transfer:'5-5',atom:'6-3'};
+for(const[k,v]of Object.entries(VIEW_OF_LAB))VIEWS[v]={n:LABS[k].n,name:LABS[k].name,lab:k};
+for(const[k,t]of Object.entries(LABS))if(!VIEW_OF_LAB[k])VIEWS[k]={n:t.n,name:t.name,lab:k};
+let route={view:'5-2',mode:null};
+function parseRoute(h){let[v,m]=decodeURIComponent(h||'').replace(/^#/,'').split('/');if(!VIEWS[v])v=VIEW_OF_LAB[v]||'5-2';return{view:v,mode:m||null};}
+const routeHash=(v,m)=>'#'+v+(m?'/'+m:'');
+function activate(h){
+  const r=parseRoute(h),V=VIEWS[r.view];let lab=V.lab,mode=r.mode;
+  if(V.tabs){const t=V.tabs.find(([,m])=>m===mode)||V.tabs[0];lab=t[0];mode=t[1];}
+  route={view:r.view,mode};const key=lab;
+  cancelAnimationFrame(raf);audioSync(false);current=key;cfg=LABS[key];state=structuredClone(cfg.state);
+  document.querySelectorAll('nav a').forEach(a=>{const on=a.dataset.view===r.view;a.classList.toggle('active',on);on?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');if(on){const d=a.closest('details');if(d)d.open=true;}});
+  document.getElementById('secno').textContent=V.n;document.getElementById('title').textContent=V.name;document.title=V.n+' '+V.name+'｜理化實驗室';
   const si=cfg.steps?cfg.controls.findIndex(c=>c.type==='seg'&&c.key===cfg.steps):-1,st=cfg.controls[si],guided=!!(cfg.steps||cfg.tasks);
+  if(st&&st.options.some(([v])=>v===mode)){state[cfg.steps]=mode;if(st.onChange)st.onChange(state);}
   const basic=cfg.controls.map((c,i)=>i===si||c.adv?'':controlHTML(c,i)).join(''),adv=cfg.controls.map((c,i)=>c.adv?controlHTML(c,i):'').join('');
-  /* cfg.stepGroups：分頁分成幾組（例如課綱內／延伸），延伸組用字母編號 */
-  const tabBtn=(j,n)=>`<button type="button" data-c="${si}" data-o="${j}"><i>${n}</i>${st.options[j][1]}</button>`,idxOf=k=>st.options.findIndex(([v])=>v===k);
-  const tabs=!st?'':cfg.stepGroups?cfg.stepGroups.map(g=>`<div class="step-group${g.ext?' ext':''}"><span class="step-group-label">${g.label}</span><div class="seg" role="group" aria-label="${g.label}">${g.keys.map((k,n)=>tabBtn(idxOf(k),g.ext?String.fromCharCode(65+n):n+1)).join('')}</div></div>`).join('')
-    :`<div class="seg" role="group" aria-label="${st.label}">${st.options.map((o,j)=>tabBtn(j,j+1)).join('')}</div>`;
-  const top=!guided?'':`<div class="steps">${st?`<div class="control step-tabs" data-c="${si}">${tabs}</div>`:''}<p class="task"></p></div>`;
-  const tail=`<div class="readouts"></div><p class="note"></p>${adv?`<details class="more"><summary>更多選項</summary>${adv}</details>`:''}<figure class="photo" hidden title="點一下放大" tabindex="0" role="button" aria-label="放大實物圖"><img alt=""><figcaption></figcaption></figure><button type="button" class="btn ghost reset">↺ 重設</button>`;
+  const idxOf=k=>st.options.findIndex(([v])=>v===k);
+  const tabBtn=(j,n)=>`<button type="button" data-c="${si}" data-o="${j}"><i>${n}</i>${st.options[j][1]}</button>`;
+  let tabs='';
+  if(st&&V.tabs)tabs=`<div class="seg" role="group" aria-label="${V.name}">${V.tabs.map(([l,m],n)=>{if(l===key)return tabBtn(idxOf(m),n+1);const L2=LABS[l],o=L2.controls.find(c=>c.type==='seg'&&c.key===L2.steps).options.find(([v])=>v===m);return `<a href="${routeHash(r.view,m)}"><i>${n+1}</i>${o[1]}</a>`;}).join('')}</div>`;
+  else if(st&&cfg.stepGroups)tabs=cfg.stepGroups.map(g=>`<div class="step-group${g.ext?' ext':''}"><span class="step-group-label">${g.label}</span><div class="seg" role="group" aria-label="${g.label}">${g.keys.map((k,n)=>tabBtn(idxOf(k),g.ext?String.fromCharCode(65+n):n+1)).join('')}</div></div>`).join('');
+  else if(st)tabs=`<div class="seg" role="group" aria-label="${st.label}">${st.options.map((o,j)=>tabBtn(j,j+1)).join('')}</div>`;
+  const top=!guided?'':`${st?`<div class="steps"><div class="control step-tabs" data-c="${si}">${tabs}</div></div>`:''}<p class="task"></p>`;
+  const tail=`<div class="readouts"></div><p class="note"></p>${adv?`<details class="more"><summary>更多選項</summary>${adv}</details>`:''}<figure class="photo" hidden title="點一下放大" tabindex="0" role="button" aria-label="放大實物圖"><img alt=""><figcaption></figcaption></figure><button type="button" class="btn ghost reset">重設</button>`;
   labEl.classList.toggle('guided',guided);
-  labEl.innerHTML=`${top}<div class="sim-layout"><div class="viz-panel${cfg.dark?' dark':''}"><svg id="scene" viewBox="0 0 900 500" role="img" aria-label="${cfg.name}"></svg>${guided?'<div class="change-toast" aria-live="polite"></div>':''}${cfg.drag?'<p class="drag-hint"><i></i>虛線圓圈可以直接拖曳</p>':''}</div><div class="controls">${guided?basic+tail:cfg.controls.map(controlHTML).join('')+tail}</div></div><section class="question">${lastQ=questionHTML()}</section>`;
+  labEl.innerHTML=`<div class="lesson">${top}<div class="sim-layout"><div class="viz-panel${cfg.dark?' dark':''}"><svg id="scene" viewBox="0 0 900 500" role="img" aria-label="${V.name}"></svg>${guided?'<div class="change-toast" aria-live="polite"></div>':''}${cfg.drag?'<p class="drag-hint"><i></i>虛線圓圈可以拖曳</p>':''}</div><div class="controls">${guided?basic+tail:cfg.controls.map(controlHTML).join('')+tail}</div></div></div><section class="question">${lastQ=questionHTML()}</section>`;
   svgEl=labEl.querySelector('#scene');lastPhoto=undefined;ann.base=null;render();fitStage();
   if(cfg.tick){let last=0;const loop=now=>{const dt=last?Math.min((now-last)/1000,0.1):0;last=now;cfg.tick(state,dt);render();raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);}
   const act=document.querySelector('nav a.active');if(act&&matchMedia('(max-width:760px)').matches)act.scrollIntoView({block:'nearest',inline:'center'});
-  else if(act){const sb=document.querySelector('.sidebar'),r=act.getBoundingClientRect(),rs=sb.getBoundingClientRect();if(r.bottom>rs.bottom||r.top<rs.top)sb.scrollTop+=r.top-rs.top-rs.height/2;}
+  else if(act){const sb=document.querySelector('.sidebar'),rr=act.getBoundingClientRect(),rs=sb.getBoundingClientRect();if(rr.bottom>rs.bottom||rr.top<rs.top)sb.scrollTop+=rr.top-rs.top-rs.height/2;}
 }
 labEl.addEventListener('input',e=>{const c=cfg.controls[e.target.dataset.c];if(!c)return;const before=snapCtl();if(c.type==='range')state[c.key]=+e.target.value;else if(c.type==='toggle'){state[c.key]=e.target.checked;if(c.onChange)c.onChange(state);}render();announce(before,null,+e.target.dataset.c);});
-labEl.addEventListener('click',e=>{const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){if(e.detail===0){cfg.tap(state,tp.dataset.tap);render();}return;}const ph=e.target.closest('.photo');if(ph&&lastPhoto){openPhoto(lastPhoto);return;}const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset')){const keep=(cfg.keep||[]).map(k=>[k,state[k]]);activate(current);if(keep.length){for(const[k,v]of keep){state[k]=v;const c=cfg.controls.find(c=>c.key===k&&c.onChange);if(c)c.onChange(state);}render();}return;}const before=snapCtl();if(b.dataset.qa&&cfg.qAction){cfg.qAction(state,b.dataset.qa);render();announce(before,null,null);return;}const c=cfg.controls[b.dataset.c];if(!c)return;
-  if(c.type==='seg'){state[c.key]=c.options[b.dataset.o][0];if(c.onChange)c.onChange(state);}else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();announce(before,c.type==='buttons'?b.textContent:null,c.type==='seg'?+b.dataset.c:null);});
+labEl.addEventListener('click',e=>{const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){if(e.detail===0){cfg.tap(state,tp.dataset.tap);render();}return;}const ph=e.target.closest('.photo');if(ph&&lastPhoto){openPhoto(lastPhoto);return;}const b=e.target.closest('button');if(!b)return;if(b.classList.contains('reset')){const keep=(cfg.keep||[]).map(k=>[k,state[k]]);activate(routeHash(route.view,route.mode));if(keep.length){for(const[k,v]of keep){state[k]=v;const c=cfg.controls.find(c=>c.key===k&&c.onChange);if(c)c.onChange(state);}render();}return;}const before=snapCtl();if(b.dataset.qa&&cfg.qAction){cfg.qAction(state,b.dataset.qa);render();announce(before,null,null);return;}const c=cfg.controls[b.dataset.c];if(!c)return;
+  if(c.type==='seg'){state[c.key]=c.options[b.dataset.o][0];if(c.onChange)c.onChange(state);if(c.key===cfg.steps&&b.closest('.step-tabs')){route.mode=state[c.key];history.replaceState(null,'',routeHash(route.view,route.mode));}}else if(c.type==='buttons')c.items[b.dataset.a][1](state);else if(c.type==='counter')state[c.key][b.dataset.k]=Math.max(0,state[c.key][b.dataset.k]+ +b.dataset.d);else return;render();announce(before,c.type==='buttons'?b.textContent:null,c.type==='seg'?+b.dataset.c:null);});
 labEl.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tp=e.target.closest('[data-tap]');if(tp&&cfg.tap){e.preventDefault();const id=tp.dataset.tap;cfg.tap(state,id);render();const again=svgEl.querySelector(`[data-tap="${id}"]`);if(again)again.focus();return;}if(e.target.closest('.photo')&&lastPhoto){e.preventDefault();openPhoto(lastPhoto);}});
 const svgPoint=e=>{const p=svgEl.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svgEl.getScreenCTM().inverse());};
 labEl.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-drag]');if(!h||!cfg.drag||!cfg.drag[h.dataset.drag])return;e.preventDefault();drag={name:h.dataset.drag,p0:svgPoint(e),s0:structuredClone(state),before:snapCtl()};svgEl.setPointerCapture(e.pointerId);labEl.classList.add('dragging');});
@@ -4741,12 +4758,17 @@ labEl.addEventListener('pointerup',e=>{const t=tapStart;tapStart=null;if(!t)retu
 labEl.addEventListener('pointercancel',()=>{tapStart=null;});
 
 /* ---------- 頁面 ---------- */
-const NAV_GROUPS=['','第一次段考','第二次段考 · 光學','第二次段考 · 溫度與熱','第三次段考 · 溫度與熱（續）','第三次段考 · 物質的基本結構'];
-let nav='';[1,2,3,4,5].forEach(g=>{const list=Object.entries(LABS).filter(([,t])=>t.group===g);if(!list.length)return;nav+=`<div class="nav-group-label">${NAV_GROUPS[g]}</div>`;list.forEach(([key,t])=>{nav+=`<a href="#${key}" data-key="${key}"><span class="count" aria-hidden="true">${t.n}</span>${t.name}</a>`;});});
+const NAV=[
+  {exam:'第三次段考',open:true,ch:[['第五章　溫度與熱',['5-2','5-3','5-4','5-5']],['第六章　物質的基本結構',['6-1','6-2','6-3','6-4','6-5']]]},
+  {exam:'第二次段考',ch:[['第四章　光、影像與顏色',['shadow','mirror','curved','refraction','lens','life','color','colorfree']],['第五章　溫度與熱',['temp']]]},
+  {exam:'第一次段考',ch:[['第一、二章',['measure','density','matter','solution']],['第三章　波動與聲音',['wave','source','sound','echo']]]}];
+const navLink=id=>`<a href="#${id}" data-view="${id}"><span class="count" aria-hidden="true">${VIEWS[id].n}</span><span class="nm">${VIEWS[id].name}</span></a>`;
+const navCh=ch=>ch.map(([t,ids])=>`<div class="nav-ch">${t}</div>${ids.map(navLink).join('')}`).join('');
+const nav=NAV.map(g=>g.open?`<div class="nav-exam current"><div class="nav-exam-label">${g.exam}</div>${navCh(g.ch)}</div>`:`<details class="nav-exam"><summary class="nav-exam-label">${g.exam}</summary>${navCh(g.ch)}</details>`).join('');
 document.getElementById('nav').innerHTML=nav;
 window.addEventListener('hashchange',()=>activate(location.hash.slice(1)));
 document.getElementById('focus').onclick=()=>{const on=document.body.classList.toggle('projection');document.getElementById('focus').textContent=on?'結束投影':'投影模式';fitStage();};
 const dialog=document.getElementById('info');dialog.querySelector('.close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li><b>先猜：</b>只改一個條件，請學生預測結果。</li><li><b>操作：</b>拖動圖中的虛線圓圈或右側控制項，驗證預測。</li><li><b>解釋：</b>對照右側數值與說明，再展開「看解釋」。</li></ol><p>4-4 以後的頁面：上方的編號分頁是各個小實驗，下面一行「試試看」告訴學生這一步要觀察什麼；每改一個條件，圖上會用大字顯示「改了什麼 → 變成什麼」，右側對應的控制項也會閃一下。不常用的開關收在「更多選項」。</p><p>「投影模式」會隱藏側欄、放大操作區。教室網路不穩時可下載離線版，雙擊 HTML 即可使用，不需安裝或帳號。</p><h3>範圍</h3><p>校方 115 學年度第一學期行事曆：第一次段考 10/5–10/6、第二次 11/25–11/26（<a href="https://www.thsh.tp.edu.tw/uploads/178591837953198rrnVIS.pdf" target="_blank" rel="noopener">行事曆</a>）。第一次範圍已核實為翰林 B3 Ch1～Ch3（<a href="https://www.thsh.tp.edu.tw/uploads/17902147214252um1mhto.pdf" target="_blank" rel="noopener">公告第 5 頁</a>）。第二次今年尚未公告，光學單元依 <a href="https://www.thsh.tp.edu.tw/uploads/1763512990199UYTfRHNp.pdf" target="_blank" rel="noopener">114 學年度第二次範圍</a>（B3 4-1～4-5）預備，另外先做了 5-1 溫度與溫度計、5-2 熱量與熱平衡。第三次範圍也還沒公告：5-3～6-5 依翰林第三冊目錄（5-3 比熱、5-4 熱對物質的影響、5-5 熱的傳播方式、6-1 元素與化合物、6-2 生活中常見的元素、6-3 原子結構、6-4 週期表、6-5 分子與化學式）預備到第三冊結束。側欄的段考分組是預估，實際範圍以學校公告為準。</p><h3>模型說明</h3><ul><li>各單元為理想模型，圖示不等於實物比例。</li><li>光學單元依講義 4-1～4-5 編排；為幾何光學，透鏡與面鏡成像採近軸近似。實線是實際光路，虛線是反向延長線。</li><li>國中不教透鏡成像公式與折射定律的 sin 式；頁面以成像規律、三條主要光線和「光速快慢」說明，公式只放在標明「延伸（高中）」的地方。</li><li>光路圖以「看得清楚」為先，不一定完全照真實比例：「透鏡成像 → 為什麼會偏折」把透鏡畫得比較厚，光在兩個表面各轉折一次（白點標出轉折處），每條平行光都畫成正好經過焦點；「焦點與焦距」「成像」用理想的薄透鏡。</li><li>「光具座實驗」紙屏上的模糊程度與燭焰影像為示意，實際操作以課本實驗步驟為準。</li><li>曲面鏡的「單束光／平行光」和課本一樣理想化：平行光反射後都正好經過焦點 F（凸面鏡是反向延長線）。</li><li>「生活中的透鏡」的照相機、投影機、放大鏡、顯微鏡與眼睛尺寸為示意比例。</li><li>溶解度曲線為常見課本數據的近似值。聲音頁預設不發聲，「多變的聲音」可自行開啟播放（請先調低音量）。</li><li>發聲體與空氣粒子的振動已放慢並放大，方便觀察；動物可聽範圍為約略值。</li><li>色光三原色用紅、綠、藍光的開關示意（螢幕上的顏色不是真實的光強度）。顏料三原色採理化常用的青、洋紅、黃（與美術課的紅黃藍不同）；真實顏料全混通常是暗褐色而非純黑。</li><li>溫度與熱：除了打開「考慮散熱」，都不計散熱與容器吸熱；熱源每分鐘 1000 cal、熱平衡的快慢、雙金屬片的彎曲程度與熱敏電阻的數值都是示意。</li><li>5-3 比熱：熱源每分鐘 1000 cal，不計散熱與容器吸熱；海陸溫度曲線與熱平衡的快慢為示意。液體 X、金屬甲、金屬乙是為了讓計算得到整數而設的假想物質。</li><li>5-4 熱對物質的影響：加熱曲線只畫到部分汽化；膨脹量與湖水溫度分布的圖示已放大；硫酸銅、暖暖包等的溫度數值為示意。</li><li>5-5 熱的傳播方式：金屬棒的溫度依熱傳導計算，其餘的時間、溫度與散熱快慢為示意，動畫已加快。</li><li>第 6 章：粒子圖、分子形狀與電解水的氣體量為示意；金屬、鑽石、食鹽不是一個個分子。原子核與粒子的大小都已放大；α 粒子散射的軌跡依電的排斥力計算，但每個 α 粒子只算遇到一個原子核；電子的排列為示意。週期表中 104 號以後元素的常溫狀態標為未確定；導熱與鹼金屬反應的時間為示意。</li><li>右側的「實物圖」是 AI 生成的示意插圖，用來連結生活與實驗器材，細節不一定與真實器材完全相同；點一下可以放大。</li><li>光路動畫的速度只是示意（真實光速約 3×10⁸ m/s）；稜鏡的色散程度有放大，方便觀察。</li></ul><p class="small">原創互動教材，不是校方公告。</p>`;dialog.showModal();};
-activate(location.hash.slice(1)||'lens');
+document.getElementById('guide').onclick=()=>{document.getElementById('info-content').innerHTML=`<h2>使用說明</h2><ol><li>上方分頁是這一節的幾個小實驗，依序上即可。</li><li>黃色那一行是這一步要觀察的事；先讓學生預測，再操作。</li><li>每改一個條件，圖上會短暫顯示「改了什麼 → 變成什麼」。</li><li>圖下方有「想一想」和例題，答案預設收起來。</li></ol><p>投影時按右上角「投影模式」，側欄會收起、字放大。教室網路不穩可以下載「離線版」，雙擊 HTML 就能用。</p><h3>範圍</h3><p>第三次段考：5-2 熱量～6-5 分子與化學式（翰林第三冊結束）。第六章依課本節次排列，6-1、6-2、6-4、6-5 是同一組互動拆成各節。前兩次段考的單元收在側欄下方。</p><h3>模型說明</h3><ul><li>各單元是理想模型，圖示不等於實物比例；除了標明「考慮散熱」的地方，都不計散熱與容器吸熱。</li><li>熱源每分鐘 1000 cal；熱平衡、熱傳導、輻射的快慢已加快，數值為示意。液體 X、金屬甲、金屬乙是為了讓計算得到整數的假想物質。</li><li>膨脹量、湖水溫度分布已放大；加熱曲線只畫到部分汽化。</li><li>第六章的粒子圖、分子形狀、電解水的氣體量為示意；金屬、鑽石、食鹽不是一個個分子。原子核與粒子大小已放大，電子排列為示意。</li><li>光學為幾何光學，透鏡與面鏡採近軸近似；實線是實際光路，虛線是反向延長線。</li><li>右側實物圖是 AI 生成的示意插圖，點一下可以放大。</li></ul>`;dialog.showModal();};
+activate(location.hash.slice(1)||'5-2');
